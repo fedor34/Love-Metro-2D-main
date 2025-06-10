@@ -2,6 +2,10 @@ using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
+/// <summary>
+/// Упрощённая версия поведения пассажира, перед появлением WandererNew.
+/// Следует за назначенными точками и взаимодействует с поручнями.
+/// </summary>
 public class Wanderer : MonoBehaviour
 {
 
@@ -36,6 +40,7 @@ public class Wanderer : MonoBehaviour
 
     public void SetCurrentTargetPositionInfo(WanderingPoint wanderingPoint, bool isUnderHandrail, int targetPositionLayer)
     {
+        // освобождаем предыдущую точку, если таковая была
         if(_currentTargetWanderingPoint != null)
             _currentTargetWanderingPoint.IsOccupied = false;
         _currentTargetWanderingPoint = wanderingPoint;

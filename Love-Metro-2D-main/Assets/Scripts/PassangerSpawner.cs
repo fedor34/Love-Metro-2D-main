@@ -2,6 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+// Класс отвечает за создание пассажиров в случайных точках
+// и назначение им начальных параметров
+
 public class PassangerSpawner : MonoBehaviour
 {
     [SerializeField] private List<Transform> _spawnLocations;
@@ -14,6 +17,8 @@ public class PassangerSpawner : MonoBehaviour
 
     [SerializeField] private int passangerCount;
     [SerializeField] private Vector3[] _possibleStartMovingDirections;
+
+    // Создаёт пачку пассажиров в доступных точках
     public void spawnPassangers()
     {
         Debug.Log("====== НАЧАЛО СПАВНА ПАССАЖИРОВ ======");
@@ -180,7 +185,7 @@ public class PassangerSpawner : MonoBehaviour
         spawnPassangers();
     }
 
-    // Вспомогательный метод для перемешивания списка
+    // Вспомогательный метод для случайного перемешивания списка
     private void ShuffleList<T>(List<T> list)
     {
         int n = list.Count;

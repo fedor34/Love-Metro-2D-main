@@ -2,6 +2,10 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [RequireComponent(typeof(Rigidbody2D), typeof(PassangerAnimator), typeof(Collider2D))]
+/// <summary>
+/// Основной класс пассажира. Содержит конечный автомат состояний:
+/// блуждание, удержание поручня, падение и соединение в пару.
+/// </summary>
 public class WandererNew : MonoBehaviour
 {
     private delegate void ReleaseHandrail();
@@ -48,6 +52,9 @@ public class WandererNew : MonoBehaviour
 
     public bool IsInCouple = false;
 
+    /// <summary>
+    /// Инициализация пассажира: установка начального состояния и подписка на поезд.
+    /// </summary>
     public void Initiate(Vector3 initialMovingDirection, TrainManager train, ScoreCounter scoreCounter)
     {
         _initialMovingDirection = initialMovingDirection;

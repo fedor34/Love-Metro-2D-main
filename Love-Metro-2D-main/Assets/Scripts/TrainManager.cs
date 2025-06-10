@@ -2,6 +2,10 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+// Этот класс управляет движением поезда и следит за событиями
+// начала и конца торможения. Также он отвечает за остановки и
+// повторный запуск состава после спавна пассажиров.
+
 public class TrainManager : MonoBehaviour
 {
     public delegate void StartInertia(Vector2 force);
@@ -37,6 +41,7 @@ public class TrainManager : MonoBehaviour
 
     private bool stopCoroutineStarted = false; // Флаг для задержки остановки
 
+    // Инициализация начальной скорости и кэширование важных объектов
     private void Start()
     {
         SetSpeed(_minSpeed);
@@ -44,6 +49,7 @@ public class TrainManager : MonoBehaviour
         _spawner = FindObjectOfType<PassangerSpawner>();
     }
 
+    // Устанавливает скорость поезда с учетом ограничений
     private void SetSpeed(float newSpeed)
     {
         _currentSpeed = newSpeed;
@@ -51,6 +57,7 @@ public class TrainManager : MonoBehaviour
     }
 
     private float _elapsedTime = 0;
+    // Основной цикл управления движением поезда
     private void Update()
     {
         _previousSpeed = _currentSpeed;
@@ -117,14 +124,17 @@ public class TrainManager : MonoBehaviour
         Debug.Log($"[TrainManager] Speed: {_currentSpeed:F2}, Distance: {_distanceTraveled:F2}");
     }
 
-    // Корутина задержки остановки поезда, если осталось 2 пассажира
+    // Корутина ожидания перед полной остановкой поезда,
+    // запускается когда больше нет возможных пар
     private IEnumerator StopAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
         StartCoroutine(HandleTrainStop());
     }
 
-    // Корутина остановки поезда, удаления пар и пассажиров, спавна новых
+    // Полная последовательность остановки и перезапуска поезда
+    // удаляет старые пары, спавнит новых пассажиров и
+    // вновь начинает движение
     private IEnumerator HandleTrainStop()
     {
         _isStopped = true;

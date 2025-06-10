@@ -5,9 +5,11 @@ using UnityEngine;
 [RequireComponent(typeof(Animator), typeof(SpriteRenderer))]
 public class PassangerAnimator : MonoBehaviour
 {
+    // Ссылки на компоненты анимации и спрайта
     private Animator _animator;
     private SpriteRenderer _spriteRenderer;
 
+    // Кэшируем имена параметров анимации для удобства
     private const string IsWalking = "IsWalking";
     private const string IsFalling = "IsFalling";
     private const string IsHolding = "IsHolding";
@@ -15,10 +17,14 @@ public class PassangerAnimator : MonoBehaviour
 
     private void Awake()
     {
+        // Находим компоненты при инициализации
         _animator = GetComponent<Animator>();
         _spriteRenderer = GetComponent<SpriteRenderer>();
     }
     
+    /// <summary>
+    /// Разворот спрайта в нужную сторону.
+    /// </summary>
     public void ChangeFacingDirection(bool isFacingRight)
     {
         if (isFacingRight)
@@ -29,7 +35,6 @@ public class PassangerAnimator : MonoBehaviour
 
     public void SetWalkingState(bool isWalking)
     {
-
         _animator.SetBool(IsWalking, isWalking);
     }
 
@@ -43,6 +48,9 @@ public class PassangerAnimator : MonoBehaviour
         _animator.SetBool(IsFalling, isFalling);
     }
 
+    /// <summary>
+    /// Воспроизводит короткую анимацию столкновения (bump).
+    /// </summary>
     public void ActivateBumping()
     {
         _animator.SetTrigger(Bumping);

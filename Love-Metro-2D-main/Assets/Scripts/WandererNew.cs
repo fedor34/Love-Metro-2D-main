@@ -1,8 +1,9 @@
 using UnityEngine;
 using UnityEngine.Events;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(Rigidbody2D), typeof(PassangerAnimator), typeof(Collider2D))]
-public class WandererNew : MonoBehaviour
+public class WandererNew : MonoBehaviour, IFieldEffectTarget
 {
     private delegate void ReleaseHandrail();
     private ReleaseHandrail releaseHandrail;
@@ -47,18 +48,24 @@ public class WandererNew : MonoBehaviour
     public PassangersContainer container; // Ссылка на контейнер
 
     public bool IsInCouple = false;
+    
+    // Эффекты поля
+    private Dictionary<FieldEffectType, Vector2> _activeFieldForces = new Dictionary<FieldEffectType, Vector2>();
+    private List<IFieldEffect> _currentEffects = new List<IFieldEffect>();
 
     public void Initiate(Vector3 initialMovingDirection, TrainManager train, ScoreCounter scoreCounter)
     {
-        _initialMovingDirection = initialMovingDirection;
+        Debug.Log($"[WandererNew] Инициализация {name}");
         
-
+        _initialMovingDirection = initialMovingDirection;
         CurrentMovingDirection = _initialMovingDirection.normalized;
 
         _scoreCounter = scoreCounter;
-        _rigidbody = GetComponent<Rigidbody2D>();
-        PassangerAnimator = GetComponent<PassangerAnimator>();
-        _collider = GetComponent<Collider2D>();
+        
+        // Проверяем что компоненты получены в Awake
+        if (_rigidbody == null) _rigidbody = GetComponent<Rigidbody2D>();
+        if (PassangerAnimator == null) PassangerAnimator = GetComponent<PassangerAnimator>();
+        if (_collider == null) _collider = GetComponent<Collider2D>();
 
         wanderingState = new Wandering(this);
         stayingOnHandrailState = new StayingOnHandrail(this);
@@ -66,28 +73,37 @@ public class WandererNew : MonoBehaviour
         matchingState = new Matching(this);
 
         _currentState = wanderingState;
-        _currentState.Enter();
+        if (_currentState != null)
+        {
+            _currentState.Enter();
+        }
 
         _train = train;
-        train.startInertia += _currentState.OnTrainSpeedChange;
+        if (train != null && _currentState != null)
+        {
+            train.startInertia += _currentState.OnTrainSpeedChange;
+        }
 
         _isInitiated = true;
+        Debug.Log($"[WandererNew] {name} успешно инициализирован, состояние: {_currentState?.GetType().Name}");
     }
 
     private void Update()
     {
-        if (_isInitiated == false)
+        if (_isInitiated == false || _currentState == null)
             return;
         _currentState.UpdateState();
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
+        if (_currentState == null) return;
         _currentState.OnCollision(collision);
     }
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
+        if (_currentState == null) return;
         _currentState.OnTriggerEnter(collision);
     }
 
@@ -110,14 +126,21 @@ public class WandererNew : MonoBehaviour
 
     private void ChangeState(PassangerState newState)
     {
-        _currentState.Exit();
-        _train.startInertia -= _currentState.OnTrainSpeedChange;
+        if (_currentState != null)
+        {
+            _currentState.Exit();
+            if (_train != null)
+                _train.startInertia -= _currentState.OnTrainSpeedChange;
+        }
         
         _currentState = newState;
         
-        _currentState.Enter();
-        _train.startInertia += _currentState.OnTrainSpeedChange;
-
+        if (_currentState != null)
+        {
+            _currentState.Enter();
+            if (_train != null)
+                _train.startInertia += _currentState.OnTrainSpeedChange;
+        }
     }
 
     private abstract class PassangerState
@@ -401,6 +424,8 @@ public class WandererNew : MonoBehaviour
 
     private void Awake()
     {
+        Debug.Log($"[WandererNew] Awake для {name}");
+        
         // Увеличиваем высоту BoxCollider2D в 2 раза для более вытянутой области столкновения
         var boxCollider = GetComponent<BoxCollider2D>();
         if (boxCollider != null)
@@ -408,6 +433,33 @@ public class WandererNew : MonoBehaviour
             Vector2 size = boxCollider.size;
             size.y *= 2.0f; // Можно изменить коэффициент для нужной высоты
             boxCollider.size = size;
+        }
+        
+        // Инициализируем базовые компоненты
+        _rigidbody = GetComponent<Rigidbody2D>();
+        PassangerAnimator = GetComponent<PassangerAnimator>();
+        _collider = GetComponent<Collider2D>();
+        
+        if (_rigidbody == null) Debug.LogError($"[WandererNew] {name} не имеет Rigidbody2D!");
+        if (PassangerAnimator == null) Debug.LogError($"[WandererNew] {name} не имеет PassangerAnimator!");
+        if (_collider == null) Debug.LogError($"[WandererNew] {name} не имеет Collider2D!");
+    }
+    
+    private void Start()
+    {
+        // Регистрируем себя в системе эффектов поля
+        if (FieldEffectSystem.Instance != null)
+        {
+            FieldEffectSystem.Instance.RegisterTarget(this);
+        }
+    }
+    
+    private void OnDestroy()
+    {
+        // Отменяем регистрацию в системе эффектов поля
+        if (FieldEffectSystem.Instance != null)
+        {
+            FieldEffectSystem.Instance.UnregisterTarget(this);
         }
     }
 
@@ -417,6 +469,138 @@ public class WandererNew : MonoBehaviour
             container.RemovePassanger(this);
         Destroy(gameObject);
     }
+    
+    #region IFieldEffectTarget Implementation
+    
+    public void ApplyFieldForce(Vector2 force, FieldEffectType effectType)
+    {
+        if (!_isInitiated) 
+        {
+            Debug.LogWarning($"[WandererNew] {name} не инициализирован, игнорирую силу поля");
+            return;
+        }
+        
+        Debug.Log($"[WandererNew] {name} получил силу поля {effectType}: {force.magnitude:F2}, состояние: {_currentState?.GetType().Name}");
+        
+        // Сохраняем силу эффекта
+        _activeFieldForces[effectType] = force;
+        
+        // Применяем силу в зависимости от текущего состояния
+        if (_currentState is Wandering wandering)
+        {
+            // В состоянии блуждания применяем как модификацию направления движения
+            Vector2 modifiedDirection = (Vector2)CurrentMovingDirection + force * 0.1f;
+            CurrentMovingDirection = modifiedDirection.normalized;
+            Debug.Log($"[WandererNew] {name} изменил направление на: {CurrentMovingDirection}");
+        }
+        else if (_currentState is Falling falling)
+        {
+            // В состоянии падения применяем напрямую к Rigidbody
+            _rigidbody.AddForce(force, ForceMode2D.Force);
+            Debug.Log($"[WandererNew] {name} получил силу падения: {force}");
+        }
+        else
+        {
+            Debug.Log($"[WandererNew] {name} в состоянии {_currentState?.GetType().Name}, сила поля не применяется");
+        }
+    }
+    
+    public void ApplyFieldForce(Vector3 force, ForceMode2D forceMode)
+    {
+        if (!_isInitiated) 
+        {
+            Debug.LogWarning($"[WandererNew] {name} не инициализирован, игнорирую силу поля");
+            return;
+        }
+        
+        Debug.Log($"[WandererNew] {name} получил силу поля: {force.magnitude:F2}, режим: {forceMode}, состояние: {_currentState?.GetType().Name}");
+        
+        // Применяем силу в зависимости от текущего состояния
+        if (_currentState is Wandering wandering)
+        {
+            // В состоянии блуждания применяем как модификацию направления движения
+            Vector2 force2D = new Vector2(force.x, force.y);
+            Vector2 modifiedDirection = (Vector2)CurrentMovingDirection + force2D * 0.1f;
+            CurrentMovingDirection = modifiedDirection.normalized;
+            Debug.Log($"[WandererNew] {name} изменил направление на: {CurrentMovingDirection}");
+        }
+        else if (_currentState is Falling falling)
+        {
+            // В состоянии падения применяем напрямую к Rigidbody
+            _rigidbody.AddForce(force, forceMode);
+            Debug.Log($"[WandererNew] {name} получил силу падения: {force}");
+        }
+        else
+        {
+            Debug.Log($"[WandererNew] {name} в состоянии {_currentState?.GetType().Name}, сила поля не применяется");
+        }
+    }
+    
+    public Vector3 GetPosition()
+    {
+        return transform.position;
+    }
+    
+    public Rigidbody2D GetRigidbody()
+    {
+        return _rigidbody;
+    }
+    
+    public bool CanBeAffectedBy(FieldEffectType effectType)
+    {
+        if (!_isInitiated || IsInCouple) return false;
+        
+        // Проверяем, может ли текущее состояние быть подвержено эффекту
+        switch (effectType)
+        {
+            case FieldEffectType.Gravity:
+            case FieldEffectType.Repulsion:
+            case FieldEffectType.Wind:
+            case FieldEffectType.Vortex:
+            case FieldEffectType.Magnetic:
+                return _currentState is Wandering || _currentState is Falling;
+            case FieldEffectType.Slowdown:
+            case FieldEffectType.Speedup:
+            case FieldEffectType.Friction:
+                return _currentState is Wandering;
+            default:
+                return true;
+        }
+    }
+    
+    public void OnEnterFieldEffect(IFieldEffect effect)
+    {
+        if (_currentEffects.Contains(effect)) return;
+        
+        _currentEffects.Add(effect);
+        
+        // Логика для реакции на вход в зону эффекта
+        var effectData = effect.GetEffectData();
+        
+        // Если это гравитация и пассажир блуждает, может начать падать
+        if (effectData.effectType == FieldEffectType.Gravity && 
+            _currentState is Wandering && 
+            effectData.strength > 3f)
+        {
+            // Сильная гравитация может заставить пассажира "упасть" к центру
+            Vector2 directionToCenter = (effectData.center - transform.position).normalized;
+            // Не используем StartFalling напрямую, а переводим в состояние падения через систему состояний
+        }
+    }
+    
+    public void OnExitFieldEffect(IFieldEffect effect)
+    {
+        _currentEffects.Remove(effect);
+        
+        // Убираем силу эффекта
+        var effectData = effect.GetEffectData();
+        if (_activeFieldForces.ContainsKey(effectData.effectType))
+        {
+            _activeFieldForces.Remove(effectData.effectType);
+        }
+    }
+    
+    #endregion
 }
 
 public class OnEnteringMatchingState : UnityEvent<Vector3> { }

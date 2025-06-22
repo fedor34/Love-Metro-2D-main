@@ -7,7 +7,7 @@ using UnityEngine;
 public class SystemStatusTest : MonoBehaviour
 {
     [Header("Отладочная информация")]
-    [SerializeField] private bool _showDebugInfo = true;
+    [SerializeField] private bool _showDebugInfo = false;
     [SerializeField] private bool _logSystemStatus = false;
     
     private void Start()
@@ -115,8 +115,12 @@ public class SystemStatusTest : MonoBehaviour
     #if UNITY_EDITOR
     private void OnGUI()
     {
-        if (!_showDebugInfo) return;
+        if (!_showDebugInfo || Event.current == null) return;
         
+        // Проверяем что мы в правильном контексте GUI
+        if (Event.current.type != EventType.Repaint && Event.current.type != EventType.Layout && Event.current.type != EventType.MouseDown)
+            return;
+            
         GUI.Box(new Rect(10, 10, 200, 120), "Field Effects Debug");
         
         if (GUI.Button(new Rect(20, 35, 180, 20), "Log System Status"))
@@ -136,15 +140,22 @@ public class SystemStatusTest : MonoBehaviour
         
         // Показываем статус системы
         string statusText = "System Status: ";
-        if (FieldEffectSystem.Instance != null)
+        try
         {
-            int effects = FieldEffectSystem.Instance.GetTotalEffectsCount();
-            int targets = FieldEffectSystem.Instance.GetTargetsCount();
-            statusText += $"OK ({effects}E, {targets}T)";
+            if (FieldEffectSystem.Instance != null)
+            {
+                int effects = FieldEffectSystem.Instance.GetTotalEffectsCount();
+                int targets = FieldEffectSystem.Instance.GetTargetsCount();
+                statusText += $"OK ({effects}E, {targets}T)";
+            }
+            else
+            {
+                statusText += "NOT FOUND!";
+            }
         }
-        else
+        catch
         {
-            statusText += "NOT FOUND!";
+            statusText += "ERROR!";
         }
         
         GUI.Label(new Rect(20, 105, 180, 20), statusText);

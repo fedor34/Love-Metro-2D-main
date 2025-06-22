@@ -335,6 +335,14 @@ public static class FieldEffectMenus
         Debug.Log(diagnostics.ToString());
         
         // Создаем окно с подробной информацией
+        // Сначала закрываем существующие окна того же типа
+        var existingWindows = Resources.FindObjectsOfTypeAll<FieldEffectDiagnosticsWindow>();
+        foreach (var existingWindow in existingWindows)
+        {
+            existingWindow.Close();
+        }
+        
+        // Создаем новое окно
         var window = EditorWindow.GetWindow<FieldEffectDiagnosticsWindow>("Field Effects Diagnostics");
         window.SetDiagnosticsText(diagnostics.ToString());
         window.Show();
@@ -372,6 +380,7 @@ public static class FieldEffectMenus
 /// <summary>
 /// Окно диагностики системы эффектов поля
 /// </summary>
+#if UNITY_EDITOR
 public class FieldEffectDiagnosticsWindow : EditorWindow
 {
     private string _diagnosticsText = "";
@@ -379,27 +388,48 @@ public class FieldEffectDiagnosticsWindow : EditorWindow
     
     public void SetDiagnosticsText(string text)
     {
-        _diagnosticsText = text;
+        _diagnosticsText = text ?? "";
+    }
+    
+    private void OnDestroy()
+    {
+        // Очищаем ресурсы при уничтожении окна
+        _diagnosticsText = "";
     }
     
     private void OnGUI()
     {
-        GUILayout.Label("Диагностика системы эффектов поля", EditorStyles.boldLabel);
-        
-        _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
-        EditorGUILayout.TextArea(_diagnosticsText, GUILayout.ExpandHeight(true));
-        EditorGUILayout.EndScrollView();
-        
-        GUILayout.Space(10);
-        
-        if (GUILayout.Button("Обновить"))
+        try
         {
-            FieldEffectMenus.ShowSystemDiagnostics();
+            GUILayout.Label("Диагностика системы эффектов поля", EditorStyles.boldLabel);
+            
+            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
+            try
+            {
+                EditorGUILayout.TextArea(_diagnosticsText, GUILayout.ExpandHeight(true));
+            }
+            finally
+            {
+                EditorGUILayout.EndScrollView();
+            }
+            
+            GUILayout.Space(10);
+            
+            if (GUILayout.Button("Обновить"))
+            {
+                FieldEffectMenus.ShowSystemDiagnostics();
+            }
+            
+            if (GUILayout.Button("Создать FieldEffectSystem"))
+            {
+                FieldEffectMenus.CreateFieldEffectSystem();
+            }
         }
-        
-        if (GUILayout.Button("Создать FieldEffectSystem"))
+        catch (System.Exception e)
         {
-            FieldEffectMenus.CreateFieldEffectSystem();
+            // Если что-то пошло не так, логируем ошибку и закрываем окно
+            Debug.LogError($"[FieldEffectDiagnosticsWindow] GUI Error: {e.Message}");
+            Close();
         }
     }
 }

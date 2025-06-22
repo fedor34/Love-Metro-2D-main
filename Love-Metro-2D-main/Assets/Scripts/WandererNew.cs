@@ -221,10 +221,30 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
         public override void OnTrainSpeedChange(Vector2 force)
         {
-            float randomVertical = Random.Range(-0.25f, 0.25f);
-            Vector2 modifiedForce = force + new Vector2(0, randomVertical);
+            // Определяем, идет ли персонаж против направления торможения
+            float directionAlignment = Vector2.Dot(Passanger.CurrentMovingDirection.normalized, force.normalized);
+            bool movingAgainstBraking = directionAlignment < -0.3f; // персонаж идет в противоположную сторону
+            
+            // Базовая случайная компонента
+            float baseRandomVertical = Random.Range(-0.15f, 0.15f);
+            float baseRandomHorizontal = Random.Range(-0.1f, 0.1f);
+            
+            // Если персонаж идет против торможения - усиливаем случайность
+            if (movingAgainstBraking)
+            {
+                baseRandomVertical *= 2f; // усиливаем вертикальную случайность
+                baseRandomHorizontal *= 3f; // усиливаем горизонтальную случайность
+            }
+            
+            // Уменьшаем влияние текущего направления движения персонажа
+            Vector2 currentDirectionInfluence = Passanger.CurrentMovingDirection * 0.15f; // было влияние через скорость, теперь минимальное
+            
+            // Основная сила - это сила торможения (доминирующая)
+            Vector2 modifiedForce = force * 0.85f + // основная сила торможения
+                                   currentDirectionInfluence + // минимальное влияние текущего направления
+                                   new Vector2(baseRandomHorizontal, baseRandomVertical); // случайность
 
-            // Магнетизм: ищем ближайшего персонажа противоположного пола и добавляем к силе падения притягивающий вектор
+            // Магнетизм: ищем ближайшего персонажа противоположного пола
             WandererNew closestOpposite = null;
             float minDist = float.MaxValue;
             foreach (var other in GameObject.FindObjectsOfType<WandererNew>())
@@ -238,13 +258,15 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
                     closestOpposite = other;
                 }
             }
-            if (closestOpposite != null && minDist < 5f) // радиус магнетизма можно настроить
+            if (closestOpposite != null && minDist < 4f) // уменьшили радиус магнетизма для большей предсказуемости
             {
                 Vector2 direction = (closestOpposite.transform.position - Passanger.transform.position).normalized;
-                float magnetStrength = 0.25f; // силу можно настроить (уменьшено вдвое)
+                float magnetStrength = 0.3f; // немного увеличили силу магнетизма
                 modifiedForce += direction * magnetStrength;
             }
 
+            Debug.Log($"[WandererNew] {Passanger.name} торможение: force={force.magnitude:F2}, против направления={movingAgainstBraking}, итоговая сила={modifiedForce.magnitude:F2}");
+            
             Passanger.ChangeState(Passanger.fallingState);
             Passanger._currentState.OnTrainSpeedChange(modifiedForce);
         }
@@ -363,17 +385,20 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
         public override void UpdateState()
         {
-            currentFallingSpeed -= currentFallingSpeed.normalized * Passanger._fallingDeceleration * Time.deltaTime * 0.5f;
+            // Уменьшили замедление на 20% (0.5 -> 0.4) для более дальнего полета
+            currentFallingSpeed -= currentFallingSpeed.normalized * Passanger._fallingDeceleration * Time.deltaTime * 0.4f;
             Passanger._rigidbody.velocity = (Vector3)currentFallingSpeed;
-            currentFallingSpeed -= currentFallingSpeed.normalized * Passanger._fallingDeceleration * Time.deltaTime * 0.5f;
+            currentFallingSpeed -= currentFallingSpeed.normalized * Passanger._fallingDeceleration * Time.deltaTime * 0.4f;
 
             Passanger.PassangerAnimator.ChangeFacingDirection(
                 Vector3.Dot(Vector3.Project(currentFallingSpeed, Vector3.right).normalized, 
                 Passanger.IsFemale ? Vector3.right : Vector3.left) != 1);
 
-            if (Vector2.Dot(previousFallingSpeed, currentFallingSpeed) <= 0 || currentFallingSpeed.magnitude <= Passanger._minFallingSpeed)
+            // Изменили условие выхода из полета - теперь персонажи дольше остаются в полете
+            if (Vector2.Dot(previousFallingSpeed, currentFallingSpeed) <= 0 || currentFallingSpeed.magnitude <= Passanger._minFallingSpeed * 0.5f)
             {
-                Passanger.ChangeState(Passanger.stayingOnHandrailState);
+                // Переходим в состояние блуждания вместо держания за поручни
+                Passanger.ChangeState(Passanger.wanderingState);
                 return;
             }
 
@@ -389,8 +414,17 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
         public override void OnTrainSpeedChange(Vector2 force)
         {
-            currentFallingSpeed += force * Passanger._fallingSpeedInitialModifier;
+            // Увеличили чувствительность к торможению в состоянии полета
+            float fallingSensitivity = Passanger._fallingSpeedInitialModifier * 1.5f; // увеличили в 1.5 раза
+            
+            // Добавляем дополнительную силу в зависимости от текущей скорости полета
+            float speedMultiplier = 1f + (currentFallingSpeed.magnitude * 0.1f); // чем быстрее летит, тем сильнее реагирует
+            
+            Vector2 additionalForce = force * fallingSensitivity * speedMultiplier;
+            currentFallingSpeed += additionalForce;
             previousFallingSpeed = currentFallingSpeed;
+            
+            Debug.Log($"[Falling] {Passanger.name} получил дополнительную силу: {additionalForce.magnitude:F2}, текущая скорость: {currentFallingSpeed.magnitude:F2}");
         }
 
         private void resetFallingSpeeds()
@@ -400,15 +434,8 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
         public override void OnTriggerEnter(Collider2D collision)
         {
-            if (collision.TryGetComponent<HandRailPosition>(out HandRailPosition Handrail)
-            && Handrail.IsOccupied == false
-            && currentFallingSpeed.magnitude <= Passanger._handrailMinGrabbingSpeed)
-            {
-                Handrail.IsOccupied = true;
-                Passanger.transform.position = Handrail.transform.position;
-                Passanger.releaseHandrail += Handrail.ReleaseHandrail;
-                Passanger.ChangeState(Passanger.stayingOnHandrailState);
-            }
+            // Убрали автоматическое хватание за поручни при низких скоростях
+            // Персонажи в полете больше не цепляются за поручни автоматически
         }
     }
 

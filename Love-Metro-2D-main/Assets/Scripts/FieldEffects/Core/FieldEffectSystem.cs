@@ -241,8 +241,17 @@ public class FieldEffectSystem : MonoBehaviour
     
     private void UpdateEffectsForTarget(IFieldEffectTarget target, float deltaTime)
     {
+        // Защита от null
+        if (target == null || _activeEffectsPerTarget == null) return;
+        
         var targetPosition = target.GetPosition();
         var nearbyEffects = GetEffectsAtPosition(targetPosition);
+        
+        // Проверяем, есть ли target в словаре, если нет - создаем
+        if (!_activeEffectsPerTarget.ContainsKey(target))
+        {
+            _activeEffectsPerTarget[target] = new List<ActiveEffectData>();
+        }
         
         var activeEffects = _activeEffectsPerTarget[target];
         
@@ -322,6 +331,8 @@ public class FieldEffectSystem : MonoBehaviour
     
     private void UpdateSpatialCache()
     {
+        if (_spatialCache == null) return; // Защита от null
+        
         if (Time.time - _cacheUpdateTime > CACHE_UPDATE_INTERVAL)
         {
             _spatialCache.Clear();
@@ -331,6 +342,12 @@ public class FieldEffectSystem : MonoBehaviour
     
     public List<IFieldEffect> GetEffectsAtPosition(Vector3 position)
     {
+        // Защита от null
+        if (_spatialCache == null || _effectsByCategory == null)
+        {
+            return new List<IFieldEffect>();
+        }
+        
         var gridPos = new Vector3(
             Mathf.Round(position.x),
             Mathf.Round(position.y),
@@ -346,6 +363,8 @@ public class FieldEffectSystem : MonoBehaviour
         
         foreach (var categoryEffects in _effectsByCategory.Values)
         {
+            if (categoryEffects == null) continue; // Защита от null списков
+            
             foreach (var effect in categoryEffects)
             {
                 if (effect != null && effect.IsInEffectZone(position))

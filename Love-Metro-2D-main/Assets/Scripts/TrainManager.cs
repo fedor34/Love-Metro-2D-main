@@ -12,15 +12,18 @@ public class TrainManager : MonoBehaviour
     public event BrakeAction OnBrakeStart;
     public event BrakeAction OnBrakeEnd;
 
-    [SerializeField] private float _maxSpeed = 10f;
+    [SerializeField] private float _maxSpeed = 15f; // увеличили с 10 до 15
     [SerializeField] private float _minSpeed = 1f;
-    [SerializeField] private float _acceleration;
-    [SerializeField] private float _deceleration;
+    [SerializeField] private float _acceleration = 8f; // установили более высокое ускорение
+    [SerializeField] private float _deceleration = 6f; // установили более высокое замедление
     [SerializeField] private SpriteRenderer _backGround;
     [SerializeField] private PassangersContainer _passangers;
     [SerializeField] private Transform _camera;
     [SerializeField] private float _cameraSpeed;
     [SerializeField] private float _cameraModifier;
+    
+    // Ссылка на параллакс эффект
+    private ParallaxEffect _parallaxEffect;
 
     private Vector3 _cameraStartPosition;
     private float _currentSpeed;
@@ -42,6 +45,7 @@ public class TrainManager : MonoBehaviour
         SetSpeed(_minSpeed);
         _cameraStartPosition = _camera.position;
         _spawner = FindObjectOfType<PassangerSpawner>();
+        _parallaxEffect = FindObjectOfType<ParallaxEffect>();
     }
 
     private void SetSpeed(float newSpeed)
@@ -109,8 +113,23 @@ public class TrainManager : MonoBehaviour
         _camera.position = Vector3.Lerp(_camera.position, 
             _cameraStartPosition + Vector3.right * _currentSpeed * _cameraModifier, _cameraSpeed);
 
+        // Передаем накопленное время для анимации фона
         _backGround.material.SetFloat("_elapsedTime", _elapsedTime);
         _elapsedTime += Time.deltaTime * _currentSpeed;
+        
+        // Передаем текущую скорость как процент от максимальной для правильного отображения
+        float speedPercent = (_currentSpeed - _minSpeed) / (_maxSpeed - _minSpeed);
+        _backGround.material.SetFloat("_Speed", speedPercent);
+        
+        // Также передаем абсолютную скорость
+        _backGround.material.SetFloat("_CurrentSpeed", _currentSpeed);
+        _backGround.material.SetFloat("_MaxSpeed", _maxSpeed);
+        
+        // Обновляем параллакс эффект
+        if (_parallaxEffect != null)
+        {
+            _parallaxEffect.SetTrainSpeed(_currentSpeed);
+        }
 
         // Считаем пройденное расстояние (может пригодиться для статистики)
         _distanceTraveled += Mathf.Abs(_currentSpeed) * Time.deltaTime;

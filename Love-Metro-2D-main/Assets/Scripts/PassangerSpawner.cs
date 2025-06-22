@@ -177,7 +177,9 @@ public class PassangerSpawner : MonoBehaviour
 
     private void Start()
     {
+        Debug.Log("[PassangerSpawner] Start() вызван, начинаем спавн персонажей");
         spawnPassangers();
+        Debug.Log("[PassangerSpawner] Start() завершен");
     }
 
     // Вспомогательный метод для перемешивания списка

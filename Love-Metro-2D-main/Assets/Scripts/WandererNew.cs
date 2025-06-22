@@ -470,17 +470,31 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
             Vector3 directionToCenter = (_absorptionCenter - Passanger.transform.position).normalized;
             float distance = Vector3.Distance(_absorptionCenter, Passanger.transform.position);
             
-            // Увеличиваем силу по мере приближения к центру
-            float dynamicForce = _absorptionForce * (1f + (5f - distance) * 0.5f);
+            Debug.Log($"[BeingAbsorbed] {Passanger.name} поглощается: расстояние={distance:F2}, время={_timeInAbsorption:F1}");
+            
+            // Очень сильная сила притяжения
+            float dynamicForce = _absorptionForce * 5f; // Увеличиваем базовую силу
+            
+            // Дополнительно увеличиваем силу по мере приближения к центру
+            if (distance < 3f)
+            {
+                dynamicForce *= (3f - distance) * 2f + 1f; // Экспоненциальное увеличение
+            }
+            
             Vector3 absorptionForce = directionToCenter * dynamicForce;
             
-            Passanger._rigidbody.AddForce(absorptionForce, ForceMode2D.Force);
+            // Применяем силу как импульс для более быстрого движения
+            Passanger._rigidbody.AddForce(absorptionForce, ForceMode2D.Impulse);
             
-            // Если персонаж очень близко к центру или слишком долго поглощается
-            if (distance < 0.5f || _timeInAbsorption > _maxAbsorptionTime)
+            // Также устанавливаем скорость напрямую для гарантированного движения к центру
+            Vector3 targetVelocity = directionToCenter * Mathf.Min(dynamicForce * 0.1f, 10f);
+            Passanger._rigidbody.velocity = Vector2.Lerp(Passanger._rigidbody.velocity, targetVelocity, 0.5f);
+            
+            // Если персонаж близко к центру или слишком долго поглощается
+            if (distance < 1f || _timeInAbsorption > _maxAbsorptionTime)
             {
                 // Уничтожаем персонажа (он поглощен черной дырой)
-                Debug.Log($"[WandererNew] {Passanger.name} поглощен черной дырой!");
+                Debug.Log($"[WandererNew] {Passanger.name} поглощен черной дырой! Расстояние: {distance:F2}");
                 Passanger.RemoveFromContainerAndDestroy();
                 return;
             }
@@ -605,6 +619,9 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         
         Debug.Log($"[WandererNew] {name} получил силу поля: {force.magnitude:F2}, режим: {forceMode}, состояние: {_currentState?.GetType().Name}");
         
+        // Проверяем, не нужно ли перейти в состояние поглощения
+        CheckForBlackHoleAbsorption();
+        
         // Применяем силу в зависимости от текущего состояния
         if (_currentState is Wandering wandering)
         {
@@ -623,6 +640,30 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         else
         {
             Debug.Log($"[WandererNew] {name} в состоянии {_currentState?.GetType().Name}, сила поля не применяется");
+        }
+    }
+    
+    private void CheckForBlackHoleAbsorption()
+    {
+        // Если уже поглощается, не проверяем
+        if (_currentState is BeingAbsorbed) return;
+        
+        // Проверяем все активные эффекты на предмет черных дыр
+        foreach (var effect in _currentEffects)
+        {
+            if (effect is GravityFieldEffectNew gravityEffect && gravityEffect._createBlackHoleEffect)
+            {
+                var effectData = gravityEffect.GetEffectData();
+                float distance = Vector3.Distance(transform.position, effectData.center);
+                
+                // Если близко к черной дыре, переводим в состояние поглощения
+                if (distance < gravityEffect._eventHorizonRadius * 1.5f)
+                {
+                    Debug.Log($"[WandererNew] {name} слишком близко к черной дыре (расстояние: {distance:F2}), переводим в поглощение");
+                    ForceToAbsorptionState(effectData.center, effectData.strength);
+                    return;
+                }
+            }
         }
     }
     
@@ -670,15 +711,18 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         // Логика для реакции на вход в зону эффекта
         var effectData = effect.GetEffectData();
         
+        Debug.Log($"[WandererNew] {name} вошел в эффект {effectData.effectType}, сила: {effectData.strength}");
+        
         // Проверяем, является ли это эффектом черной дыры
         if (effectData.effectType == FieldEffectType.Gravity && effect is GravityFieldEffectNew gravityEffect)
         {
             float distanceToCenter = Vector3.Distance(transform.position, effectData.center);
+            Debug.Log($"[WandererNew] {name} проверяет черную дыру: расстояние={distanceToCenter:F2}, горизонт={gravityEffect._eventHorizonRadius}, черная дыра={gravityEffect._createBlackHoleEffect}");
             
-            // Если это черная дыра с горизонтом событий и мы близко к центру
-            if (gravityEffect._createBlackHoleEffect && distanceToCenter < gravityEffect._eventHorizonRadius * 2f)
+            // Если это черная дыра - сразу переводим в состояние поглощения при любом расстоянии в зоне эффекта
+            if (gravityEffect._createBlackHoleEffect)
             {
-                // Переводим в состояние поглощения
+                Debug.Log($"[WandererNew] {name} попал в черную дыру! Переводим в состояние поглощения");
                 ForceToAbsorptionState(effectData.center, effectData.strength);
                 return;
             }
@@ -686,6 +730,7 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
             // Если это сильная гравитация и пассажир блуждает, переводим в падение
             if (_currentState is Wandering && effectData.strength > 3f)
             {
+                Debug.Log($"[WandererNew] {name} попал в сильную гравитацию, переводим в падение");
                 Vector2 directionToCenter = (effectData.center - transform.position).normalized;
                 Vector2 initialFallingForce = directionToCenter * effectData.strength * 0.5f;
                 

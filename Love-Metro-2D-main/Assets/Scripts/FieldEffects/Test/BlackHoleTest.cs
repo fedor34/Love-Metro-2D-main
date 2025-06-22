@@ -75,14 +75,30 @@ public class BlackHoleTest : MonoBehaviour
     {
         // Рисуем зону эффекта
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireCircle(transform.position, _radius);
+        DrawCircle(transform.position, _radius);
         
         // Рисуем горизонт событий
         Gizmos.color = Color.red;
-        Gizmos.DrawWireCircle(transform.position, _eventHorizonRadius);
+        DrawCircle(transform.position, _eventHorizonRadius);
         
         // Рисуем центр
         Gizmos.color = Color.black;
         Gizmos.DrawSphere(transform.position, 0.5f);
+    }
+    
+    private void DrawCircle(Vector3 center, float radius)
+    {
+        const int segments = 32;
+        float angleStep = 2f * Mathf.PI / segments;
+        
+        Vector3 prevPoint = center + new Vector3(radius, 0, 0);
+        
+        for (int i = 1; i <= segments; i++)
+        {
+            float angle = i * angleStep;
+            Vector3 newPoint = center + new Vector3(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius, 0);
+            Gizmos.DrawLine(prevPoint, newPoint);
+            prevPoint = newPoint;
+        }
     }
 } 

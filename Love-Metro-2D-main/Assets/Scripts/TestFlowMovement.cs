@@ -26,10 +26,11 @@ public class TestFlowMovement : MonoBehaviour
         _rigidbody.AddForce((_rigidbody.velocity.sqrMagnitude * -_rigidbody.velocity.normalized) / 2 * _correctingForce);
         _rigidbody.velocity = Vector2.ClampMagnitude(_rigidbody.velocity, _maxSpeed);
         _animator.ChangeFacingDirection(Vector3.Project(_rigidbody.velocity, Vector3.right).normalized == Vector3.right);
+        // Используем принудительное управление анимацией для тестового скрипта
         if(_rigidbody.velocity.magnitude > _walkingAnimationSpeed)
-            _animator.SetWalkingState(true);
+            _animator.ForceWalkingState(true);
         else
-            _animator.SetWalkingState(false);
+            _animator.ForceWalkingState(false);
     }
 
     public void DisablePhysics()

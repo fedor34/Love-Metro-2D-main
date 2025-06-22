@@ -178,7 +178,8 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         public override void Exit() 
         {
             Passanger._rigidbody.velocity = Vector2.zero;
-            Passanger.PassangerAnimator.SetWalkingState(false);
+            // Принудительно отключаем анимацию ходьбы при выходе из состояния
+            Passanger.PassangerAnimator.ForceWalkingState(false);
         }
          
         public override void UpdateState()
@@ -203,7 +204,8 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         public override void Enter() 
         {
             Passanger._rigidbody.bodyType = RigidbodyType2D.Dynamic;
-            Passanger.PassangerAnimator.SetWalkingState(true);
+            // Включаем автоматическое управление анимацией на основе реальной скорости
+            Passanger.PassangerAnimator.EnableAutomaticWalkingAnimation();
         }
 
         public override void OnTrainSpeedChange(Vector2 force)

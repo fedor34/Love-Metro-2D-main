@@ -12,8 +12,8 @@ public class GravityFieldEffectNew : BaseFieldEffect
     [SerializeField] private float _centralMass = 100f;
     [SerializeField] private bool _affectRotation = false;
     [SerializeField] private float _rotationStrength = 1f;
-    [SerializeField] private bool _createBlackHoleEffect = false;
-    [SerializeField] private float _eventHorizonRadius = 1f;
+    [SerializeField] public bool _createBlackHoleEffect = false;
+    [SerializeField] public float _eventHorizonRadius = 1f;
     
     protected override FieldEffectData CreateDefaultEffectData()
     {
@@ -97,7 +97,14 @@ public class GravityFieldEffectNew : BaseFieldEffect
     
     private void ApplyBlackHoleEffect(IFieldEffectTarget target, Vector3 force)
     {
-        // Увеличиваем силу внутри горизонта событий
+        // Если цель - это WandererNew, переводим в состояние поглощения
+        if (target is WandererNew wanderer)
+        {
+            wanderer.ForceToAbsorptionState(transform.position, _effectData.strength);
+            return;
+        }
+        
+        // Для других объектов увеличиваем силу внутри горизонта событий
         Vector3 extremeForce = force * 10f;
         target.ApplyFieldForce(extremeForce, ForceMode2D.Impulse);
         

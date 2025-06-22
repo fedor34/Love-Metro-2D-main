@@ -42,6 +42,7 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
     private StayingOnHandrail stayingOnHandrailState;
     private Falling fallingState;
     private Matching matchingState;
+    private BeingAbsorbed beingAbsorbedState;
 
     private bool _isInitiated = false;
 
@@ -71,6 +72,7 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         stayingOnHandrailState = new StayingOnHandrail(this);
         fallingState = new Falling(this);
         matchingState = new Matching(this);
+        beingAbsorbedState = new BeingAbsorbed(this);
 
         _currentState = wanderingState;
         if (_currentState != null)
@@ -122,6 +124,15 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
     public void Transport(Vector3 position)
     {
         transform.position = position;
+    }
+    
+    public void ForceToAbsorptionState(Vector3 absorptionCenter, float absorptionForce)
+    {
+        if (IsInCouple || _currentState is BeingAbsorbed) return;
+        
+        Debug.Log($"[WandererNew] {name} переходит в состояние поглощения");
+        beingAbsorbedState.SetAbsorptionParameters(absorptionCenter, absorptionForce);
+        ChangeState(beingAbsorbedState);
     }
 
     private void ChangeState(PassangerState newState)
@@ -424,6 +435,83 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         public override void OnTriggerEnter(Collider2D collision){}
     }
 
+    private class BeingAbsorbed : PassangerState
+    {
+        private Vector3 _absorptionCenter;
+        private float _absorptionForce;
+        private float _timeInAbsorption = 0f;
+        private float _maxAbsorptionTime = 3f; // Максимальное время поглощения
+        
+        public BeingAbsorbed(WandererNew passenger) : base(passenger) {}
+        
+        public void SetAbsorptionParameters(Vector3 center, float force)
+        {
+            _absorptionCenter = center;
+            _absorptionForce = force;
+        }
+        
+        public override void OnCollision(Collision2D collision) 
+        {
+            // В состоянии поглощения игнорируем большинство столкновений
+        }
+        
+        public override void Exit() 
+        {
+            Passanger.PassangerAnimator.SetFallingState(false);
+            Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._defaultLayer);
+            _timeInAbsorption = 0f;
+        }
+        
+        public override void UpdateState()
+        {
+            _timeInAbsorption += Time.deltaTime;
+            
+            // Постоянно притягиваем к центру поглощения
+            Vector3 directionToCenter = (_absorptionCenter - Passanger.transform.position).normalized;
+            float distance = Vector3.Distance(_absorptionCenter, Passanger.transform.position);
+            
+            // Увеличиваем силу по мере приближения к центру
+            float dynamicForce = _absorptionForce * (1f + (5f - distance) * 0.5f);
+            Vector3 absorptionForce = directionToCenter * dynamicForce;
+            
+            Passanger._rigidbody.AddForce(absorptionForce, ForceMode2D.Force);
+            
+            // Если персонаж очень близко к центру или слишком долго поглощается
+            if (distance < 0.5f || _timeInAbsorption > _maxAbsorptionTime)
+            {
+                // Уничтожаем персонажа (он поглощен черной дырой)
+                Debug.Log($"[WandererNew] {Passanger.name} поглощен черной дырой!");
+                Passanger.RemoveFromContainerAndDestroy();
+                return;
+            }
+            
+            // Анимация падения/поглощения
+            Passanger.PassangerAnimator.ChangeFacingDirection(
+                Vector3.Dot(Vector3.Project(absorptionForce, Vector3.right).normalized, 
+                Passanger.IsFemale ? Vector3.right : Vector3.left) != 1);
+        }
+        
+        public override void Enter() 
+        {
+            Debug.Log($"[WandererNew] {Passanger.name} начинает поглощаться черной дырой");
+            Passanger._rigidbody.bodyType = RigidbodyType2D.Dynamic;
+            Passanger.PassangerAnimator.SetFallingState(true);
+            Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._fallingLayer);
+            Passanger.IsMatchable = false; // Не может больше создавать пары
+            _timeInAbsorption = 0f;
+        }
+        
+        public override void OnTrainSpeedChange(Vector2 force)
+        {
+            // В состоянии поглощения игнорируем инерцию поезда
+        }
+        
+        public override void OnTriggerEnter(Collider2D collision)
+        {
+            // В состоянии поглощения не реагируем на поручни
+        }
+    }
+
     private void Awake()
     {
         Debug.Log($"[WandererNew] Awake для {name}");
@@ -552,6 +640,9 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
     {
         if (!_isInitiated || IsInCouple) return false;
         
+        // В состоянии поглощения не подвержены другим эффектам
+        if (_currentState is BeingAbsorbed) return false;
+        
         // Проверяем, может ли текущее состояние быть подвержено эффекту
         switch (effectType)
         {
@@ -579,14 +670,29 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         // Логика для реакции на вход в зону эффекта
         var effectData = effect.GetEffectData();
         
-        // Если это гравитация и пассажир блуждает, может начать падать
-        if (effectData.effectType == FieldEffectType.Gravity && 
-            _currentState is Wandering && 
-            effectData.strength > 3f)
+        // Проверяем, является ли это эффектом черной дыры
+        if (effectData.effectType == FieldEffectType.Gravity && effect is GravityFieldEffectNew gravityEffect)
         {
-            // Сильная гравитация может заставить пассажира "упасть" к центру
-            Vector2 directionToCenter = (effectData.center - transform.position).normalized;
-            // Не используем StartFalling напрямую, а переводим в состояние падения через систему состояний
+            float distanceToCenter = Vector3.Distance(transform.position, effectData.center);
+            
+            // Если это черная дыра с горизонтом событий и мы близко к центру
+            if (gravityEffect._createBlackHoleEffect && distanceToCenter < gravityEffect._eventHorizonRadius * 2f)
+            {
+                // Переводим в состояние поглощения
+                ForceToAbsorptionState(effectData.center, effectData.strength);
+                return;
+            }
+            
+            // Если это сильная гравитация и пассажир блуждает, переводим в падение
+            if (_currentState is Wandering && effectData.strength > 3f)
+            {
+                Vector2 directionToCenter = (effectData.center - transform.position).normalized;
+                Vector2 initialFallingForce = directionToCenter * effectData.strength * 0.5f;
+                
+                // Переводим в состояние падения с начальной силой
+                ChangeState(fallingState);
+                _currentState.OnTrainSpeedChange(initialFallingForce);
+            }
         }
     }
     

@@ -75,7 +75,7 @@ public static class FieldEffectMenus
     {
         var effect = CreateEffectAtSceneViewCenter<WindFieldEffect>("Turbulent Wind Effect");
         effect.SetWindDirection(Vector2.right);
-        effect.SetTurbulence(true, 0.7f, 2f);
+        effect.SetFluctuations(true, 0.7f, 2f);
         Debug.Log("Создан турбулентный эффект ветра");
     }
     
@@ -152,7 +152,7 @@ public static class FieldEffectMenus
         sideWind1.SetStrength(3f);
         sideWind1.SetRadius(6f);
         sideWind1.SetWindDirection(Vector2.down + Vector2.right);
-        sideWind1.SetTurbulence(true, 0.5f, 3f);
+        sideWind1.SetFluctuations(true, 0.5f, 3f);
         sideWind1.SetPriority(5);
         
         var sideWind2 = FieldEffectFactory.CreateEffect<WindFieldEffect>(center + Vector3.down * 4f);
@@ -160,7 +160,7 @@ public static class FieldEffectMenus
         sideWind2.SetStrength(3f);
         sideWind2.SetRadius(6f);
         sideWind2.SetWindDirection(Vector2.up + Vector2.right);
-        sideWind2.SetTurbulence(true, 0.5f, 3f);
+        sideWind2.SetFluctuations(true, 0.5f, 3f);
         sideWind2.SetPriority(5);
         
         // Группируем эффекты

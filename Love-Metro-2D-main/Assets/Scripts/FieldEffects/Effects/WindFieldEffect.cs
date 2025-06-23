@@ -1,244 +1,160 @@
 using UnityEngine;
 
 /// <summary>
-/// Эффект ветра - постоянная сила в определенном направлении
+/// Эффект ветра - создает постоянную силу в определенном направлении
 /// </summary>
 public class WindFieldEffect : BaseFieldEffect
 {
-    [Header("Ветер")]
+    [Header("Параметры ветра")]
     [SerializeField] private Vector2 _windDirection = Vector2.right;
-    [SerializeField] private bool _turbulence = false;
-    [SerializeField] private float _turbulenceStrength = 0.5f;
-    [SerializeField] private float _turbulenceFrequency = 2f;
-    [SerializeField] private bool _affectBasedOnSize = true;
-    [SerializeField] private AnimationCurve _gustPattern = AnimationCurve.Constant(0, 1, 1);
-    [SerializeField] private bool _rotateWithWind = false;
+    [SerializeField] private float _windStrength = 10f;
+    [SerializeField] private bool _useRandomFluctuations = true;
+    [SerializeField] private float _fluctuationIntensity = 0.3f;
+    [SerializeField] private float _fluctuationSpeed = 2f;
     
-    private float _turbulenceTime;
+    [Header("Визуальные эффекты")]
+    [SerializeField] private bool _showWindDirection = true;
+    [SerializeField] private Color _windColor = Color.cyan;
     
-    protected override FieldEffectData CreateDefaultEffectData()
+    private float _fluctuationTime = 0f;
+    private Vector2 _normalizedDirection;
+    
+    protected override void Start()
     {
-        var data = new FieldEffectData(FieldEffectType.Wind, 3f, 8f, transform.position);
-        data.direction = _windDirection;
-        return data;
-    }
-    
-    protected override void InitializeEffectData()
-    {
-        base.InitializeEffectData();
+        base.Start();
         
-        _gizmoColor = Color.cyan;
-        _effectData.effectColor = Color.cyan;
-        _effectData.forceMode = ForceMode2D.Force;
-        _effectData.respectMass = false;
-        _effectData.direction = _windDirection;
-    }
-    
-    protected override void OnUpdateEffect()
-    {
-        base.OnUpdateEffect();
+        // Нормализуем направление ветра
+        _normalizedDirection = _windDirection.normalized;
         
-        _turbulenceTime += Time.deltaTime * _turbulenceFrequency;
-        _effectData.direction = _windDirection.normalized;
-    }
-    
-    public override void ApplyEffect(IFieldEffectTarget target, float deltaTime)
-    {
-        if (!_isActive || target == null) return;
-        
-        Vector3 targetPos = target.GetPosition();
-        float distance = Vector3.Distance(transform.position, targetPos);
-        
-        if (distance > _effectData.radius) return;
-        if (!target.CanBeAffectedBy(_effectData.effectType)) return;
-        
-        Vector3 windForce = CalculateWindForce(target, distance);
-        target.ApplyFieldForce(windForce, _effectData.forceMode);
-        
-        // Применяем вращение если нужно
-        if (_rotateWithWind)
+        // Настройка данных эффекта
+        if (EffectData.effectType != FieldEffectType.Wind)
         {
-            ApplyWindRotation(target, windForce.magnitude);
+            EffectData.effectType = FieldEffectType.Wind;
+            EffectData.strength = _windStrength;
+            EffectData.affectedLayers = LayerMask.GetMask("Default");
+        }
+        
+        Debug.Log($"[WindFieldEffect] Создан ветер: направление={_windDirection}, сила={_windStrength}");
+    }
+    
+    protected override void Update()
+    {
+        base.Update();
+        
+        // Обновляем время для флуктуаций
+        _fluctuationTime += Time.deltaTime * _fluctuationSpeed;
+    }
+    
+    public override void ApplyEffect(IFieldEffectTarget target, float distance)
+    {
+        if (target == null) return;
+        
+        // Вычисляем силу ветра на основе расстояния
+        float effectiveStrength = _windStrength;
+        
+        // Уменьшаем силу с расстоянием (опционально)
+        if (EffectData.radius > 0 && distance > 0)
+        {
+            float distanceFactor = 1f - (distance / EffectData.radius);
+            effectiveStrength *= distanceFactor;
+        }
+        
+        // Базовое направление ветра
+        Vector2 windForce = _normalizedDirection * effectiveStrength;
+        
+        // Добавляем флуктуации если включены
+        if (_useRandomFluctuations)
+        {
+            float fluctuation = Mathf.Sin(_fluctuationTime + distance) * _fluctuationIntensity;
+            Vector2 perpendicular = new Vector2(-_normalizedDirection.y, _normalizedDirection.x);
+            windForce += perpendicular * fluctuation * effectiveStrength;
+        }
+        
+        // Применяем силу ветра
+        target.ApplyFieldForce(windForce);
+        
+        if (DebugMode)
+        {
+            Debug.Log($"[WindFieldEffect] Применен ветер к {target}: сила={windForce.magnitude:F2}, направление={windForce.normalized}");
         }
     }
     
-    private Vector3 CalculateWindForce(IFieldEffectTarget target, float distance)
+    public override void RemoveEffect(IFieldEffectTarget target)
     {
-        float baseStrength = _effectData.GetEffectiveStrength(distance);
-        Vector3 windDirection = _effectData.direction;
-        
-        // Применяем паттерн порывов
-        float gustMultiplier = _gustPattern.Evaluate(Time.time % 1f);
-        baseStrength *= gustMultiplier;
-        
-        // Добавляем турбулентность
-        if (_turbulence)
-        {
-            Vector3 turbulenceVector = GetTurbulenceVector();
-            windDirection += turbulenceVector * _turbulenceStrength;
-        }
-        
-        // Учитываем размер объекта
-        if (_affectBasedOnSize)
-        {
-            float sizeMultiplier = GetTargetSizeMultiplier(target);
-            baseStrength *= sizeMultiplier;
-        }
-        
-        return windDirection.normalized * baseStrength;
+        // Ветер не требует специального удаления эффекта
+        // Просто перестаем применять силу
     }
-    
-    private Vector3 GetTurbulenceVector()
-    {
-        float noiseX = Mathf.PerlinNoise(_turbulenceTime, 0f) * 2f - 1f;
-        float noiseY = Mathf.PerlinNoise(0f, _turbulenceTime) * 2f - 1f;
-        return new Vector3(noiseX, noiseY, 0f);
-    }
-    
-    private float GetTargetSizeMultiplier(IFieldEffectTarget target)
-    {
-        if (target is MonoBehaviour mb)
-        {
-            var collider = mb.GetComponent<Collider2D>();
-            if (collider != null)
-            {
-                float area = collider.bounds.size.x * collider.bounds.size.y;
-                return Mathf.Sqrt(area); // Площадь влияет на силу ветра
-            }
-        }
-        return 1f;
-    }
-    
-    private void ApplyWindRotation(IFieldEffectTarget target, float windStrength)
-    {
-        if (target is MonoBehaviour mb)
-        {
-            var rb = mb.GetComponent<Rigidbody2D>();
-            if (rb != null)
-            {
-                // Вращение пропорционально силе ветра
-                float torque = windStrength * 0.1f * (Random.value - 0.5f);
-                rb.AddTorque(torque);
-            }
-        }
-    }
-    
-    protected override void DrawEffectRadius()
-    {
-        base.DrawEffectRadius();
-        
-        // Рисуем направление ветра
-        if (_effectData != null)
-        {
-            Gizmos.color = Color.white;
-            Vector3 center = transform.position;
-            Vector3 direction = _effectData.direction.normalized;
-            
-            // Рисуем стрелку направления
-            Vector3 arrowEnd = center + direction * _effectData.radius * 0.7f;
-            Gizmos.DrawLine(center, arrowEnd);
-            
-            // Рисуем наконечник стрелки
-            Vector3 arrowHead1 = arrowEnd - direction * 0.5f + Vector3.Cross(direction, Vector3.forward) * 0.3f;
-            Vector3 arrowHead2 = arrowEnd - direction * 0.5f - Vector3.Cross(direction, Vector3.forward) * 0.3f;
-            Gizmos.DrawLine(arrowEnd, arrowHead1);
-            Gizmos.DrawLine(arrowEnd, arrowHead2);
-            
-            // Рисуем линии потока ветра
-            DrawWindLines();
-        }
-    }
-    
-    private void DrawWindLines()
-    {
-        if (_effectData == null) return;
-        
-        Gizmos.color = new Color(Color.cyan.r, Color.cyan.g, Color.cyan.b, 0.3f);
-        Vector3 center = transform.position;
-        Vector3 direction = _effectData.direction.normalized;
-        Vector3 perpendicular = Vector3.Cross(direction, Vector3.forward);
-        
-        // Рисуем несколько линий потока
-        for (int i = -2; i <= 2; i++)
-        {
-            Vector3 lineStart = center + perpendicular * i * 0.5f - direction * _effectData.radius * 0.8f;
-            Vector3 lineEnd = center + perpendicular * i * 0.5f + direction * _effectData.radius * 0.8f;
-            Gizmos.DrawLine(lineStart, lineEnd);
-        }
-    }
-    
-    protected override void DrawEffectInfo()
-    {
-        base.DrawEffectInfo();
-        
-#if UNITY_EDITOR
-        if (_effectData != null)
-        {
-            var labelPos = transform.position + Vector3.up * (_effectData.radius + 2f);
-            string info = $"Wind Effect\nDirection: {_windDirection}\nStrength: {_effectData.strength:F1}\n";
-            
-            if (_turbulence)
-            {
-                info += $"Turbulence: {_turbulenceStrength:F1}\n";
-            }
-            
-            info += $"Targets: {_currentTargets.Count}";
-            
-            UnityEditor.Handles.Label(labelPos, info);
-        }
-#endif
-    }
-    
-    #region Public Interface
     
     /// <summary>
-    /// Установить направление ветра
+    /// Устанавливает направление ветра
     /// </summary>
     public void SetWindDirection(Vector2 direction)
     {
-        _windDirection = direction.normalized;
-        if (_effectData != null)
+        _windDirection = direction;
+        _normalizedDirection = direction.normalized;
+        Debug.Log($"[WindFieldEffect] Направление ветра изменено на {direction}");
+    }
+    
+    /// <summary>
+    /// Устанавливает силу ветра
+    /// </summary>
+    public void SetWindStrength(float strength)
+    {
+        _windStrength = strength;
+        EffectData.strength = strength;
+        Debug.Log($"[WindFieldEffect] Сила ветра изменена на {strength}");
+    }
+    
+    /// <summary>
+    /// Включает/выключает флуктуации ветра
+    /// </summary>
+    public void SetFluctuations(bool enable, float intensity = 0.3f, float speed = 2f)
+    {
+        _useRandomFluctuations = enable;
+        _fluctuationIntensity = intensity;
+        _fluctuationSpeed = speed;
+    }
+    
+    protected override void OnDrawGizmosSelected()
+    {
+        base.OnDrawGizmosSelected();
+        
+        if (!_showWindDirection) return;
+        
+        // Рисуем направление ветра
+        Gizmos.color = _windColor;
+        Vector3 center = transform.position;
+        Vector3 direction = new Vector3(_normalizedDirection.x, _normalizedDirection.y, 0);
+        
+        // Основная стрелка
+        Gizmos.DrawRay(center, direction * 2f);
+        
+        // Наконечник стрелки
+        Vector3 arrowHead1 = direction * 1.5f + Vector3.Cross(direction, Vector3.forward) * 0.3f;
+        Vector3 arrowHead2 = direction * 1.5f + Vector3.Cross(direction, Vector3.back) * 0.3f;
+        
+        Gizmos.DrawLine(center + direction * 2f, center + arrowHead1);
+        Gizmos.DrawLine(center + direction * 2f, center + arrowHead2);
+        
+        // Показываем зону действия
+        if (EffectData.radius > 0)
         {
-            _effectData.direction = _windDirection;
+            Gizmos.color = new Color(_windColor.r, _windColor.g, _windColor.b, 0.2f);
+            Gizmos.DrawSphere(center, EffectData.radius);
         }
     }
     
-    /// <summary>
-    /// Настроить турбулентность
-    /// </summary>
-    public void SetTurbulence(bool enable, float strength = 0.5f, float frequency = 2f)
+    protected override string GetEffectInfo()
     {
-        _turbulence = enable;
-        _turbulenceStrength = strength;
-        _turbulenceFrequency = frequency;
-    }
-    
-    /// <summary>
-    /// Установить паттерн порывов
-    /// </summary>
-    public void SetGustPattern(AnimationCurve pattern)
-    {
-        _gustPattern = pattern ?? AnimationCurve.Constant(0, 1, 1);
-    }
-    
-    /// <summary>
-    /// Получить силу ветра в точке
-    /// </summary>
-    public Vector3 GetWindForceAtPoint(Vector3 point)
-    {
-        float distance = Vector3.Distance(transform.position, point);
-        if (distance > _effectData.radius) return Vector3.zero;
+        string info = base.GetEffectInfo();
+        info += $"\nWind Direction: {_windDirection}";
+        info += $"\nWind Strength: {_windStrength:F1}";
         
-        float strength = _effectData.GetEffectiveStrength(distance);
-        Vector3 direction = _effectData.direction;
-        
-        if (_turbulence)
+        if (_useRandomFluctuations)
         {
-            direction += GetTurbulenceVector() * _turbulenceStrength;
+            info += $"\nFluctuations: {_fluctuationIntensity:F1}x at {_fluctuationSpeed:F1}Hz";
         }
         
-        return direction.normalized * strength;
+        return info;
     }
-    
-    #endregion
 } 

@@ -16,6 +16,7 @@ public class ScoreCounter : MonoBehaviour
     [SerializeField] private float _floatingTextSpawnOffsetY;
     
     [SerializeField] private TMP_Text _matchesPerBrakeText; // Текст для отображения пар за торможение
+    [SerializeField] private TrainManager _trainManager; // Прямая ссылка на TrainManager
     
     private int _matchesInCurrentBrake = 0; // Счетчик пар за текущее торможение
     private bool _brakingInProgress = false; // Флаг активного торможения
@@ -47,11 +48,10 @@ public class ScoreCounter : MonoBehaviour
     private void Start()
     {
         // Добавляем подписку на события торможения в TrainManager
-        TrainManager trainManager = FindObjectOfType<TrainManager>();
-        if (trainManager != null)
+        if (_trainManager != null)
         {
-            trainManager.OnBrakeStart += StartBrakingSession;
-            trainManager.OnBrakeEnd += EndBrakingSession;
+            _trainManager.OnBrakeStart += StartBrakingSession;
+            _trainManager.OnBrakeEnd += EndBrakingSession;
         }
     }
 

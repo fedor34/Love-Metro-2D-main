@@ -62,8 +62,6 @@ public class FieldEffectSystem : MonoBehaviour
         GameObject systemObj = new GameObject("[FieldEffectSystem]");
         _instance = systemObj.AddComponent<FieldEffectSystem>();
         DontDestroyOnLoad(systemObj);
-        
-        Debug.Log("[FieldEffectSystem] Система инициализирована автоматически");
     }
     
     private void Awake()

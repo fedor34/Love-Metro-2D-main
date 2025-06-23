@@ -31,7 +31,7 @@ public class TrainManager : MonoBehaviour
     private float _currentShakeOffset = 0f;
 
     // Ссылка на параллакс эффект
-    private ParallaxEffect _parallaxEffect;
+    [SerializeField] private ParallaxEffect _parallaxEffect;
 
     private Vector3 _cameraStartPosition;
     private float _currentSpeed;
@@ -44,19 +44,23 @@ public class TrainManager : MonoBehaviour
     //[SerializeField] private float[] _stopDistances = new float[] { 0.2f, 0.4f, 0.6f };
     //private int _nextStopIndex = 0;
     private bool _isStopped = false;
-    private PassangerSpawner _spawner;
+    [SerializeField] private PassangerSpawner _spawner;
 
     private bool stopCoroutineStarted = false; // Флаг для задержки остановки
 
     // Текущее фактическое ускорение (полезно для отладки или эффектов)
     private float _currentAcceleration = 0f;
 
+    // Публичный метод для получения текущей скорости
+    public float GetCurrentSpeed()
+    {
+        return _currentSpeed;
+    }
+
     private void Start()
     {
         SetSpeed(_minSpeed);
         _cameraStartPosition = _camera.position;
-        _spawner = FindObjectOfType<PassangerSpawner>();
-        _parallaxEffect = FindObjectOfType<ParallaxEffect>();
     }
 
     private void SetSpeed(float newSpeed)
@@ -153,7 +157,6 @@ public class TrainManager : MonoBehaviour
 
         // Считаем пройденное расстояние
         _distanceTraveled += Mathf.Abs(_currentSpeed) * Time.deltaTime;
-        //Debug.Log($"[TrainManager] Speed: {_currentSpeed:F2}, Display Speed: {_currentSpeed:F2}, Distance: {_distanceTraveled:F2}");
     }
 
     // Корутина задержки остановки поезда, если осталось 2 пассажира
@@ -191,7 +194,5 @@ public class TrainManager : MonoBehaviour
         SetSpeed(_minSpeed);
         _distanceTraveled = 0f; // Сброс расстояния после остановки
         stopCoroutineStarted = false; // Сброс флага
-
-        Debug.Log("[TrainManager] Остановка поезда! Distance: " + _distanceTraveled);
     }
 }

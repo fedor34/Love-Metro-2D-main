@@ -16,30 +16,24 @@ public class PassangerSpawner : MonoBehaviour
     [SerializeField] private Vector3[] _possibleStartMovingDirections;
     public void spawnPassangers()
     {
-        Debug.Log("====== НАЧАЛО СПАВНА ПАССАЖИРОВ ======");
-        
         // Проверка и инициализация списков
         if (_spawnLocations == null || _spawnLocations.Count == 0)
         {
-            Debug.LogError("Нет точек спавна пассажиров!");
             return;
         }
         
         if (_passangerFemalePrefs == null || _passangerFemalePrefs.Count == 0)
         {
-            Debug.LogError("Список префабов женщин пуст!");
             return;
         }
         
         if (_passangerMalePrefs == null || _passangerMalePrefs.Count == 0)
         {
-            Debug.LogError("Список префабов мужчин пуст!");
             return;
         }
         
         if (_possibleStartMovingDirections == null || _possibleStartMovingDirections.Length == 0)
         {
-            Debug.LogError("Список возможных направлений движения пуст!");
             return;
         }
         
@@ -52,21 +46,15 @@ public class PassangerSpawner : MonoBehaviour
         
         if (availableLocations.Count == 0)
         {
-            Debug.LogError("Список доступных точек спавна пуст после фильтрации!");
             return;
         }
         
         // Перемешиваем точки спавна для более равномерного распределения
         ShuffleList(availableLocations);
         
-        Debug.Log($"Доступно точек спавна: {availableLocations.Count}");
-        Debug.Log($"Префабов женщин: {_passangerFemalePrefs.Count}");
-        Debug.Log($"Префабов мужчин: {_passangerMalePrefs.Count}");
-        
         // Определяем количество пассажиров для спавна
         int maxPossibleSpawn = Mathf.Min(8, availableLocations.Count);
         int spawnCount = UnityEngine.Random.Range(4, maxPossibleSpawn + 1);
-        Debug.Log($"Будет создано пассажиров: {spawnCount}");
         
         // Создаем списки перемешанных префабов для женщин и мужчин
         List<WandererNew> femalePrefabsShuffled = new List<WandererNew>(_passangerFemalePrefs);
@@ -95,7 +83,6 @@ public class PassangerSpawner : MonoBehaviour
         {
             if (availableLocations.Count == 0)
             {
-                Debug.LogWarning("Закончились доступные точки спавна, прерываем создание пассажиров.");
                 break;
             }
             
@@ -125,7 +112,6 @@ public class PassangerSpawner : MonoBehaviour
             
             if (prefab == null)
             {
-                Debug.LogWarning("Не удалось выбрать префаб пассажира, пропускаем.");
                 continue;
             }
             
@@ -135,7 +121,6 @@ public class PassangerSpawner : MonoBehaviour
             
             if (spawnPoint == null)
             {
-                Debug.LogWarning("Точка спавна оказалась null, пропускаем.");
                 continue;
             }
             
@@ -154,11 +139,10 @@ public class PassangerSpawner : MonoBehaviour
                 if (createFemale) femalesCreated++;
                 else malesCreated++;
                 
-                Debug.Log($"Создан пассажир: {(createFemale ? "женщина" : "мужчина")} на позиции {spawnPoint.position}");
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"Ошибка при создании пассажира: {e.Message}");
+                continue;
             }
         }
         
@@ -166,20 +150,11 @@ public class PassangerSpawner : MonoBehaviour
         {
             _sortingLayerEditor.getPassangerSprites();
         }
-        else
-        {
-            Debug.LogWarning("_sortingLayerEditor не назначен!");
-        }
-        
-        Debug.Log($"Завершено создание пассажиров. Создано женщин: {femalesCreated}, мужчин: {malesCreated}");
-        Debug.Log("====== КОНЕЦ СПАВНА ПАССАЖИРОВ ======");
     }
 
     private void Start()
     {
-        Debug.Log("[PassangerSpawner] Start() вызван, начинаем спавн персонажей");
         spawnPassangers();
-        Debug.Log("[PassangerSpawner] Start() завершен");
     }
 
     // Вспомогательный метод для перемешивания списка

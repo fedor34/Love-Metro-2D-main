@@ -8,13 +8,10 @@ public class ParallaxEffect : MonoBehaviour
     [SerializeField] private ParallaxLayer[] _parallaxLayers;
     [SerializeField] private float _speedMultiplier = 1f;
     [SerializeField] private bool _updateViaReflection = false; // Если true, старое поведение, иначе используем только SetTrainSpeed
-    
-    private TrainManager _trainManager;
+    [SerializeField] private TrainManager _trainManager;
     
     private void Start()
     {
-        _trainManager = FindObjectOfType<TrainManager>();
-        
         // Инициализируем слои если они не заданы
         if (_parallaxLayers == null || _parallaxLayers.Length == 0)
         {
@@ -28,8 +25,8 @@ public class ParallaxEffect : MonoBehaviour
 
         if (_trainManager == null) return;
         
-        // Получаем текущую скорость поезда через reflection
-        float trainSpeed = GetTrainSpeed();
+        // Получаем текущую скорость поезда
+        float trainSpeed = _trainManager.GetCurrentSpeed();
         
         // Обновляем каждый слой параллакса
         foreach (var layer in _parallaxLayers)
@@ -41,27 +38,11 @@ public class ParallaxEffect : MonoBehaviour
         }
     }
     
-    private float GetTrainSpeed()
-    {
-        // Используем рефлексию для получения приватного поля _currentSpeed
-        var speedField = typeof(TrainManager).GetField("_currentSpeed", 
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        if (speedField != null)
-        {
-            return (float)speedField.GetValue(_trainManager);
-        }
-        
-        return 0f;
-    }
-    
     private void InitializeDefaultLayers()
     {
         // Находим все объекты с ParallaxLayer компонентами
         var foundLayers = FindObjectsOfType<ParallaxLayer>();
         _parallaxLayers = foundLayers;
-        
-        Debug.Log($"[ParallaxEffect] Найдено {foundLayers.Length} слоев параллакса");
     }
     
     // Публичный метод для установки скорости извне

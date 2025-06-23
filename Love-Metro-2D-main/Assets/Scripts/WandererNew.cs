@@ -56,8 +56,6 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
     public void Initiate(Vector3 initialMovingDirection, TrainManager train, ScoreCounter scoreCounter)
     {
-        Debug.Log($"[WandererNew] Инициализация {name}");
-        
         _initialMovingDirection = initialMovingDirection;
         CurrentMovingDirection = _initialMovingDirection.normalized;
 
@@ -87,7 +85,6 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         }
 
         _isInitiated = true;
-        Debug.Log($"[WandererNew] {name} успешно инициализирован, состояние: {_currentState?.GetType().Name}");
     }
 
     private void Update()
@@ -115,7 +112,6 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         {
             Couple couple = Instantiate(CouplePref).GetComponent<Couple>();
             couple.init(this, partner);
-            Debug.Log(couple.transform.position);
             _scoreCounter.UpdateScorePointFromMatching(Camera.main.WorldToScreenPoint(couple.transform.position));
         }
         ChangeState(matchingState);
@@ -130,7 +126,6 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
     {
         if (IsInCouple || _currentState is BeingAbsorbed) return;
         
-        Debug.Log($"[WandererNew] {name} переходит в состояние поглощения");
         beingAbsorbedState.SetAbsorptionParameters(absorptionCenter, absorptionForce);
         ChangeState(beingAbsorbedState);
     }
@@ -221,54 +216,18 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
         public override void OnTrainSpeedChange(Vector2 force)
         {
-            // Определяем, идет ли персонаж против направления торможения
-            float directionAlignment = Vector2.Dot(Passanger.CurrentMovingDirection.normalized, force.normalized);
-            bool movingAgainstBraking = directionAlignment < -0.3f; // персонаж идет в противоположную сторону
-            
-            // Базовая случайная компонента
-            float baseRandomVertical = Random.Range(-0.15f, 0.15f);
-            float baseRandomHorizontal = Random.Range(-0.1f, 0.1f);
-            
-            // Если персонаж идет против торможения - усиливаем случайность
-            if (movingAgainstBraking)
-            {
-                baseRandomVertical *= 2f; // усиливаем вертикальную случайность
-                baseRandomHorizontal *= 3f; // усиливаем горизонтальную случайность
-            }
-            
-            // Уменьшаем влияние текущего направления движения персонажа
-            Vector2 currentDirectionInfluence = Passanger.CurrentMovingDirection * 0.15f; // было влияние через скорость, теперь минимальное
-            
-            // Основная сила - это сила торможения (доминирующая)
-            Vector2 modifiedForce = force * 0.85f + // основная сила торможения
-                                   currentDirectionInfluence + // минимальное влияние текущего направления
-                                   new Vector2(baseRandomHorizontal, baseRandomVertical); // случайность
+            if (Passanger._currentState != Passanger.wanderingState) return;
 
-            // Магнетизм: ищем ближайшего персонажа противоположного пола
-            WandererNew closestOpposite = null;
-            float minDist = float.MaxValue;
-            foreach (var other in GameObject.FindObjectsOfType<WandererNew>())
+            bool movingAgainstBraking = Vector3.Dot(Passanger.CurrentMovingDirection, force) < 0;
+            Vector2 modifiedForce = movingAgainstBraking ? force * 1.5f : force * 0.3f;
+
+            Vector2 finalInertiaForce = modifiedForce / 10f;
+            if (finalInertiaForce.magnitude > 20f)
             {
-                if (other == Passanger) continue;
-                if (other.IsFemale == Passanger.IsFemale) continue;
-                float dist = Vector2.Distance(Passanger.transform.position, other.transform.position);
-                if (dist < minDist)
-                {
-                    minDist = dist;
-                    closestOpposite = other;
-                }
-            }
-            if (closestOpposite != null && minDist < 4f) // уменьшили радиус магнетизма для большей предсказуемости
-            {
-                Vector2 direction = (closestOpposite.transform.position - Passanger.transform.position).normalized;
-                float magnetStrength = 0.3f; // немного увеличили силу магнетизма
-                modifiedForce += direction * magnetStrength;
+                finalInertiaForce = finalInertiaForce.normalized * 20f;
             }
 
-            Debug.Log($"[WandererNew] {Passanger.name} торможение: force={force.magnitude:F2}, против направления={movingAgainstBraking}, итоговая сила={modifiedForce.magnitude:F2}");
-            
-            Passanger.ChangeState(Passanger.fallingState);
-            Passanger._currentState.OnTrainSpeedChange(modifiedForce);
+            Passanger._rigidbody.AddForce(finalInertiaForce, ForceMode2D.Impulse);
         }
 
         public override void OnTriggerEnter(Collider2D collision)
@@ -414,17 +373,20 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
         public override void OnTrainSpeedChange(Vector2 force)
         {
-            // Увеличили чувствительность к торможению в состоянии полета
-            float fallingSensitivity = Passanger._fallingSpeedInitialModifier * 1.5f; // увеличили в 1.5 раза
+            if (Passanger._currentState != Passanger.fallingState) return;
             
-            // Добавляем дополнительную силу в зависимости от текущей скорости полета
-            float speedMultiplier = 1f + (currentFallingSpeed.magnitude * 0.1f); // чем быстрее летит, тем сильнее реагирует
+            Vector2 additionalForce = force * 0.8f;
+            if (additionalForce.magnitude > 15f)
+            {
+                additionalForce = additionalForce.normalized * 15f;
+            }
             
-            Vector2 additionalForce = force * fallingSensitivity * speedMultiplier;
             currentFallingSpeed += additionalForce;
-            previousFallingSpeed = currentFallingSpeed;
             
-            Debug.Log($"[Falling] {Passanger.name} получил дополнительную силу: {additionalForce.magnitude:F2}, текущая скорость: {currentFallingSpeed.magnitude:F2}");
+            if (currentFallingSpeed.magnitude > 30f)
+            {
+                currentFallingSpeed = currentFallingSpeed.normalized * 30f;
+            }
         }
 
         private void resetFallingSpeeds()
@@ -493,48 +455,25 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         {
             _timeInAbsorption += Time.deltaTime;
             
-            // Постоянно притягиваем к центру поглощения
-            Vector3 directionToCenter = (_absorptionCenter - Passanger.transform.position).normalized;
-            float distance = Vector3.Distance(_absorptionCenter, Passanger.transform.position);
+            Vector3 direction = (_absorptionCenter - Passanger.transform.position).normalized;
+            float distance = Vector3.Distance(Passanger.transform.position, _absorptionCenter);
             
-            Debug.Log($"[BeingAbsorbed] {Passanger.name} поглощается: расстояние={distance:F2}, время={_timeInAbsorption:F1}");
-            
-            // Очень сильная сила притяжения
-            float dynamicForce = _absorptionForce * 5f; // Увеличиваем базовую силу
-            
-            // Дополнительно увеличиваем силу по мере приближения к центру
-            if (distance < 3f)
+            if (distance < 0.5f || _timeInAbsorption > _maxAbsorptionTime)
             {
-                dynamicForce *= (3f - distance) * 2f + 1f; // Экспоненциальное увеличение
-            }
-            
-            Vector3 absorptionForce = directionToCenter * dynamicForce;
-            
-            // Применяем силу как импульс для более быстрого движения
-            Passanger._rigidbody.AddForce(absorptionForce, ForceMode2D.Impulse);
-            
-            // Также устанавливаем скорость напрямую для гарантированного движения к центру
-            Vector3 targetVelocity = directionToCenter * Mathf.Min(dynamicForce * 0.1f, 10f);
-            Passanger._rigidbody.velocity = Vector2.Lerp(Passanger._rigidbody.velocity, targetVelocity, 0.5f);
-            
-            // Если персонаж близко к центру или слишком долго поглощается
-            if (distance < 1f || _timeInAbsorption > _maxAbsorptionTime)
-            {
-                // Уничтожаем персонажа (он поглощен черной дырой)
-                Debug.Log($"[WandererNew] {Passanger.name} поглощен черной дырой! Расстояние: {distance:F2}");
+                // Персонаж поглощен или время истекло
                 Passanger.RemoveFromContainerAndDestroy();
                 return;
             }
             
-            // Анимация падения/поглощения
-            Passanger.PassangerAnimator.ChangeFacingDirection(
-                Vector3.Dot(Vector3.Project(absorptionForce, Vector3.right).normalized, 
-                Passanger.IsFemale ? Vector3.right : Vector3.left) != 1);
+            // Применяем силу поглощения
+            Vector2 absorptionForce = direction * _absorptionForce;
+            absorptionForce *= (1f / Mathf.Max(distance, 0.1f)); // Увеличиваем силу при приближении
+            
+            Passanger._rigidbody.AddForce(absorptionForce, ForceMode2D.Force);
         }
         
         public override void Enter() 
         {
-            Debug.Log($"[WandererNew] {Passanger.name} начинает поглощаться черной дырой");
             Passanger._rigidbody.bodyType = RigidbodyType2D.Dynamic;
             Passanger.PassangerAnimator.SetFallingState(true);
             Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._fallingLayer);
@@ -555,25 +494,19 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
     private void Awake()
     {
-        Debug.Log($"[WandererNew] Awake для {name}");
-        
-        // Увеличиваем высоту BoxCollider2D в 2 раза для более вытянутой области столкновения
         var boxCollider = GetComponent<BoxCollider2D>();
         if (boxCollider != null)
         {
-            Vector2 size = boxCollider.size;
-            size.y *= 2.0f; // Можно изменить коэффициент для нужной высоты
-            boxCollider.size = size;
+            boxCollider.isTrigger = false;
         }
-        
-        // Инициализируем базовые компоненты
+
         _rigidbody = GetComponent<Rigidbody2D>();
         PassangerAnimator = GetComponent<PassangerAnimator>();
         _collider = GetComponent<Collider2D>();
-        
-        if (_rigidbody == null) Debug.LogError($"[WandererNew] {name} не имеет Rigidbody2D!");
-        if (PassangerAnimator == null) Debug.LogError($"[WandererNew] {name} не имеет PassangerAnimator!");
-        if (_collider == null) Debug.LogError($"[WandererNew] {name} не имеет Collider2D!");
+
+        if (_rigidbody == null) gameObject.AddComponent<Rigidbody2D>();
+        if (PassangerAnimator == null) gameObject.AddComponent<PassangerAnimator>();
+        if (_collider == null) gameObject.AddComponent<Collider2D>();
     }
     
     private void Start()
@@ -605,90 +538,54 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
     
     public void ApplyFieldForce(Vector2 force, FieldEffectType effectType)
     {
-        if (!_isInitiated) 
+        if (!_isInitiated)
         {
-            Debug.LogWarning($"[WandererNew] {name} не инициализирован, игнорирую силу поля");
             return;
         }
-        
-        Debug.Log($"[WandererNew] {name} получил силу поля {effectType}: {force.magnitude:F2}, состояние: {_currentState?.GetType().Name}");
-        
-        // Сохраняем силу эффекта
-        _activeFieldForces[effectType] = force;
-        
-        // Применяем силу в зависимости от текущего состояния
-        if (_currentState is Wandering wandering)
+
+        if (_currentState is Falling)
         {
-            // В состоянии блуждания применяем как модификацию направления движения
-            Vector2 modifiedDirection = (Vector2)CurrentMovingDirection + force * 0.1f;
-            CurrentMovingDirection = modifiedDirection.normalized;
-            Debug.Log($"[WandererNew] {name} изменил направление на: {CurrentMovingDirection}");
-        }
-        else if (_currentState is Falling falling)
-        {
-            // В состоянии падения применяем напрямую к Rigidbody
+            CurrentMovingDirection = force.normalized;
             _rigidbody.AddForce(force, ForceMode2D.Force);
-            Debug.Log($"[WandererNew] {name} получил силу падения: {force}");
         }
-        else
+        else if (_currentState is Wandering)
         {
-            Debug.Log($"[WandererNew] {name} в состоянии {_currentState?.GetType().Name}, сила поля не применяется");
+            CurrentMovingDirection = force.normalized;
         }
     }
     
     public void ApplyFieldForce(Vector3 force, ForceMode2D forceMode)
     {
-        if (!_isInitiated) 
+        if (!_isInitiated)
         {
-            Debug.LogWarning($"[WandererNew] {name} не инициализирован, игнорирую силу поля");
             return;
         }
-        
-        Debug.Log($"[WandererNew] {name} получил силу поля: {force.magnitude:F2}, режим: {forceMode}, состояние: {_currentState?.GetType().Name}");
-        
-        // Проверяем, не нужно ли перейти в состояние поглощения
-        CheckForBlackHoleAbsorption();
-        
-        // Применяем силу в зависимости от текущего состояния
-        if (_currentState is Wandering wandering)
+
+        if (_currentState is Falling)
         {
-            // В состоянии блуждания применяем как модификацию направления движения
-            Vector2 force2D = new Vector2(force.x, force.y);
-            Vector2 modifiedDirection = (Vector2)CurrentMovingDirection + force2D * 0.1f;
-            CurrentMovingDirection = modifiedDirection.normalized;
-            Debug.Log($"[WandererNew] {name} изменил направление на: {CurrentMovingDirection}");
-        }
-        else if (_currentState is Falling falling)
-        {
-            // В состоянии падения применяем напрямую к Rigidbody
+            CurrentMovingDirection = force.normalized;
             _rigidbody.AddForce(force, forceMode);
-            Debug.Log($"[WandererNew] {name} получил силу падения: {force}");
         }
-        else
+        else if (_currentState is Wandering)
         {
-            Debug.Log($"[WandererNew] {name} в состоянии {_currentState?.GetType().Name}, сила поля не применяется");
+            CurrentMovingDirection = force.normalized;
         }
     }
     
     private void CheckForBlackHoleAbsorption()
     {
-        // Если уже поглощается, не проверяем
-        if (_currentState is BeingAbsorbed) return;
+        var effects = FieldEffectSystem.Instance?.GetEffectsByType(FieldEffectType.Gravity);
+        if (effects == null) return;
         
-        // Проверяем все активные эффекты на предмет черных дыр
-        foreach (var effect in _currentEffects)
+        foreach (var effect in effects)
         {
             if (effect is GravityFieldEffectNew gravityEffect && gravityEffect._createBlackHoleEffect)
             {
-                var effectData = gravityEffect.GetEffectData();
-                float distance = Vector3.Distance(transform.position, effectData.center);
-                
-                // Если близко к черной дыре, переводим в состояние поглощения
-                if (distance < gravityEffect._eventHorizonRadius * 1.5f)
+                float distance = Vector3.Distance(transform.position, gravityEffect.transform.position);
+                if (distance <= gravityEffect._eventHorizonRadius)
                 {
-                    Debug.Log($"[WandererNew] {name} слишком близко к черной дыре (расстояние: {distance:F2}), переводим в поглощение");
-                    ForceToAbsorptionState(effectData.center, effectData.strength);
-                    return;
+                    ForceToAbsorptionState(gravityEffect.transform.position, gravityEffect._effectData.strength);
+                    break;
                 }
             }
         }
@@ -731,39 +628,29 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
     
     public void OnEnterFieldEffect(IFieldEffect effect)
     {
-        if (_currentEffects.Contains(effect)) return;
-        
-        _currentEffects.Add(effect);
-        
-        // Логика для реакции на вход в зону эффекта
+        if (!_currentEffects.Contains(effect))
+        {
+            _currentEffects.Add(effect);
+        }
+
         var effectData = effect.GetEffectData();
-        
-        Debug.Log($"[WandererNew] {name} вошел в эффект {effectData.effectType}, сила: {effectData.strength}");
-        
-        // Проверяем, является ли это эффектом черной дыры
+
+        // Специальная обработка гравитационных эффектов
         if (effectData.effectType == FieldEffectType.Gravity && effect is GravityFieldEffectNew gravityEffect)
         {
             float distanceToCenter = Vector3.Distance(transform.position, effectData.center);
-            Debug.Log($"[WandererNew] {name} проверяет черную дыру: расстояние={distanceToCenter:F2}, горизонт={gravityEffect._eventHorizonRadius}, черная дыра={gravityEffect._createBlackHoleEffect}");
             
-            // Если это черная дыра - сразу переводим в состояние поглощения при любом расстоянии в зоне эффекта
-            if (gravityEffect._createBlackHoleEffect)
+            if (gravityEffect._createBlackHoleEffect && distanceToCenter <= gravityEffect._eventHorizonRadius)
             {
-                Debug.Log($"[WandererNew] {name} попал в черную дыру! Переводим в состояние поглощения");
                 ForceToAbsorptionState(effectData.center, effectData.strength);
                 return;
             }
             
-            // Если это сильная гравитация и пассажир блуждает, переводим в падение
-            if (_currentState is Wandering && effectData.strength > 3f)
+            // Если сила гравитации превышает порог падения и персонаж не держится за поручень
+            if (effectData.strength > _handrailMinGrabbingSpeed && 
+                !(_currentState is StayingOnHandrail))
             {
-                Debug.Log($"[WandererNew] {name} попал в сильную гравитацию, переводим в падение");
-                Vector2 directionToCenter = (effectData.center - transform.position).normalized;
-                Vector2 initialFallingForce = directionToCenter * effectData.strength * 0.5f;
-                
-                // Переводим в состояние падения с начальной силой
                 ChangeState(fallingState);
-                _currentState.OnTrainSpeedChange(initialFallingForce);
             }
         }
     }

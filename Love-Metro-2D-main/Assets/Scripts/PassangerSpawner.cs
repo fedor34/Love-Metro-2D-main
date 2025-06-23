@@ -16,7 +16,7 @@ public class PassangerSpawner : MonoBehaviour
     [SerializeField] private Vector3[] _possibleStartMovingDirections;
     public void spawnPassangers()
     {
-        Debug.Log("PassangerSpawner: Начинаем спавн пассажиров");
+        Debug.Log("========== НАЧАЛО СПАВНА ПАССАЖИРОВ ==========");
         
         // Проверка и инициализация списков
         if (_spawnLocations == null || _spawnLocations.Count == 0)
@@ -24,36 +24,42 @@ public class PassangerSpawner : MonoBehaviour
             Debug.LogError("PassangerSpawner: Нет точек спавна!");
             return;
         }
+        Debug.Log($"PassangerSpawner: Точек спавна: {_spawnLocations.Count}");
         
         if (_passangerFemalePrefs == null || _passangerFemalePrefs.Count == 0)
         {
             Debug.LogError("PassangerSpawner: Нет женских префабов!");
             return;
         }
+        Debug.Log($"PassangerSpawner: Женских префабов: {_passangerFemalePrefs.Count}");
         
         if (_passangerMalePrefs == null || _passangerMalePrefs.Count == 0)
         {
             Debug.LogError("PassangerSpawner: Нет мужских префабов!");
             return;
         }
+        Debug.Log($"PassangerSpawner: Мужских префабов: {_passangerMalePrefs.Count}");
         
         if (_possibleStartMovingDirections == null || _possibleStartMovingDirections.Length == 0)
         {
             Debug.LogError("PassangerSpawner: Нет направлений движения!");
             return;
         }
+        Debug.Log($"PassangerSpawner: Направлений движения: {_possibleStartMovingDirections.Length}");
         
         if (_passiveContainer == null)
         {
             Debug.LogError("PassangerSpawner: Контейнер пассажиров не назначен!");
             return;
         }
+        Debug.Log($"PassangerSpawner: Контейнер назначен, текущих пассажиров: {_passiveContainer.Passangers?.Count ?? 0}");
         
         if (_trainManager == null)
         {
             Debug.LogError("PassangerSpawner: TrainManager не назначен!");
             return;
         }
+        Debug.Log("PassangerSpawner: TrainManager назначен");
         
         // Создаем локальную копию списка точек спавна
         List<Transform> availableLocations = new List<Transform>();
@@ -169,7 +175,8 @@ public class PassangerSpawner : MonoBehaviour
             }
         }
         
-        Debug.Log($"PassangerSpawner: Спавн завершен! Создано женщин: {femalesCreated}, мужчин: {malesCreated}");
+        Debug.Log($"========== СПАВН ЗАВЕРШЕН! Создано женщин: {femalesCreated}, мужчин: {malesCreated} ==========");
+        Debug.Log($"PassangerSpawner: Итого в контейнере пассажиров: {_passiveContainer.Passangers?.Count ?? 0}");
         
         // Временно отключаем SortingLayerEditor чтобы избежать ошибок
         /*if (_sortingLayerEditor != null)

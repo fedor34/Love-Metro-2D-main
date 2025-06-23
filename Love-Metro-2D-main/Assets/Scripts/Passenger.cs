@@ -216,18 +216,54 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
         public override void OnTrainSpeedChange(Vector2 force)
         {
-            if (Passanger._currentState != Passanger.wanderingState) return;
-
-            bool movingAgainstBraking = Vector3.Dot(Passanger.CurrentMovingDirection, force) < 0;
-            Vector2 modifiedForce = movingAgainstBraking ? force * 1.5f : force * 0.3f;
-
-            Vector2 finalInertiaForce = modifiedForce / 10f;
-            if (finalInertiaForce.magnitude > 20f)
+            // Определяем, идет ли персонаж против направления торможения
+            float directionAlignment = Vector2.Dot(Passanger.CurrentMovingDirection.normalized, force.normalized);
+            bool movingAgainstBraking = directionAlignment < -0.3f; // персонаж идет в противоположную сторону
+            
+            // Базовая случайная компонента
+            float baseRandomVertical = Random.Range(-0.15f, 0.15f);
+            float baseRandomHorizontal = Random.Range(-0.1f, 0.1f);
+            
+            // Если персонаж идет против торможения - усиливаем случайность
+            if (movingAgainstBraking)
             {
-                finalInertiaForce = finalInertiaForce.normalized * 20f;
+                baseRandomVertical *= 2f; // усиливаем вертикальную случайность
+                baseRandomHorizontal *= 3f; // усиливаем горизонтальную случайность
             }
+            
+            // Уменьшаем влияние текущего направления движения персонажа
+            Vector2 currentDirectionInfluence = Passanger.CurrentMovingDirection * 0.15f; // было влияние через скорость, теперь минимальное
+            
+            // Основная сила - это сила торможения (доминирующая)
+            Vector2 modifiedForce = force * 0.85f + // основная сила торможения
+                                   currentDirectionInfluence + // минимальное влияние текущего направления
+                                   new Vector2(baseRandomHorizontal, baseRandomVertical); // случайность
 
-            Passanger._rigidbody.AddForce(finalInertiaForce, ForceMode2D.Impulse);
+            // Магнетизм: ищем ближайшего персонажа противоположного пола
+            Passenger closestOpposite = null;
+            float minDist = float.MaxValue;
+            foreach (var other in GameObject.FindObjectsOfType<Passenger>())
+            {
+                if (other == Passanger) continue;
+                if (other.IsFemale == Passanger.IsFemale) continue;
+                float dist = Vector2.Distance(Passanger.transform.position, other.transform.position);
+                if (dist < minDist)
+                {
+                    minDist = dist;
+                    closestOpposite = other;
+                }
+            }
+            if (closestOpposite != null && minDist < 4f) // уменьшили радиус магнетизма для большей предсказуемости
+            {
+                Vector2 direction = (closestOpposite.transform.position - Passanger.transform.position).normalized;
+                float magnetStrength = 0.3f; // немного увеличили силу магнетизма
+                modifiedForce += direction * magnetStrength;
+            }
+            
+            // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: автоматический переход в состояние падения
+            Passanger.ChangeState(Passanger.fallingState);
+            ((Falling)Passanger.fallingState).SetInitialFallingSpeed(modifiedForce);
+            Passanger._currentState.OnTrainSpeedChange(modifiedForce);
         }
 
         public override void OnTriggerEnter(Collider2D collision)
@@ -315,6 +351,12 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             resetFallingSpeeds();
         }
 
+        public void SetInitialFallingSpeed(Vector2 initialSpeed)
+        {
+            currentFallingSpeed = initialSpeed * Passanger._fallingSpeedInitialModifier;
+            previousFallingSpeed = currentFallingSpeed;
+        }
+
         public override void OnCollision(Collision2D collision)
         {
             if (collision.transform.TryGetComponent<PlatformEffector2D>(out PlatformEffector2D platform))
@@ -373,20 +415,15 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
         public override void OnTrainSpeedChange(Vector2 force)
         {
-            if (Passanger._currentState != Passanger.fallingState) return;
+            // Увеличили чувствительность к торможению в состоянии полета
+            float fallingSensitivity = Passanger._fallingSpeedInitialModifier * 1.5f; // увеличили в 1.5 раза
             
-            Vector2 additionalForce = force * 0.8f;
-            if (additionalForce.magnitude > 15f)
-            {
-                additionalForce = additionalForce.normalized * 15f;
-            }
+            // Добавляем дополнительную силу в зависимости от текущей скорости полета
+            float speedMultiplier = 1f + (currentFallingSpeed.magnitude * 0.1f); // чем быстрее летит, тем сильнее реагирует
             
+            Vector2 additionalForce = force * fallingSensitivity * speedMultiplier;
             currentFallingSpeed += additionalForce;
-            
-            if (currentFallingSpeed.magnitude > 30f)
-            {
-                currentFallingSpeed = currentFallingSpeed.normalized * 30f;
-            }
+            previousFallingSpeed = currentFallingSpeed;
         }
 
         private void resetFallingSpeeds()

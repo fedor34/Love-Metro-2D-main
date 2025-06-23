@@ -50,7 +50,7 @@ public class BlackHoleTest : MonoBehaviour
         // Отладочная информация
         if (_blackHole != null && Time.frameCount % 60 == 0) // Каждую секунду
         {
-            var targets = FindObjectsOfType<WandererNew>();
+            var targets = FindObjectsOfType<Passenger>();
             int absorbedCount = 0;
             int nearbyCount = 0;
             

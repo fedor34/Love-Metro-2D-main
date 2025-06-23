@@ -18,6 +18,7 @@ public class TrainManager : MonoBehaviour
     [SerializeField] private float _acceleration = 60f;  // Очень быстрое ускорение
     [SerializeField] private float _deceleration = 10f;   // Замедление
     [SerializeField] private float _brakeDeceleration = 25f; // Резкое торможение по S
+    [SerializeField] private float _startBoost = 8f; // мгновенный прирост скорости при старте
 
     [Header("Настройки камеры и фона")]
     [SerializeField] private SpriteRenderer _backGround;
@@ -76,9 +77,11 @@ public class TrainManager : MonoBehaviour
         // ----------------------------------------------------
         // 1.  Вызовы инерции (делегаты) – разово при смене фаз
         // ----------------------------------------------------
-        // Начало ускорения: мягкий толчок назад
+        // Начало ускорения: мягкий толчок назад + резкий старт
         if (Input.GetKeyDown(KeyCode.Space))
         {
+            // Мгновенный прирост скорости
+            SetSpeed(_currentSpeed + _startBoost);
             startInertia?.Invoke(Vector2.right * _acceleration * 0.2f);
             OnBrakeEnd?.Invoke();
         }

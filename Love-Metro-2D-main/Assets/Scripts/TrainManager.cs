@@ -61,6 +61,20 @@ public class TrainManager : MonoBehaviour
     {
         SetSpeed(_minSpeed);
         _cameraStartPosition = _camera.position;
+        
+        // Автоматический поиск спавнера, если он не назначен
+        if (_spawner == null)
+        {
+            _spawner = FindObjectOfType<PassangerSpawner>();
+            if (_spawner != null)
+            {
+                Debug.Log("TrainManager: Автоматически найден PassangerSpawner");
+            }
+            else
+            {
+                Debug.LogError("TrainManager: PassangerSpawner не найден в сцене!");
+            }
+        }
     }
 
     private void SetSpeed(float newSpeed)

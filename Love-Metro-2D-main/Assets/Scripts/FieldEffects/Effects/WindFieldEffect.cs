@@ -86,7 +86,7 @@ public class WindFieldEffect : BaseFieldEffect
         }
         
         // Применяем силу ветра с учетом deltaTime
-        target.ApplyFieldForce(windForce * deltaTime);
+        target.ApplyFieldForce(windForce * deltaTime, FieldEffectType.Wind);
         
         if (_showGizmos)
         {

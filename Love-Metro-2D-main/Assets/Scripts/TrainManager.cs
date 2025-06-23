@@ -28,8 +28,7 @@ public class TrainManager : MonoBehaviour
 
     private Vector3 _cameraStartPosition;
     private float _currentSpeed;
-    private bool _isAccelerated;
-    private bool _isBraking; // новый флаг для торможения
+    private bool _isBraking; // флаг для торможения
     private float _previousSpeed;
 
     // Счётчик пройденного расстояния
@@ -64,7 +63,6 @@ public class TrainManager : MonoBehaviour
         _previousSpeed = _currentSpeed;
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            _isAccelerated = true;
             _isBraking = true;
             startInertia.Invoke(Vector2.left * (_maxSpeed - _currentSpeed) * (_acceleration / _deceleration));
             // Вызываем событие начала торможения
@@ -72,7 +70,6 @@ public class TrainManager : MonoBehaviour
         }
         if (Input.GetKeyUp(KeyCode.Space))
         {
-            _isAccelerated = false;
             _isBraking = false;
             startInertia.Invoke(Vector2.right * (_currentSpeed - _minSpeed) * (_acceleration / _deceleration));
             // Вызываем событие окончания торможения
@@ -107,21 +104,17 @@ public class TrainManager : MonoBehaviour
         }
         // --- Конец блока ---
 
-        if (_isAccelerated && _isBraking)
+        if (_isBraking)
         {
             // При торможении используем более сильное замедление
             SetSpeed(_currentSpeed - _brakeDeceleration * Time.deltaTime);
         }
-        else if (_isAccelerated)
-        {
-            SetSpeed(_currentSpeed + _acceleration * Time.deltaTime);
-        }
         else
         {
-            // Обычное замедление до минимальной скорости
-            if (_currentSpeed > _minSpeed)
+            // Обычное ускорение до максимальной скорости
+            if (_currentSpeed < _maxSpeed)
             {
-                SetSpeed(_currentSpeed - _deceleration * Time.deltaTime);
+                SetSpeed(_currentSpeed + _acceleration * Time.deltaTime);
             }
         }
 

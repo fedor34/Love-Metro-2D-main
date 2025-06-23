@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(SpriteRenderer))]
+// Убираем принудительное требование SpriteRenderer, так как он нужен только для отладки
 public class WanderingPoint : MonoBehaviour
 {
     public bool IsOccupied;
@@ -10,11 +10,14 @@ public class WanderingPoint : MonoBehaviour
 
     public void Ping() 
     { 
-        GetComponent<SpriteRenderer>().color = Color.yellow;
+        // Проверяем наличие SpriteRenderer перед использованием
+        SpriteRenderer sr = GetComponent<SpriteRenderer>();
+        if (sr != null)
+            sr.color = Color.yellow;
     }
 
     private void Start()
     {
-        SpriteRenderer spriteRenderer = GetComponent<SpriteRenderer>();
+        // Убираем неиспользуемую переменную
     }
 }

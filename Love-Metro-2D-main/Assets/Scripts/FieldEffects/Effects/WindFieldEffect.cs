@@ -130,9 +130,9 @@ public class WindFieldEffect : BaseFieldEffect
         _fluctuationSpeed = speed;
     }
     
-    protected override void OnDrawGizmosSelected()
+    protected override void OnDrawGizmos()
     {
-        base.OnDrawGizmosSelected();
+        base.OnDrawGizmos();
         
         if (!_showWindDirection) return;
         

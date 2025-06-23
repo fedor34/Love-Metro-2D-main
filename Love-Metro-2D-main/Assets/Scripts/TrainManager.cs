@@ -12,11 +12,14 @@ public class TrainManager : MonoBehaviour
     public event BrakeAction OnBrakeStart;
     public event BrakeAction OnBrakeEnd;
 
-    [SerializeField] private float _maxSpeed = 15f; // увеличили с 10 до 15
+    [Header("Параметры движения")]
+    [SerializeField] private float _maxSpeed = 15f;
     [SerializeField] private float _minSpeed = 1f;
-    [SerializeField] private float _acceleration = 8f; // установили более высокое ускорение
-    [SerializeField] private float _deceleration = 6f; // установили более высокое замедление
-    [SerializeField] private float _brakeDeceleration = 25f; // новый параметр для торможения пробелом
+    [SerializeField] private float _acceleration = 8f;   // Реалистичное ускорение
+    [SerializeField] private float _deceleration = 3f;   // Плавное естественное замедление
+    [SerializeField] private float _brakeDeceleration = 15f; // Резкое торможение по S
+
+    [Header("Настройки камеры и фона")]
     [SerializeField] private SpriteRenderer _backGround;
     [SerializeField] private PassangersContainer _passangers;
     [SerializeField] private Transform _camera;
@@ -41,6 +44,9 @@ public class TrainManager : MonoBehaviour
 
     private bool stopCoroutineStarted = false; // Флаг для задержки остановки
 
+    // Текущее фактическое ускорение (полезно для отладки или эффектов)
+    private float _currentAcceleration = 0f;
+
     private void Start()
     {
         SetSpeed(_minSpeed);
@@ -52,99 +58,98 @@ public class TrainManager : MonoBehaviour
     private void SetSpeed(float newSpeed)
     {
         _currentSpeed = newSpeed;
-        // Ограничиваем скорость снизу нулем вместо _minSpeed при торможении
-        float minLimit = _isBraking ? 0f : _minSpeed;
-        _currentSpeed = Mathf.Clamp(_currentSpeed, minLimit, _maxSpeed);
+        // Ограничиваем скорость, но позволяем ей опускаться до 0
+        _currentSpeed = Mathf.Clamp(newSpeed, 0f, _maxSpeed);
     }
 
     private float _elapsedTime = 0;
     private void Update()
     {
         _previousSpeed = _currentSpeed;
+        
+        bool isAccelerating = Input.GetKey(KeyCode.Space);
+        _isBraking = Input.GetKey(KeyCode.S); // Торможение на S
+
+        // ----------------------------------------------------
+        // 1.  Вызовы инерции (делегаты) – разово при смене фаз
+        // ----------------------------------------------------
+        // Сильный толчок назад в начале ускорения
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            _isBraking = true;
-            startInertia.Invoke(Vector2.left * (_maxSpeed - _currentSpeed) * (_acceleration / _deceleration));
-            // Вызываем событие начала торможения
-            OnBrakeStart?.Invoke();
+            startInertia?.Invoke(Vector2.right * _acceleration * 2f);
+            OnBrakeEnd?.Invoke();
         }
+        // Мягкий толчок вперёд, когда игрок отпускает ускорение
         if (Input.GetKeyUp(KeyCode.Space))
         {
-            _isBraking = false;
-            startInertia.Invoke(Vector2.right * (_currentSpeed - _minSpeed) * (_acceleration / _deceleration));
-            // Вызываем событие окончания торможения
+            float predictedDecel = Mathf.Clamp(_currentSpeed, 0, _deceleration * 4f);
+            startInertia?.Invoke(Vector2.left * predictedDecel);
+        }
+
+        // Резкий толчок вперёд при экстренном торможении (S)
+        if (Input.GetKeyDown(KeyCode.S))
+        {
+            startInertia?.Invoke(Vector2.left * Mathf.Max(_currentSpeed, _brakeDeceleration * 2f));
+            OnBrakeStart?.Invoke();
+        }
+        if (Input.GetKeyUp(KeyCode.S))
+        {
             OnBrakeEnd?.Invoke();
         }
 
-        // Если поезд остановлен, не двигаем дальше
-        if (_isStopped)
-            return;
-
-        // --- Остановка только если не осталось возможных пар ---
-        int freeFemales = 0;
-        int freeMales = 0;
-        foreach (var p in _passangers.Passangers)
-        {
-            if (!p.IsInCouple)
-            {
-                if (p.IsFemale) freeFemales++;
-                else freeMales++;
-            }
-        }
-        int possiblePairs = Mathf.Min(freeFemales, freeMales);
-        Debug.Log($"[TrainManager] Свободных женщин: {freeFemales}, мужчин: {freeMales}, возможных пар: {possiblePairs}, stopCoroutineStarted: {stopCoroutineStarted}, _isStopped: {_isStopped}");
-        if (possiblePairs == 0 && !stopCoroutineStarted && !_isStopped)
-        {
-            stopCoroutineStarted = true;
-            StartCoroutine(StopAfterDelay(3f));
-        }
-        if (possiblePairs > 0)
-        {
-            stopCoroutineStarted = false;
-        }
-        // --- Конец блока ---
-
+        // ----------------------------------------------------
+        // 2.  Фактическая физика движения поезда
+        // ----------------------------------------------------
+        float accelerationValue = 0f;
         if (_isBraking)
         {
-            // При торможении используем более сильное замедление
-            SetSpeed(_currentSpeed - _brakeDeceleration * Time.deltaTime);
+            accelerationValue = -_brakeDeceleration;
+        }
+        else if (isAccelerating)
+        {
+            accelerationValue = _acceleration;
         }
         else
         {
-            // Обычное ускорение до максимальной скорости
-            if (_currentSpeed < _maxSpeed)
-            {
-                SetSpeed(_currentSpeed + _acceleration * Time.deltaTime);
-            }
+            // Естественное трение/сопротивление движению
+            accelerationValue = -_deceleration;
         }
 
-        _camera.position = Vector3.Lerp(_camera.position, 
-            _cameraStartPosition + Vector3.right * _currentSpeed * _cameraModifier, _cameraSpeed);
+        // Сохраняем для отладки
+        _currentAcceleration = accelerationValue;
+
+        // Интегрируем скорость
+        SetSpeed(_currentSpeed + accelerationValue * Time.deltaTime);
+
+        if (_camera != null)
+        {
+            _camera.position = Vector3.Lerp(_camera.position, 
+                _cameraStartPosition + Vector3.right * _currentSpeed * _cameraModifier, _cameraSpeed);
+        }
 
         // Для фона используем только положительную скорость
         float displaySpeed = Mathf.Max(0, _currentSpeed);
         
-        // Передаем накопленное время для анимации фона
-        _backGround.material.SetFloat("_elapsedTime", _elapsedTime);
+        // Передаем параметры в шейдер фона
+        if (_backGround != null && _backGround.material != null)
+        {
+            _backGround.material.SetFloat("_elapsedTime", _elapsedTime);
+            float speedPercent = displaySpeed / _maxSpeed;
+            _backGround.material.SetFloat("_Speed", speedPercent);
+            _backGround.material.SetFloat("_CurrentSpeed", displaySpeed);
+            _backGround.material.SetFloat("_MaxSpeed", _maxSpeed);
+        }
         _elapsedTime += Time.deltaTime * displaySpeed;
         
-        // Передаем текущую скорость как процент от максимальной для правильного отображения
-        float speedPercent = displaySpeed / _maxSpeed;
-        _backGround.material.SetFloat("_Speed", speedPercent);
-        
-        // Также передаем абсолютную скорость
-        _backGround.material.SetFloat("_CurrentSpeed", displaySpeed);
-        _backGround.material.SetFloat("_MaxSpeed", _maxSpeed);
-        
-        // Обновляем параллакс эффект только с положительной скоростью
+        // Обновляем параллакс эффект
         if (_parallaxEffect != null)
         {
             _parallaxEffect.SetTrainSpeed(displaySpeed);
         }
 
-        // Считаем пройденное расстояние (может пригодиться для статистики)
+        // Считаем пройденное расстояние
         _distanceTraveled += Mathf.Abs(displaySpeed) * Time.deltaTime;
-        Debug.Log($"[TrainManager] Speed: {_currentSpeed:F2}, Display Speed: {displaySpeed:F2}, Distance: {_distanceTraveled:F2}");
+        //Debug.Log($"[TrainManager] Speed: {_currentSpeed:F2}, Display Speed: {displaySpeed:F2}, Distance: {_distanceTraveled:F2}");
     }
 
     // Корутина задержки остановки поезда, если осталось 2 пассажира

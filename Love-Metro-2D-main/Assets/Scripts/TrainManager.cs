@@ -91,6 +91,14 @@ public class TrainManager : MonoBehaviour
                 StartCoroutine(StopAfterDelay(2f));
             }
         }
+        
+        // Принудительная остановка для тестирования (клавиша R)
+        if (Input.GetKeyDown(KeyCode.R) && !_isStopped && !stopCoroutineStarted)
+        {
+            Debug.Log("TrainManager: Принудительная остановка по клавише R");
+            stopCoroutineStarted = true;
+            StartCoroutine(StopAfterDelay(0.5f));
+        }
 
         // ----------------------------------------------------
         // 1.  Вызовы инерции (делегаты) – разово при смене фаз

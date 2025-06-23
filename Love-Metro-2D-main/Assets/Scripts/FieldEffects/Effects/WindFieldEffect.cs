@@ -19,6 +19,18 @@ public class WindFieldEffect : BaseFieldEffect
     private float _fluctuationTime = 0f;
     private Vector2 _normalizedDirection;
     
+    protected override FieldEffectData CreateDefaultEffectData()
+    {
+        return new FieldEffectData
+        {
+            effectType = FieldEffectType.Wind,
+            strength = _windStrength,
+            radius = 10f,
+            center = transform.position,
+            affectedLayers = LayerMask.GetMask("Default")
+        };
+    }
+    
     protected override void Start()
     {
         base.Start();
@@ -27,11 +39,11 @@ public class WindFieldEffect : BaseFieldEffect
         _normalizedDirection = _windDirection.normalized;
         
         // Настройка данных эффекта
-        if (EffectData.effectType != FieldEffectType.Wind)
+        if (_effectData.effectType != FieldEffectType.Wind)
         {
-            EffectData.effectType = FieldEffectType.Wind;
-            EffectData.strength = _windStrength;
-            EffectData.affectedLayers = LayerMask.GetMask("Default");
+            _effectData.effectType = FieldEffectType.Wind;
+            _effectData.strength = _windStrength;
+            _effectData.affectedLayers = LayerMask.GetMask("Default");
         }
         
         Debug.Log($"[WindFieldEffect] Создан ветер: направление={_windDirection}, сила={_windStrength}");
@@ -45,17 +57,20 @@ public class WindFieldEffect : BaseFieldEffect
         _fluctuationTime += Time.deltaTime * _fluctuationSpeed;
     }
     
-    public override void ApplyEffect(IFieldEffectTarget target, float distance)
+    public override void ApplyEffect(IFieldEffectTarget target, float deltaTime)
     {
         if (target == null) return;
+        
+        // Получаем расстояние до цели
+        float distance = GetDistanceToTarget(target);
         
         // Вычисляем силу ветра на основе расстояния
         float effectiveStrength = _windStrength;
         
         // Уменьшаем силу с расстоянием (опционально)
-        if (EffectData.radius > 0 && distance > 0)
+        if (_effectData.radius > 0 && distance > 0)
         {
-            float distanceFactor = 1f - (distance / EffectData.radius);
+            float distanceFactor = 1f - (distance / _effectData.radius);
             effectiveStrength *= distanceFactor;
         }
         
@@ -70,10 +85,10 @@ public class WindFieldEffect : BaseFieldEffect
             windForce += perpendicular * fluctuation * effectiveStrength;
         }
         
-        // Применяем силу ветра
-        target.ApplyFieldForce(windForce);
+        // Применяем силу ветра с учетом deltaTime
+        target.ApplyFieldForce(windForce * deltaTime);
         
-        if (DebugMode)
+        if (_showGizmos)
         {
             Debug.Log($"[WindFieldEffect] Применен ветер к {target}: сила={windForce.magnitude:F2}, направление={windForce.normalized}");
         }
@@ -101,7 +116,7 @@ public class WindFieldEffect : BaseFieldEffect
     public void SetWindStrength(float strength)
     {
         _windStrength = strength;
-        EffectData.strength = strength;
+        _effectData.strength = strength;
         Debug.Log($"[WindFieldEffect] Сила ветра изменена на {strength}");
     }
     
@@ -137,16 +152,16 @@ public class WindFieldEffect : BaseFieldEffect
         Gizmos.DrawLine(center + direction * 2f, center + arrowHead2);
         
         // Показываем зону действия
-        if (EffectData.radius > 0)
+        if (_effectData.radius > 0)
         {
             Gizmos.color = new Color(_windColor.r, _windColor.g, _windColor.b, 0.2f);
-            Gizmos.DrawSphere(center, EffectData.radius);
+            Gizmos.DrawSphere(center, _effectData.radius);
         }
     }
     
-    protected override string GetEffectInfo()
+    protected virtual string GetEffectInfo()
     {
-        string info = base.GetEffectInfo();
+        string info = $"Wind Effect - {gameObject.name}";
         info += $"\nWind Direction: {_windDirection}";
         info += $"\nWind Strength: {_windStrength:F1}";
         

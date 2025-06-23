@@ -13,19 +13,18 @@ public class TrainManager : MonoBehaviour
     public event BrakeAction OnBrakeEnd;
 
     [Header("Параметры движения")]
-    [SerializeField] private float _maxSpeed = 15f;
+    [SerializeField] private float _maxSpeed = 25f;
     [SerializeField] private float _minSpeed = 1f;
-    [SerializeField] private float _acceleration = 8f;   // Реалистичное ускорение
-    [SerializeField] private float _deceleration = 3f;   // Плавное естественное замедление
-    [SerializeField] private float _brakeDeceleration = 15f; // Резкое торможение по S
+    [SerializeField] private float _acceleration = 60f;  // Очень быстрое ускорение
+    [SerializeField] private float _deceleration = 10f;   // Замедление
+    [SerializeField] private float _brakeDeceleration = 25f; // Резкое торможение по S
 
     [Header("Настройки камеры и фона")]
     [SerializeField] private SpriteRenderer _backGround;
     [SerializeField] private PassangersContainer _passangers;
     [SerializeField] private Transform _camera;
-    [SerializeField] private float _cameraSpeed;
-    [SerializeField] private float _cameraModifier;
-    
+    // Камера будет статична – убираем смещения
+
     // Ссылка на параллакс эффект
     private ParallaxEffect _parallaxEffect;
 
@@ -73,23 +72,22 @@ public class TrainManager : MonoBehaviour
         // ----------------------------------------------------
         // 1.  Вызовы инерции (делегаты) – разово при смене фаз
         // ----------------------------------------------------
-        // Сильный толчок назад в начале ускорения
+        // Начало ускорения: мягкий толчок назад
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            startInertia?.Invoke(Vector2.right * _acceleration * 2f);
+            startInertia?.Invoke(Vector2.right * _acceleration * 0.2f);
             OnBrakeEnd?.Invoke();
         }
-        // Мягкий толчок вперёд, когда игрок отпускает ускорение
+        // Конец ускорения: мягкий толчок вперёд
         if (Input.GetKeyUp(KeyCode.Space))
         {
-            float predictedDecel = Mathf.Clamp(_currentSpeed, 0, _deceleration * 4f);
-            startInertia?.Invoke(Vector2.left * predictedDecel);
+            startInertia?.Invoke(Vector2.left * _deceleration);
         }
 
-        // Резкий толчок вперёд при экстренном торможении (S)
+        // Резкое торможение (S)
         if (Input.GetKeyDown(KeyCode.S))
         {
-            startInertia?.Invoke(Vector2.left * Mathf.Max(_currentSpeed, _brakeDeceleration * 2f));
+            startInertia?.Invoke(Vector2.left * _currentSpeed * 0.5f);
             OnBrakeStart?.Invoke();
         }
         if (Input.GetKeyUp(KeyCode.S))
@@ -121,35 +119,26 @@ public class TrainManager : MonoBehaviour
         // Интегрируем скорость
         SetSpeed(_currentSpeed + accelerationValue * Time.deltaTime);
 
+        // --- Камера фиксирована ---
         if (_camera != null)
         {
-            _camera.position = Vector3.Lerp(_camera.position, 
-                _cameraStartPosition + Vector3.right * _currentSpeed * _cameraModifier, _cameraSpeed);
+            _camera.position = _cameraStartPosition;
         }
 
-        // Для фона используем только положительную скорость
-        float displaySpeed = Mathf.Max(0, _currentSpeed);
-        
-        // Передаем параметры в шейдер фона
-        if (_backGround != null && _backGround.material != null)
+        // --- Фон и параллакс ---
+        if (_backGround?.material != null)
         {
             _backGround.material.SetFloat("_elapsedTime", _elapsedTime);
-            float speedPercent = displaySpeed / _maxSpeed;
-            _backGround.material.SetFloat("_Speed", speedPercent);
-            _backGround.material.SetFloat("_CurrentSpeed", displaySpeed);
-            _backGround.material.SetFloat("_MaxSpeed", _maxSpeed);
+            _backGround.material.SetFloat("_Speed", _currentSpeed / _maxSpeed);
+            _backGround.material.SetFloat("_CurrentSpeed", _currentSpeed);
         }
-        _elapsedTime += Time.deltaTime * displaySpeed;
+        _elapsedTime += Time.deltaTime * _currentSpeed;
         
-        // Обновляем параллакс эффект
-        if (_parallaxEffect != null)
-        {
-            _parallaxEffect.SetTrainSpeed(displaySpeed);
-        }
+        _parallaxEffect?.SetTrainSpeed(_currentSpeed);
 
         // Считаем пройденное расстояние
-        _distanceTraveled += Mathf.Abs(displaySpeed) * Time.deltaTime;
-        //Debug.Log($"[TrainManager] Speed: {_currentSpeed:F2}, Display Speed: {displaySpeed:F2}, Distance: {_distanceTraveled:F2}");
+        _distanceTraveled += Mathf.Abs(_currentSpeed) * Time.deltaTime;
+        //Debug.Log($"[TrainManager] Speed: {_currentSpeed:F2}, Display Speed: {_currentSpeed:F2}, Distance: {_distanceTraveled:F2}");
     }
 
     // Корутина задержки остановки поезда, если осталось 2 пассажира

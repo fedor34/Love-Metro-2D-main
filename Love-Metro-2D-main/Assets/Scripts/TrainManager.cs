@@ -79,6 +79,19 @@ public class TrainManager : MonoBehaviour
         _isBraking = Input.GetKey(KeyCode.S); // Торможение на S
 
         // ----------------------------------------------------
+        // Проверка количества возможных пар для остановки
+        // ----------------------------------------------------
+        if (!_isStopped && !stopCoroutineStarted && _passangers != null)
+        {
+            int possiblePairs = CalculatePossiblePairs();
+            if (possiblePairs <= 1)
+            {
+                stopCoroutineStarted = true;
+                StartCoroutine(StopAfterDelay(2f));
+            }
+        }
+
+        // ----------------------------------------------------
         // 1.  Вызовы инерции (делегаты) – разово при смене фаз
         // ----------------------------------------------------
         // Начало ускорения: мягкий толчок назад + резкий старт
@@ -157,6 +170,31 @@ public class TrainManager : MonoBehaviour
 
         // Считаем пройденное расстояние
         _distanceTraveled += Mathf.Abs(_currentSpeed) * Time.deltaTime;
+    }
+
+    // Метод для расчета количества возможных пар
+    private int CalculatePossiblePairs()
+    {
+        if (_passangers == null || _passangers.Passangers == null)
+            return 0;
+
+        int males = 0;
+        int females = 0;
+
+        foreach (var passenger in _passangers.Passangers)
+        {
+            // Считаем только пассажиров, которые могут образовать пары
+            if (passenger != null && passenger.IsMatchable && !passenger.IsInCouple)
+            {
+                if (passenger.IsFemale)
+                    females++;
+                else
+                    males++;
+            }
+        }
+
+        // Возвращаем количество возможных пар
+        return Mathf.Min(males, females);
     }
 
     // Корутина задержки остановки поезда, если осталось 2 пассажира

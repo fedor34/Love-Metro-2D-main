@@ -16,24 +16,30 @@ public class PassangerSpawner : MonoBehaviour
     [SerializeField] private Vector3[] _possibleStartMovingDirections;
     public void spawnPassangers()
     {
+        Debug.Log("PassangerSpawner: Начинаем спавн пассажиров");
+        
         // Проверка и инициализация списков
         if (_spawnLocations == null || _spawnLocations.Count == 0)
         {
+            Debug.LogError("PassangerSpawner: Нет точек спавна!");
             return;
         }
         
         if (_passangerFemalePrefs == null || _passangerFemalePrefs.Count == 0)
         {
+            Debug.LogError("PassangerSpawner: Нет женских префабов!");
             return;
         }
         
         if (_passangerMalePrefs == null || _passangerMalePrefs.Count == 0)
         {
+            Debug.LogError("PassangerSpawner: Нет мужских префабов!");
             return;
         }
         
         if (_possibleStartMovingDirections == null || _possibleStartMovingDirections.Length == 0)
         {
+            Debug.LogError("PassangerSpawner: Нет направлений движения!");
             return;
         }
         
@@ -55,6 +61,8 @@ public class PassangerSpawner : MonoBehaviour
         // Определяем количество пассажиров для спавна
         int maxPossibleSpawn = Mathf.Min(8, availableLocations.Count);
         int spawnCount = UnityEngine.Random.Range(4, maxPossibleSpawn + 1);
+        
+        Debug.Log($"PassangerSpawner: Планируем создать {spawnCount} пассажиров из {availableLocations.Count} доступных точек");
         
         // Создаем списки перемешанных префабов для женщин и мужчин
         List<Passenger> femalePrefabsShuffled = new List<Passenger>(_passangerFemalePrefs);
@@ -139,12 +147,17 @@ public class PassangerSpawner : MonoBehaviour
                 if (createFemale) femalesCreated++;
                 else malesCreated++;
                 
+                Debug.Log($"PassangerSpawner: Создан пассажир {(createFemale ? "женщина" : "мужчина")} в позиции {spawnPoint.position}");
+                
             }
             catch (System.Exception e)
             {
+                Debug.LogError($"PassangerSpawner: Ошибка при создании пассажира: {e.Message}");
                 continue;
             }
         }
+        
+        Debug.Log($"PassangerSpawner: Спавн завершен! Создано женщин: {femalesCreated}, мужчин: {malesCreated}");
         
         if (_sortingLayerEditor != null)
         {

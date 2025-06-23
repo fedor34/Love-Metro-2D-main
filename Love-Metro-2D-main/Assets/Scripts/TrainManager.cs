@@ -86,6 +86,7 @@ public class TrainManager : MonoBehaviour
             int possiblePairs = CalculatePossiblePairs();
             if (possiblePairs <= 1)
             {
+                Debug.Log($"TrainManager: Автоматическая остановка! Возможных пар: {possiblePairs}");
                 stopCoroutineStarted = true;
                 StartCoroutine(StopAfterDelay(2f));
             }
@@ -256,7 +257,14 @@ public class TrainManager : MonoBehaviour
 
         // Спавним новых пассажиров
         if (_spawner != null)
+        {
+            Debug.Log("TrainManager: Вызываем спавн новых пассажиров на остановке");
             _spawner.spawnPassangers();
+        }
+        else
+        {
+            Debug.LogError("TrainManager: Спавнер не назначен!");
+        }
 
         // Ждём и снова запускаем поезд
         yield return new WaitForSeconds(1.5f);

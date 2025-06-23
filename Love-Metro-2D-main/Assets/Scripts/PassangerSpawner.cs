@@ -43,6 +43,18 @@ public class PassangerSpawner : MonoBehaviour
             return;
         }
         
+        if (_passiveContainer == null)
+        {
+            Debug.LogError("PassangerSpawner: Контейнер пассажиров не назначен!");
+            return;
+        }
+        
+        if (_trainManager == null)
+        {
+            Debug.LogError("PassangerSpawner: TrainManager не назначен!");
+            return;
+        }
+        
         // Создаем локальную копию списка точек спавна
         List<Transform> availableLocations = new List<Transform>();
         foreach (var loc in _spawnLocations)

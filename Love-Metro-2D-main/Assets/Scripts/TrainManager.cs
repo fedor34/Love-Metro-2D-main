@@ -250,7 +250,20 @@ public class TrainManager : MonoBehaviour
         {
             Destroy(couple.gameObject);
         }
-        // Не трогаем пассажиров без пары
+        
+        // Удаляем всех оставшихся пассажиров
+        if (_passangers != null && _passangers.Passangers != null)
+        {
+            Debug.Log($"TrainManager: Удаляем {_passangers.Passangers.Count} оставшихся пассажиров");
+            for (int i = _passangers.Passangers.Count - 1; i >= 0; i--)
+            {
+                if (_passangers.Passangers[i] != null)
+                {
+                    Destroy(_passangers.Passangers[i].gameObject);
+                }
+            }
+            _passangers.Passangers.Clear();
+        }
 
         // Ждём чуть-чуть для эффекта
         yield return new WaitForSeconds(0.5f);

@@ -23,7 +23,11 @@ public class TrainManager : MonoBehaviour
     [SerializeField] private SpriteRenderer _backGround;
     [SerializeField] private PassangersContainer _passangers;
     [SerializeField] private Transform _camera;
-    // Камера будет статична – убираем смещения
+    [Header("Камера: следование и качка")]
+    [SerializeField] private float _cameraFollowStrength = 8f; // коэффициент lerp
+    [SerializeField] private float _cameraShakeAmplitude = 0.2f; // макс смещение по Y
+    [SerializeField] private float _cameraShakeSmooth = 5f; // скорость сглаживания
+    private float _currentShakeOffset = 0f;
 
     // Ссылка на параллакс эффект
     private ParallaxEffect _parallaxEffect;
@@ -119,10 +123,18 @@ public class TrainManager : MonoBehaviour
         // Интегрируем скорость
         SetSpeed(_currentSpeed + accelerationValue * Time.deltaTime);
 
-        // --- Камера фиксирована ---
+        // --- Камера: плавное следование + атмосферная качка ---
         if (_camera != null)
         {
-            _camera.position = _cameraStartPosition;
+            // 1. Горизонтальное следование за пройденным путём
+            float targetX = _cameraStartPosition.x + _distanceTraveled;
+            float newX = Mathf.Lerp(_camera.position.x, targetX, _cameraFollowStrength * Time.deltaTime);
+
+            // 2. Вертикальная качка от ускорения
+            float targetShake = Mathf.Clamp(-_currentAcceleration / _acceleration, -1f, 1f) * _cameraShakeAmplitude;
+            _currentShakeOffset = Mathf.Lerp(_currentShakeOffset, targetShake, _cameraShakeSmooth * Time.deltaTime);
+
+            _camera.position = new Vector3(newX, _cameraStartPosition.y + _currentShakeOffset, _cameraStartPosition.z);
         }
 
         // --- Фон и параллакс ---

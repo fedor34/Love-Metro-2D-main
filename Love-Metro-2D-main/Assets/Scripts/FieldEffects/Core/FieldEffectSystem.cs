@@ -230,12 +230,54 @@ public class FieldEffectSystem : MonoBehaviour
         // Обновляем кэш если нужно
         UpdateSpatialCache();
         
+        // Очищаем null объекты из списка целей
+        CleanupNullTargets();
+        
         // Обновляем все активные эффекты
         foreach (var target in _allTargets)
         {
             if (target == null) continue;
             
-            UpdateEffectsForTarget(target, deltaTime);
+            try
+            {
+                UpdateEffectsForTarget(target, deltaTime);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[FieldEffectSystem] Ошибка при обновлении эффекта для цели: {e.Message}");
+            }
+        }
+    }
+    
+    private void CleanupNullTargets()
+    {
+        if (_allTargets == null) return;
+        
+        // Удаляем null объекты из списка целей
+        for (int i = _allTargets.Count - 1; i >= 0; i--)
+        {
+            if (_allTargets[i] == null)
+            {
+                _allTargets.RemoveAt(i);
+            }
+        }
+        
+        // Удаляем null объекты из активных эффектов
+        if (_activeEffectsPerTarget != null)
+        {
+            var keysToRemove = new List<IFieldEffectTarget>();
+            foreach (var key in _activeEffectsPerTarget.Keys)
+            {
+                if (key == null)
+                {
+                    keysToRemove.Add(key);
+                }
+            }
+            
+            foreach (var key in keysToRemove)
+            {
+                _activeEffectsPerTarget.Remove(key);
+            }
         }
     }
     
@@ -244,7 +286,18 @@ public class FieldEffectSystem : MonoBehaviour
         // Защита от null
         if (target == null || _activeEffectsPerTarget == null) return;
         
-        var targetPosition = target.GetPosition();
+        Vector3 targetPosition;
+        try
+        {
+            targetPosition = target.GetPosition();
+        }
+        catch (System.Exception)
+        {
+            // Объект уничтожен, удаляем его из списка
+            _allTargets.Remove(target);
+            return;
+        }
+        
         var nearbyEffects = GetEffectsAtPosition(targetPosition);
         
         // Проверяем, есть ли target в словаре, если нет - создаем

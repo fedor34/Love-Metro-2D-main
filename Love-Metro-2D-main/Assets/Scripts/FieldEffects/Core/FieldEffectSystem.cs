@@ -230,13 +230,21 @@ public class FieldEffectSystem : MonoBehaviour
         // Обновляем кэш если нужно
         UpdateSpatialCache();
         
-        // Очищаем null объекты из списка целей
-        CleanupNullTargets();
+        // Простая и безопасная проверка на null
+        if (_allTargets == null) return;
+        
+        // Создаем копию списка для безопасной итерации
+        var targetsCopy = new List<IFieldEffectTarget>(_allTargets);
         
         // Обновляем все активные эффекты
-        foreach (var target in _allTargets)
+        foreach (var target in targetsCopy)
         {
-            if (target == null) continue;
+            if (target == null) 
+            {
+                // Удаляем null объект из оригинального списка
+                _allTargets.Remove(target);
+                continue;
+            }
             
             try
             {
@@ -245,41 +253,12 @@ public class FieldEffectSystem : MonoBehaviour
             catch (System.Exception e)
             {
                 Debug.LogWarning($"[FieldEffectSystem] Ошибка при обновлении эффекта для цели: {e.Message}");
+                // Удаляем проблемную цель
+                _allTargets.Remove(target);
             }
         }
     }
-    
-    private void CleanupNullTargets()
-    {
-        if (_allTargets == null) return;
-        
-        // Удаляем null объекты из списка целей
-        for (int i = _allTargets.Count - 1; i >= 0; i--)
-        {
-            if (_allTargets[i] == null)
-            {
-                _allTargets.RemoveAt(i);
-            }
-        }
-        
-        // Удаляем null объекты из активных эффектов
-        if (_activeEffectsPerTarget != null)
-        {
-            var keysToRemove = new List<IFieldEffectTarget>();
-            foreach (var key in _activeEffectsPerTarget.Keys)
-            {
-                if (key == null)
-                {
-                    keysToRemove.Add(key);
-                }
-            }
-            
-            foreach (var key in keysToRemove)
-            {
-                _activeEffectsPerTarget.Remove(key);
-            }
-        }
-    }
+
     
     private void UpdateEffectsForTarget(IFieldEffectTarget target, float deltaTime)
     {

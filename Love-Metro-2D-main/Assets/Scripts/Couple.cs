@@ -11,15 +11,15 @@ public class Couple : MonoBehaviour
     [SerializeField] private float _socialDistance;
     
     // Ссылки на двух пассажиров, образующих пару
-    private WandererNew PassangerMain;
-    private WandererNew PassangerOther;
+    private Passenger PassangerMain;
+    private Passenger PassangerOther;
 
     /// <summary>
     /// Инициализирует пару, позиционируя пассажиров относительно друг друга
     /// </summary>
     /// <param name="PassangerMain">Главный пассажир пары</param>
     /// <param name="PassangerOther">Второй пассажир в паре</param>
-    public void init(WandererNew PassangerMain, WandererNew PassangerOther)
+    public void init(Passenger PassangerMain, Passenger PassangerOther)
     {
         // Получаем текущие позиции обоих пассажиров
         Vector3 mainPosition = PassangerMain.transform.position;

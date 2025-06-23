@@ -9,26 +9,37 @@ public class SortingLayerEditor : MonoBehaviour
     [SerializeField] private SortingLayer _wandererLayer;
     private PassangersContainer _container;
     private List<SpriteRenderer> _passangerSprites;
+    private int _lastPassengerCount = 0;
 
     private void Start()
     {
         _container = GetComponent<PassangersContainer>();
-        getPassangerSprites();
+        UpdatePassangerSprites();
     }
 
     private void Update()
     {
-        // Обновляем список спрайтов каждый кадр, чтобы учесть возможные изменения в контейнере пассажиров
-        getPassangerSprites();
+        // Обновляем список только при изменении количества пассажиров
+        if (_container.Passangers.Count != _lastPassengerCount)
+        {
+            UpdatePassangerSprites();
+            _lastPassengerCount = _container.Passangers.Count;
+        }
+        
         SortDepth();
     }
 
     public void getPassangerSprites()
     {
+        UpdatePassangerSprites();
+    }
+
+    private void UpdatePassangerSprites()
+    {
         _passangerSprites = new List<SpriteRenderer>();
         if (_container != null && _container.Passangers != null)
         {
-            foreach (WandererNew p in _container.Passangers)
+            foreach (Passenger p in _container.Passangers)
             {
                 if (p != null && p.transform != null)
                 {
@@ -47,12 +58,11 @@ public class SortingLayerEditor : MonoBehaviour
         if (_passangerSprites == null || _passangerSprites.Count == 0 || 
             _container == null || _container.Passangers == null)
         {
-            return; // Предотвращаем обработку, если списки пусты или равны null
+            return;
         }
 
         _passangerSprites.Sort(new PassangerComparer());
 
-        // Используем длину списка спрайтов для цикла, чтобы избежать индексов вне диапазона
         for (int i = 0; i < _passangerSprites.Count; i++)
         {
             _passangerSprites[i].sortingOrder = i;

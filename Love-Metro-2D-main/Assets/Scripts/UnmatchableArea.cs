@@ -4,18 +4,19 @@ using UnityEngine;
 
 public class UnmatchableArea : MonoBehaviour
 {
-    private void OnTriggerStay2D(Collider2D collision)
+    private void OnTriggerEnter2D(Collider2D collision)
     {
-        if (collision.TryGetComponent<WandererNew>(out WandererNew wanderer))
+        if (collision.TryGetComponent<Passenger>(out Passenger passenger))
         {
-            wanderer.IsMatchable = false;
+            passenger.IsMatchable = false;
         }
     }
+    
     private void OnTriggerExit2D(Collider2D collision)
     {
-        if (collision.TryGetComponent<WandererNew>(out WandererNew wanderer))
+        if (collision.TryGetComponent<Passenger>(out Passenger passenger))
         {
-            wanderer.IsMatchable = true;
+            passenger.IsMatchable = true;
         }
     }
 }

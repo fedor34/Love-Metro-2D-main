@@ -7,8 +7,8 @@ public class PassangerSpawner : MonoBehaviour
     [SerializeField] private List<Transform> _spawnLocations;
     [SerializeField] private TrainManager _trainManager;
     [SerializeField] private PassangersContainer _passiveContainer;
-    [SerializeField] private List<WandererNew> _passangerFemalePrefs;
-    [SerializeField] private List<WandererNew> _passangerMalePrefs;
+    [SerializeField] private List<Passenger> _passangerFemalePrefs;
+    [SerializeField] private List<Passenger> _passangerMalePrefs;
     [SerializeField] private SortingLayerEditor _sortingLayerEditor;
     [SerializeField] private ScoreCounter _scoreCounter;
 
@@ -57,8 +57,8 @@ public class PassangerSpawner : MonoBehaviour
         int spawnCount = UnityEngine.Random.Range(4, maxPossibleSpawn + 1);
         
         // Создаем списки перемешанных префабов для женщин и мужчин
-        List<WandererNew> femalePrefabsShuffled = new List<WandererNew>(_passangerFemalePrefs);
-        List<WandererNew> malePrefabsShuffled = new List<WandererNew>(_passangerMalePrefs);
+        List<Passenger> femalePrefabsShuffled = new List<Passenger>(_passangerFemalePrefs);
+        List<Passenger> malePrefabsShuffled = new List<Passenger>(_passangerMalePrefs);
         ShuffleList(femalePrefabsShuffled);
         ShuffleList(malePrefabsShuffled);
         
@@ -88,7 +88,7 @@ public class PassangerSpawner : MonoBehaviour
             
             bool createFemale = i < genderDistribution.Count ? genderDistribution[i] : (i % 2 == 0);
             
-            WandererNew prefab = null;
+            Passenger prefab = null;
             if (createFemale)
             {
                 if (femalePrefabsShuffled.Count > 0)
@@ -96,7 +96,7 @@ public class PassangerSpawner : MonoBehaviour
                     prefab = femalePrefabsShuffled[0];
                     femalePrefabsShuffled.RemoveAt(0);
                     if (femalePrefabsShuffled.Count == 0)
-                        femalePrefabsShuffled = new List<WandererNew>(_passangerFemalePrefs);
+                        femalePrefabsShuffled = new List<Passenger>(_passangerFemalePrefs);
                 }
             }
             else
@@ -106,7 +106,7 @@ public class PassangerSpawner : MonoBehaviour
                     prefab = malePrefabsShuffled[0];
                     malePrefabsShuffled.RemoveAt(0);
                     if (malePrefabsShuffled.Count == 0)
-                        malePrefabsShuffled = new List<WandererNew>(_passangerMalePrefs);
+                        malePrefabsShuffled = new List<Passenger>(_passangerMalePrefs);
                 }
             }
             
@@ -131,7 +131,7 @@ public class PassangerSpawner : MonoBehaviour
             // Создаем пассажира
             try
             {
-                WandererNew passenger = Instantiate(prefab, spawnPoint.position, Quaternion.identity);
+                Passenger passenger = Instantiate(prefab, spawnPoint.position, Quaternion.identity);
                 passenger.Initiate(direction, _trainManager, _scoreCounter);
                 passenger.container = _passiveContainer;
                 _passiveContainer.Passangers.Add(passenger);

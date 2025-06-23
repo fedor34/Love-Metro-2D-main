@@ -48,10 +48,14 @@ public class GravityFieldEffectNew : BaseFieldEffect
         float effectiveStrength = CalculateGravityStrength(distance, target);
         Vector3 force = direction * effectiveStrength;
         
-        // Специальная обработка для черной дыры
-        if (_createBlackHoleEffect && distance < _eventHorizonRadius)
+        // Специальная обработка для поглощения черной дырой
+        if (_createBlackHoleEffect && distance <= _eventHorizonRadius)
         {
-            ApplyBlackHoleEffect(target, force);
+            if (target is Passenger passenger)
+            {
+                passenger.ForceToAbsorptionState(transform.position, _effectData.strength);
+                return;
+            }
         }
         else
         {
@@ -97,10 +101,10 @@ public class GravityFieldEffectNew : BaseFieldEffect
     
     private void ApplyBlackHoleEffect(IFieldEffectTarget target, Vector3 force)
     {
-        // Если цель - это WandererNew, переводим в состояние поглощения
-        if (target is WandererNew wanderer)
+        // Если цель - это пассажир, переводим в состояние поглощения
+        if (target is Passenger passenger)
         {
-            wanderer.ForceToAbsorptionState(transform.position, _effectData.strength);
+            passenger.ForceToAbsorptionState(transform.position, _effectData.strength);
             return;
         }
         

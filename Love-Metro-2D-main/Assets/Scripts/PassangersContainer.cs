@@ -4,9 +4,9 @@ using UnityEngine;
 
 public class PassangersContainer : MonoBehaviour
 {
-    [SerializeField] public List<WandererNew> Passangers;
+    [SerializeField] public List<Passenger> Passangers;
 
-    public void RemovePassanger(WandererNew p)
+    public void RemovePassanger(Passenger p)
     {
         if (Passangers.Contains(p))
             Passangers.Remove(p);

@@ -3,7 +3,7 @@ using UnityEngine.Events;
 using System.Collections.Generic;
 
 [RequireComponent(typeof(Rigidbody2D), typeof(PassangerAnimator), typeof(Collider2D))]
-public class WandererNew : MonoBehaviour, IFieldEffectTarget
+public class Passenger : MonoBehaviour, IFieldEffectTarget
 {
     private delegate void ReleaseHandrail();
     private ReleaseHandrail releaseHandrail;
@@ -106,7 +106,7 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         _currentState.OnTriggerEnter(collision);
     }
 
-    public void ForceToMatchingState(WandererNew partner)
+    public void ForceToMatchingState(Passenger partner)
     {
         if (transform.position.x <= partner.transform.position.x)
         {
@@ -151,8 +151,8 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
     private abstract class PassangerState
     {
-        protected WandererNew Passanger;
-        public PassangerState(WandererNew pasanger)
+        protected Passenger Passanger;
+        public PassangerState(Passenger pasanger)
         {
             Passanger = pasanger;
         }
@@ -166,7 +166,7 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
     private class Wandering : PassangerState
     {
-        public Wandering(WandererNew pasanger) : base(pasanger){}
+        public Wandering(Passenger pasanger) : base(pasanger){}
 
         private float _expiredCollisionCheckTime = 0;
 
@@ -264,7 +264,7 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
     private class StayingOnHandrail : PassangerState
     {
         private float _expiredTime, _stayingTime;
-        public StayingOnHandrail(WandererNew pasanger) : base(pasanger) {}
+        public StayingOnHandrail(Passenger pasanger) : base(pasanger) {}
 
         public override void OnCollision(Collision2D collision) {}
 
@@ -310,7 +310,7 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
     {
         private Vector2 currentFallingSpeed;
         private Vector2 previousFallingSpeed;
-        public Falling(WandererNew pasanger) : base(pasanger)
+        public Falling(Passenger pasanger) : base(pasanger)
         {
             resetFallingSpeeds();
         }
@@ -325,12 +325,12 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
             Passanger.CurrentMovingDirection = Vector2.Reflect(Passanger.CurrentMovingDirection, collision.contacts[0].normal).normalized;
 
-            if (collision.transform.TryGetComponent<WandererNew>(out WandererNew wanderer)
-                && wanderer.IsFemale != Passanger.IsFemale
-                && wanderer.IsMatchable)
+            if (collision.transform.TryGetComponent<Passenger>(out Passenger passenger)
+                && passenger.IsFemale != Passanger.IsFemale
+                && passenger.IsMatchable)
             {
-                Passanger.ForceToMatchingState(wanderer);
-                wanderer.ForceToMatchingState(Passanger);
+                Passanger.ForceToMatchingState(passenger);
+                passenger.ForceToMatchingState(Passanger);
             }
         }
 
@@ -403,7 +403,7 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
 
     private class Matching : PassangerState
     {
-        public Matching(WandererNew pasanger) : base(pasanger){}
+        public Matching(Passenger pasanger) : base(pasanger){}
 
         public override void OnCollision(Collision2D collision){}
 
@@ -431,7 +431,7 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
         private float _timeInAbsorption = 0f;
         private float _maxAbsorptionTime = 3f; // Максимальное время поглощения
         
-        public BeingAbsorbed(WandererNew passenger) : base(passenger) {}
+        public BeingAbsorbed(Passenger passenger) : base(passenger) {}
         
         public void SetAbsorptionParameters(Vector3 center, float force)
         {
@@ -584,7 +584,8 @@ public class WandererNew : MonoBehaviour, IFieldEffectTarget
                 float distance = Vector3.Distance(transform.position, gravityEffect.transform.position);
                 if (distance <= gravityEffect._eventHorizonRadius)
                 {
-                    ForceToAbsorptionState(gravityEffect.transform.position, gravityEffect._effectData.strength);
+                    var data = gravityEffect.GetEffectData();
+                    ForceToAbsorptionState(gravityEffect.transform.position, data.strength);
                     break;
                 }
             }

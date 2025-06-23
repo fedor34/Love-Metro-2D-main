@@ -16,6 +16,11 @@ public class WindFieldEffect : BaseFieldEffect
     [SerializeField] private bool _showWindDirection = true;
     [SerializeField] private Color _windColor = Color.cyan;
     
+    [Header("Турбулентность")]
+    [SerializeField] private bool _useTurbulence = true;
+    [SerializeField] private float _turbulenceFrequency = 1f;
+    [SerializeField] private float _turbulenceStrength = 1f;
+    
     private float _fluctuationTime = 0f;
     private Vector2 _normalizedDirection;
     
@@ -45,8 +50,6 @@ public class WindFieldEffect : BaseFieldEffect
             _effectData.strength = _windStrength;
             _effectData.affectedLayers = LayerMask.GetMask("Default");
         }
-        
-        Debug.Log($"[WindFieldEffect] Создан ветер: направление={_windDirection}, сила={_windStrength}");
     }
     
     protected override void Update()
@@ -57,41 +60,37 @@ public class WindFieldEffect : BaseFieldEffect
         _fluctuationTime += Time.deltaTime * _fluctuationSpeed;
     }
     
+    protected override void OnUpdateEffect()
+    {
+        // Обновляем данные эффекта
+        _effectData.direction = _windDirection;
+        _effectData.strength = _windStrength;
+    }
+    
     public override void ApplyEffect(IFieldEffectTarget target, float deltaTime)
     {
-        if (target == null) return;
+        if (!IsActive || target == null) return;
         
-        // Получаем расстояние до цели
-        float distance = GetDistanceToTarget(target);
+        Vector3 targetPosition = target.GetPosition();
+        if (!IsInEffectZone(targetPosition)) return;
         
-        // Вычисляем силу ветра на основе расстояния
-        float effectiveStrength = _windStrength;
+        // Вычисляем силу ветра с учетом расстояния
+        float distance = Vector3.Distance(transform.position, targetPosition);
+        float effectiveStrength = GetEffectStrengthAtDistance(distance);
         
-        // Уменьшаем силу с расстоянием (опционально)
-        if (_effectData.radius > 0 && distance > 0)
+        Vector2 windForce = _windDirection * effectiveStrength * _windStrength;
+        
+        // Применяем турбулентность если включена
+        if (_useTurbulence)
         {
-            float distanceFactor = 1f - (distance / _effectData.radius);
-            effectiveStrength *= distanceFactor;
+            float turbulenceX = Mathf.PerlinNoise(Time.time * _turbulenceFrequency, targetPosition.y * 0.1f) - 0.5f;
+            float turbulenceY = Mathf.PerlinNoise(targetPosition.x * 0.1f, Time.time * _turbulenceFrequency) - 0.5f;
+            
+            Vector2 turbulence = new Vector2(turbulenceX, turbulenceY) * _turbulenceStrength;
+            windForce += turbulence;
         }
         
-        // Базовое направление ветра
-        Vector2 windForce = _normalizedDirection * effectiveStrength;
-        
-        // Добавляем флуктуации если включены
-        if (_useRandomFluctuations)
-        {
-            float fluctuation = Mathf.Sin(_fluctuationTime + distance) * _fluctuationIntensity;
-            Vector2 perpendicular = new Vector2(-_normalizedDirection.y, _normalizedDirection.x);
-            windForce += perpendicular * fluctuation * effectiveStrength;
-        }
-        
-        // Применяем силу ветра с учетом deltaTime
-        target.ApplyFieldForce(windForce * deltaTime, FieldEffectType.Wind);
-        
-        if (_showGizmos)
-        {
-            Debug.Log($"[WindFieldEffect] Применен ветер к {target}: сила={windForce.magnitude:F2}, направление={windForce.normalized}");
-        }
+        target.ApplyFieldForce(windForce, _effectData.effectType);
     }
     
     public override void RemoveEffect(IFieldEffectTarget target)
@@ -107,7 +106,6 @@ public class WindFieldEffect : BaseFieldEffect
     {
         _windDirection = direction;
         _normalizedDirection = direction.normalized;
-        Debug.Log($"[WindFieldEffect] Направление ветра изменено на {direction}");
     }
     
     /// <summary>
@@ -117,7 +115,6 @@ public class WindFieldEffect : BaseFieldEffect
     {
         _windStrength = strength;
         _effectData.strength = strength;
-        Debug.Log($"[WindFieldEffect] Сила ветра изменена на {strength}");
     }
     
     /// <summary>

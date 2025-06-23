@@ -94,54 +94,63 @@ public class TrainManager : MonoBehaviour
         // ----------------------------------------------------
         // 1.  Вызовы инерции (делегаты) – разово при смене фаз
         // ----------------------------------------------------
-        // Начало ускорения: мягкий толчок назад + резкий старт
-        if (Input.GetKeyDown(KeyCode.Space))
+        // Во время остановки игнорируем управление игрока
+        if (!_isStopped)
         {
-            // Мгновенный прирост скорости
-            SetSpeed(_currentSpeed + _startBoost);
-            startInertia?.Invoke(Vector2.right * _acceleration * 0.2f);
-            OnBrakeEnd?.Invoke();
-        }
-        // Конец ускорения: мягкий толчок вперёд
-        if (Input.GetKeyUp(KeyCode.Space))
-        {
-            startInertia?.Invoke(Vector2.left * _deceleration);
-        }
+            // Начало ускорения: мягкий толчок назад + резкий старт
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                // Мгновенный прирост скорости
+                SetSpeed(_currentSpeed + _startBoost);
+                startInertia?.Invoke(Vector2.right * _acceleration * 0.2f);
+                OnBrakeEnd?.Invoke();
+            }
+            // Конец ускорения: мягкий толчок вперёд
+            if (Input.GetKeyUp(KeyCode.Space))
+            {
+                startInertia?.Invoke(Vector2.left * _deceleration);
+            }
 
-        // Резкое торможение (S)
-        if (Input.GetKeyDown(KeyCode.S))
-        {
-            startInertia?.Invoke(Vector2.left * _currentSpeed * 0.5f);
-            OnBrakeStart?.Invoke();
-        }
-        if (Input.GetKeyUp(KeyCode.S))
-        {
-            OnBrakeEnd?.Invoke();
+            // Резкое торможение (S)
+            if (Input.GetKeyDown(KeyCode.S))
+            {
+                startInertia?.Invoke(Vector2.left * _currentSpeed * 0.5f);
+                OnBrakeStart?.Invoke();
+            }
+            if (Input.GetKeyUp(KeyCode.S))
+            {
+                OnBrakeEnd?.Invoke();
+            }
         }
 
         // ----------------------------------------------------
         // 2.  Фактическая физика движения поезда
         // ----------------------------------------------------
         float accelerationValue = 0f;
-        if (_isBraking)
+        
+        // Во время остановки игнорируем управление игрока
+        if (!_isStopped)
         {
-            accelerationValue = -_brakeDeceleration;
-        }
-        else if (isAccelerating)
-        {
-            accelerationValue = _acceleration;
-        }
-        else
-        {
-            // Естественное трение/сопротивление движению
-            accelerationValue = -_deceleration;
-        }
+            if (_isBraking)
+            {
+                accelerationValue = -_brakeDeceleration;
+            }
+            else if (isAccelerating)
+            {
+                accelerationValue = _acceleration;
+            }
+            else
+            {
+                // Естественное трение/сопротивление движению
+                accelerationValue = -_deceleration;
+            }
 
-        // Сохраняем для отладки
-        _currentAcceleration = accelerationValue;
+            // Сохраняем для отладки
+            _currentAcceleration = accelerationValue;
 
-        // Интегрируем скорость
-        SetSpeed(_currentSpeed + accelerationValue * Time.deltaTime);
+            // Интегрируем скорость
+            SetSpeed(_currentSpeed + accelerationValue * Time.deltaTime);
+        }
 
         // --- Камера: плавное следование + атмосферная качка ---
         if (_camera != null)
@@ -208,9 +217,32 @@ public class TrainManager : MonoBehaviour
     private IEnumerator HandleTrainStop()
     {
         _isStopped = true;
+        
+        // Плавное торможение поезда до полной остановки
+        float originalSpeed = _currentSpeed;
+        float brakeTime = 2.0f; // Время торможения
+        float elapsedTime = 0f;
+        
+        // Сигнал инерции для торможения
+        startInertia?.Invoke(Vector2.left * _currentSpeed * 0.8f);
+        OnBrakeStart?.Invoke();
+        
+        while (elapsedTime < brakeTime && _currentSpeed > 0.1f)
+        {
+            elapsedTime += Time.deltaTime;
+            float t = elapsedTime / brakeTime;
+            // Плавное замедление по кривой
+            float newSpeed = Mathf.Lerp(originalSpeed, 0f, t * t); // Квадратичная кривая для реалистичного торможения
+            SetSpeed(newSpeed);
+            yield return null;
+        }
+        
+        // Окончательная остановка
         SetSpeed(0);
-        // Ждём чуть-чуть для эффекта остановки
-        yield return new WaitForSeconds(1.0f);
+        OnBrakeEnd?.Invoke();
+        
+        // Ждём момент для эффекта полной остановки
+        yield return new WaitForSeconds(0.5f);
 
         // Удаляем все пары
         foreach (var couple in FindObjectsOfType<Couple>())
@@ -227,7 +259,7 @@ public class TrainManager : MonoBehaviour
             _spawner.spawnPassangers();
 
         // Ждём и снова запускаем поезд
-        yield return new WaitForSeconds(1.0f);
+        yield return new WaitForSeconds(1.5f);
         _isStopped = false;
         SetSpeed(_minSpeed);
         _distanceTraveled = 0f; // Сброс расстояния после остановки

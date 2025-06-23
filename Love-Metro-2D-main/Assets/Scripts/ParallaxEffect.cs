@@ -7,6 +7,7 @@ public class ParallaxEffect : MonoBehaviour
     [Header("Параллакс настройки")]
     [SerializeField] private ParallaxLayer[] _parallaxLayers;
     [SerializeField] private float _speedMultiplier = 1f;
+    [SerializeField] private bool _updateViaReflection = false; // Если true, старое поведение, иначе используем только SetTrainSpeed
     
     private TrainManager _trainManager;
     
@@ -23,9 +24,11 @@ public class ParallaxEffect : MonoBehaviour
     
     private void Update()
     {
+        if (!_updateViaReflection) return; // Обновляемся только если явно включено
+
         if (_trainManager == null) return;
         
-        // Получаем текущую скорость поезда
+        // Получаем текущую скорость поезда через reflection
         float trainSpeed = GetTrainSpeed();
         
         // Обновляем каждый слой параллакса

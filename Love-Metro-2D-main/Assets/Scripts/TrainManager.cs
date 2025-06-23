@@ -259,6 +259,13 @@ public class TrainManager : MonoBehaviour
             Destroy(couple.gameObject);
         }
         
+        // Принудительно очищаем список от удаленных объектов
+        if (_passangers != null && _passangers.Passangers != null)
+        {
+            _passangers.Passangers.RemoveAll(p => p == null);
+            Debug.Log($"TrainManager: После очистки осталось {_passangers.Passangers.Count} пассажиров");
+        }
+        
         // Одиночные пассажиры остаются в поезде
         Debug.Log("TrainManager: Пары удалены, одиночные пассажиры остаются в поезде");
 

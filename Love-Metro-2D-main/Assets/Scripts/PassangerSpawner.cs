@@ -171,10 +171,11 @@ public class PassangerSpawner : MonoBehaviour
         
         Debug.Log($"PassangerSpawner: Спавн завершен! Создано женщин: {femalesCreated}, мужчин: {malesCreated}");
         
-        if (_sortingLayerEditor != null)
+        // Временно отключаем SortingLayerEditor чтобы избежать ошибок
+        /*if (_sortingLayerEditor != null)
         {
             _sortingLayerEditor.getPassangerSprites();
-        }
+        }*/
     }
 
     private void Start()

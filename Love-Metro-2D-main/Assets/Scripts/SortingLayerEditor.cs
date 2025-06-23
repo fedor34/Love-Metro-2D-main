@@ -61,11 +61,22 @@ public class SortingLayerEditor : MonoBehaviour
             return;
         }
 
+        // Удаляем null объекты из списка
+        _passangerSprites.RemoveAll(sprite => sprite == null);
+
+        if (_passangerSprites.Count == 0)
+        {
+            return;
+        }
+
         _passangerSprites.Sort(new PassangerComparer());
 
         for (int i = 0; i < _passangerSprites.Count; i++)
         {
-            _passangerSprites[i].sortingOrder = i;
+            if (_passangerSprites[i] != null)
+            {
+                _passangerSprites[i].sortingOrder = i;
+            }
         }
     }
 

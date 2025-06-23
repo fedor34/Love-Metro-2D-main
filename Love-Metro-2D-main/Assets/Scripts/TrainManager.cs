@@ -16,6 +16,7 @@ public class TrainManager : MonoBehaviour
     [SerializeField] private float _minSpeed = 1f;
     [SerializeField] private float _acceleration = 8f; // установили более высокое ускорение
     [SerializeField] private float _deceleration = 6f; // установили более высокое замедление
+    [SerializeField] private float _brakeDeceleration = 25f; // новый параметр для торможения пробелом
     [SerializeField] private SpriteRenderer _backGround;
     [SerializeField] private PassangersContainer _passangers;
     [SerializeField] private Transform _camera;
@@ -28,6 +29,7 @@ public class TrainManager : MonoBehaviour
     private Vector3 _cameraStartPosition;
     private float _currentSpeed;
     private bool _isAccelerated;
+    private bool _isBraking; // новый флаг для торможения
     private float _previousSpeed;
 
     // Счётчик пройденного расстояния
@@ -51,7 +53,9 @@ public class TrainManager : MonoBehaviour
     private void SetSpeed(float newSpeed)
     {
         _currentSpeed = newSpeed;
-        _currentSpeed = Mathf.Clamp(_currentSpeed, _minSpeed, _maxSpeed);
+        // Ограничиваем скорость снизу нулем вместо _minSpeed при торможении
+        float minLimit = _isBraking ? 0f : _minSpeed;
+        _currentSpeed = Mathf.Clamp(_currentSpeed, minLimit, _maxSpeed);
     }
 
     private float _elapsedTime = 0;
@@ -61,6 +65,7 @@ public class TrainManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Space))
         {
             _isAccelerated = true;
+            _isBraking = true;
             startInertia.Invoke(Vector2.left * (_maxSpeed - _currentSpeed) * (_acceleration / _deceleration));
             // Вызываем событие начала торможения
             OnBrakeStart?.Invoke();
@@ -68,6 +73,7 @@ public class TrainManager : MonoBehaviour
         if (Input.GetKeyUp(KeyCode.Space))
         {
             _isAccelerated = false;
+            _isBraking = false;
             startInertia.Invoke(Vector2.right * (_currentSpeed - _minSpeed) * (_acceleration / _deceleration));
             // Вызываем событие окончания торможения
             OnBrakeEnd?.Invoke();
@@ -101,39 +107,51 @@ public class TrainManager : MonoBehaviour
         }
         // --- Конец блока ---
 
-        if (_isAccelerated)
+        if (_isAccelerated && _isBraking)
+        {
+            // При торможении используем более сильное замедление
+            SetSpeed(_currentSpeed - _brakeDeceleration * Time.deltaTime);
+        }
+        else if (_isAccelerated)
         {
             SetSpeed(_currentSpeed + _acceleration * Time.deltaTime);
         }
         else
         {
-            SetSpeed(_currentSpeed - _deceleration * Time.deltaTime);
+            // Обычное замедление до минимальной скорости
+            if (_currentSpeed > _minSpeed)
+            {
+                SetSpeed(_currentSpeed - _deceleration * Time.deltaTime);
+            }
         }
 
         _camera.position = Vector3.Lerp(_camera.position, 
             _cameraStartPosition + Vector3.right * _currentSpeed * _cameraModifier, _cameraSpeed);
 
+        // Для фона используем только положительную скорость
+        float displaySpeed = Mathf.Max(0, _currentSpeed);
+        
         // Передаем накопленное время для анимации фона
         _backGround.material.SetFloat("_elapsedTime", _elapsedTime);
-        _elapsedTime += Time.deltaTime * _currentSpeed;
+        _elapsedTime += Time.deltaTime * displaySpeed;
         
         // Передаем текущую скорость как процент от максимальной для правильного отображения
-        float speedPercent = (_currentSpeed - _minSpeed) / (_maxSpeed - _minSpeed);
+        float speedPercent = displaySpeed / _maxSpeed;
         _backGround.material.SetFloat("_Speed", speedPercent);
         
         // Также передаем абсолютную скорость
-        _backGround.material.SetFloat("_CurrentSpeed", _currentSpeed);
+        _backGround.material.SetFloat("_CurrentSpeed", displaySpeed);
         _backGround.material.SetFloat("_MaxSpeed", _maxSpeed);
         
-        // Обновляем параллакс эффект
+        // Обновляем параллакс эффект только с положительной скоростью
         if (_parallaxEffect != null)
         {
-            _parallaxEffect.SetTrainSpeed(_currentSpeed);
+            _parallaxEffect.SetTrainSpeed(displaySpeed);
         }
 
         // Считаем пройденное расстояние (может пригодиться для статистики)
-        _distanceTraveled += Mathf.Abs(_currentSpeed) * Time.deltaTime;
-        Debug.Log($"[TrainManager] Speed: {_currentSpeed:F2}, Distance: {_distanceTraveled:F2}");
+        _distanceTraveled += Mathf.Abs(displaySpeed) * Time.deltaTime;
+        Debug.Log($"[TrainManager] Speed: {_currentSpeed:F2}, Display Speed: {displaySpeed:F2}, Distance: {_distanceTraveled:F2}");
     }
 
     // Корутина задержки остановки поезда, если осталось 2 пассажира

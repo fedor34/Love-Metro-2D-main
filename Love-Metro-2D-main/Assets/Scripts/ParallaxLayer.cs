@@ -35,8 +35,11 @@ public class ParallaxLayer : MonoBehaviour
     {
         if (!_useTrainSpeed || _material == null) return;
         
+        // Используем только положительную скорость для предотвращения обратного движения
+        float effectiveTrainSpeed = Mathf.Max(0, trainSpeed);
+        
         // Вычисляем смещение на основе скорости поезда
-        float effectiveSpeed = trainSpeed * _parallaxSpeed;
+        float effectiveSpeed = effectiveTrainSpeed * _parallaxSpeed;
         _offset += _scrollDirection * effectiveSpeed * Time.deltaTime;
         
         // Применяем смещение к материалу

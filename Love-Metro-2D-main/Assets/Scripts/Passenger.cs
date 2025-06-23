@@ -124,6 +124,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     
     public void ForceToAbsorptionState(Vector3 absorptionCenter, float absorptionForce)
     {
+        // ВАЖНО: Пассажиры в парах НЕ МОГУТ быть поглощены - они защищены!
         if (IsInCouple || _currentState is BeingAbsorbed) return;
         
         beingAbsorbedState.SetAbsorptionParameters(absorptionCenter, absorptionForce);
@@ -666,6 +667,9 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     
     public void OnEnterFieldEffect(IFieldEffect effect)
     {
+        // ВАЖНО: Пассажиры в парах не должны подвергаться воздействию эффектов поля
+        if (IsInCouple) return;
+        
         if (!_currentEffects.Contains(effect))
         {
             _currentEffects.Add(effect);

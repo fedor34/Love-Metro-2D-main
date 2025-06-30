@@ -645,6 +645,11 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         PassangerAnimator = GetComponent<PassangerAnimator>();
         _collider = GetComponent<Collider2D>();
 
+        if (_rigidbody != null)
+        {
+            _rigidbody.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        }
+
         if (_rigidbody == null) gameObject.AddComponent<Rigidbody2D>();
         if (PassangerAnimator == null) gameObject.AddComponent<PassangerAnimator>();
         if (_collider == null) gameObject.AddComponent<Collider2D>();

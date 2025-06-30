@@ -175,11 +175,10 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
         public override void OnCollision(Collision2D collision)
         {
-            if(collision.transform.TryGetComponent<PlatformEffector2D>(out PlatformEffector2D platform)
-                && Vector3.Dot(platform.transform.up, Passanger.CurrentMovingDirection.normalized) >= 0)
-            {
-                return;
-            }
+            // Previously the side boundaries used one-way PlatformEffector2D
+            // components. After switching to thicker BoxCollider2D boundaries,
+            // this early-out is no longer needed and would suppress collision
+            // response with the new walls.
             ReflectMovmentDirection(collision.contacts[0].normal);
             _expiredCollisionCheckTime = 0;
         }
@@ -388,10 +387,9 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
         public override void OnCollision(Collision2D collision)
         {
-            if (collision.transform.TryGetComponent<PlatformEffector2D>(out PlatformEffector2D platform))
-            {
-                return;
-            }
+            // With the side walls converted to BoxCollider2D the one-way
+            // effector check is no longer required. Removing it ensures the
+            // passenger properly bounces off the boundaries.
             resetFallingSpeeds();
 
             Passanger.CurrentMovingDirection = Vector2.Reflect(Passanger.CurrentMovingDirection, collision.contacts[0].normal).normalized;

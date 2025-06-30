@@ -95,7 +95,15 @@ public class PassangerSpawner : MonoBehaviour
         // Создаем список индексов полов для случайного распределения
         List<bool> genderDistribution = new List<bool>();
         int femaleCount = spawnCount / 2;
-        int maleCount = spawnCount - femaleCount;
+        int maleCount = spawnCount / 2;
+        // Если нужно распределить нечетное количество пассажиров, случайно добавляем лишнего
+        if (spawnCount % 2 == 1)
+        {
+            if (UnityEngine.Random.value < 0.5f)
+                femaleCount++;
+            else
+                maleCount++;
+        }
         
         // Заполняем список распределения полов
         for (int i = 0; i < femaleCount; i++) genderDistribution.Add(true);  // true = женщина

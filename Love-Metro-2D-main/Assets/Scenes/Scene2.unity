@@ -553,11 +553,11 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1287473051}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 176, y: 335}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 20, y: -20}
   m_SizeDelta: {x: 66.2995, y: 37.458496}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_Pivot: {x: 0, y: 1}
 --- !u!114 &72410761
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -577,7 +577,7 @@ MonoBehaviour:
   _floatingTextInitialSpeed: 900
   _floatingTextSpawnOffsetY: 100
   _matchesPerBrakeText: {fileID: 0}
-  _trainManager: {fileID: 0}
+  _trainManager: {fileID: 1652136996}
 --- !u!95 &72410762
 Animator:
   serializedVersion: 5

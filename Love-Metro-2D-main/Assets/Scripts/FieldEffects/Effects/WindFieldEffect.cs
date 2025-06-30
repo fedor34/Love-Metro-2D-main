@@ -78,7 +78,9 @@ public class WindFieldEffect : BaseFieldEffect
         float distance = Vector3.Distance(transform.position, targetPosition);
         float effectiveStrength = GetEffectStrengthAtDistance(distance);
         
-        Vector2 windForce = _windDirection * effectiveStrength * _windStrength;
+        // Ограничиваем максимальную силу ветра для предотвращения багов
+        float clampedWindStrength = Mathf.Clamp(_windStrength, 0f, 100f);
+        Vector2 windForce = _windDirection * effectiveStrength * clampedWindStrength;
         
         // Применяем турбулентность если включена
         if (_useTurbulence)
@@ -113,8 +115,14 @@ public class WindFieldEffect : BaseFieldEffect
     /// </summary>
     public void SetWindStrength(float strength)
     {
-        _windStrength = strength;
-        _effectData.strength = strength;
+        // Ограничиваем силу ветра разумными пределами
+        _windStrength = Mathf.Clamp(strength, 0f, 100f);
+        _effectData.strength = _windStrength;
+        
+        if (strength > 100f)
+        {
+            Debug.LogWarning($"[WindFieldEffect] Сила ветра {strength} слишком большая! Ограничена до {_windStrength}");
+        }
     }
     
     /// <summary>

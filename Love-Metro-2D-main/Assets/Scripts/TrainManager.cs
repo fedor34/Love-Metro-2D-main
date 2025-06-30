@@ -17,7 +17,7 @@ public class TrainManager : MonoBehaviour
     [SerializeField] private float _minSpeed = 1f;
     [SerializeField] private float _acceleration = 60f;  // Очень быстрое ускорение
     [SerializeField] private float _deceleration = 10f;   // Замедление
-    [SerializeField] private float _brakeDeceleration = 25f; // Резкое торможение по S
+    [SerializeField] private float _brakeDeceleration = 25f; // Резкое торможение при отпускании пробела
     [SerializeField] private float _startBoost = 8f; // мгновенный прирост скорости при старте
 
     [Header("Настройки камеры и фона")]
@@ -90,7 +90,7 @@ public class TrainManager : MonoBehaviour
         _previousSpeed = _currentSpeed;
         
         bool isAccelerating = Input.GetKey(KeyCode.Space);
-        _isBraking = Input.GetKey(KeyCode.S); // Торможение на S
+        // Торможение теперь только при отпускании пробела (убрана кнопка S)
 
         // ----------------------------------------------------
         // Проверка количества возможных пар для остановки
@@ -128,21 +128,12 @@ public class TrainManager : MonoBehaviour
                 startInertia?.Invoke(Vector2.right * _acceleration * 0.2f);
                 OnBrakeEnd?.Invoke();
             }
-            // Конец ускорения: мягкий толчок вперёд
+            // Конец ускорения: торможение при отпускании пробела
             if (Input.GetKeyUp(KeyCode.Space))
-            {
-                startInertia?.Invoke(Vector2.left * _deceleration);
-            }
-
-            // Резкое торможение (S)
-            if (Input.GetKeyDown(KeyCode.S))
             {
                 startInertia?.Invoke(Vector2.left * _currentSpeed * 0.5f);
                 OnBrakeStart?.Invoke();
-            }
-            if (Input.GetKeyUp(KeyCode.S))
-            {
-                OnBrakeEnd?.Invoke();
+                _isBraking = true; // Включаем режим торможения
             }
         }
 
@@ -157,6 +148,12 @@ public class TrainManager : MonoBehaviour
             if (_isBraking)
             {
                 accelerationValue = -_brakeDeceleration;
+                // Выключаем торможение, когда скорость достаточно мала или при новом ускорении
+                if (_currentSpeed <= _minSpeed || isAccelerating)
+                {
+                    _isBraking = false;
+                    OnBrakeEnd?.Invoke();
+                }
             }
             else if (isAccelerating)
             {
@@ -196,7 +193,8 @@ public class TrainManager : MonoBehaviour
             _backGround.material.SetFloat("_Speed", _currentSpeed / _maxSpeed);
             _backGround.material.SetFloat("_CurrentSpeed", _currentSpeed);
         }
-        _elapsedTime += Time.deltaTime * _currentSpeed;
+        // Обновляем таймер независимо от скорости, иначе смещение параллакса увеличивается квадратично
+        _elapsedTime += Time.deltaTime;
         
         _parallaxEffect?.SetTrainSpeed(_currentSpeed);
 

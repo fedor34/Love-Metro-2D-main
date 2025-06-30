@@ -41,6 +41,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     private Wandering wanderingState;
     private StayingOnHandrail stayingOnHandrailState;
     private Falling fallingState;
+    private Flying flyingState;
     private Matching matchingState;
     private BeingAbsorbed beingAbsorbedState;
 
@@ -69,6 +70,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         wanderingState = new Wandering(this);
         stayingOnHandrailState = new StayingOnHandrail(this);
         fallingState = new Falling(this);
+        flyingState = new Flying(this);
         matchingState = new Matching(this);
         beingAbsorbedState = new BeingAbsorbed(this);
 
@@ -191,7 +193,33 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
          
         public override void UpdateState()
         {
-            Passanger._rigidbody.velocity = (Vector3)Passanger.CurrentMovingDirection * Passanger._speed;
+            // Проверяем, есть ли активные силы поля (например, ветер)
+            Vector2 currentVelocity = Passanger._rigidbody.velocity;
+            Vector2 naturalVelocity = Passanger.CurrentMovingDirection * Passanger._speed;
+            
+            // Если текущая скорость значительно больше натуральной, значит действует внешняя сила
+            if (currentVelocity.magnitude > naturalVelocity.magnitude * 1.2f)
+            {
+                // Внешняя сила активна - не перезаписываем velocity, только корректируем направление
+                Vector2 externalForce = currentVelocity - naturalVelocity;
+                if (externalForce.magnitude > 0.5f) // Если внешняя сила достаточно сильная
+                {
+                    // Плавно смешиваем естественное движение с внешней силой
+                    Vector2 targetVelocity = Vector2.Lerp(naturalVelocity, currentVelocity, 0.8f);
+                    Passanger._rigidbody.velocity = targetVelocity;
+                }
+                else
+                {
+                    // Слабая внешняя сила - возвращаемся к нормальному движению
+                    Passanger._rigidbody.velocity = naturalVelocity;
+                }
+            }
+            else
+            {
+                // Нет внешних сил - нормальное движение
+                Passanger._rigidbody.velocity = naturalVelocity;
+            }
+            
             Passanger.PassangerAnimator.ChangeFacingDirection(
                 Vector3.Dot(Vector3.Project(Passanger.CurrentMovingDirection, Vector3.right).normalized, Vector3.right) == 1);
 
@@ -439,6 +467,83 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         }
     }
 
+    private class Flying : PassangerState
+    {
+        private Vector2 _flyingVelocity;
+        private float _windStrength = 0f;
+        private float _flyingTime = 0f;
+        private const float MIN_WIND_STRENGTH_FOR_FLYING = 8f;
+        private const float MAX_FLYING_TIME = 5f;
+
+        public Flying(Passenger pasanger) : base(pasanger) {}
+
+        public override void OnCollision(Collision2D collision)
+        {
+            // При столкновении в полете переходим в падение
+            Passanger.ChangeState(Passanger.fallingState);
+            ((Falling)Passanger.fallingState).SetInitialFallingSpeed(_flyingVelocity);
+        }
+
+        public override void Exit()
+        {
+            Passanger.IsMatchable = true;
+            Passanger.PassangerAnimator.SetFallingState(false);
+            Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._defaultLayer);
+            _flyingTime = 0f;
+        }
+
+        public override void UpdateState()
+        {
+            _flyingTime += Time.deltaTime;
+            
+            // Применяем движение от ветра
+            Passanger._rigidbody.velocity = _flyingVelocity;
+            
+            // Если ветер ослаб или время полета превышено, переходим к падению
+            if (_windStrength < MIN_WIND_STRENGTH_FOR_FLYING || _flyingTime > MAX_FLYING_TIME)
+            {
+                Passanger.ChangeState(Passanger.fallingState);
+                ((Falling)Passanger.fallingState).SetInitialFallingSpeed(_flyingVelocity);
+                return;
+            }
+
+            // Обновляем направление анимации
+            Passanger.PassangerAnimator.ChangeFacingDirection(
+                Vector3.Dot(Vector3.Project(_flyingVelocity, Vector3.right).normalized, Vector3.right) == 1);
+        }
+
+        public override void Enter()
+        {
+            Passanger.IsMatchable = false;
+            Passanger.PassangerAnimator.SetFallingState(true); // Используем анимацию падения для полета
+            Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._fallingLayer);
+            _flyingTime = 0f;
+        }
+
+        public override void OnTrainSpeedChange(Vector2 force)
+        {
+            // В полете добавляем инерцию поезда к скорости
+            _flyingVelocity += force * 0.3f; // Меньший коэффициент чем при падении
+        }
+
+        public override void OnTriggerEnter(Collider2D collision)
+        {
+            // В полете не цепляемся за поручни
+        }
+
+        public void SetFlyingParameters(Vector2 windVelocity, float windStrength)
+        {
+            _flyingVelocity = windVelocity;
+            _windStrength = windStrength;
+        }
+
+        public void UpdateWindEffect(Vector2 windVelocity, float windStrength)
+        {
+            _flyingVelocity = windVelocity;
+            _windStrength = windStrength;
+        }
+    }
+
     private class Matching : PassangerState
     {
         public Matching(Passenger pasanger) : base(pasanger){}
@@ -581,6 +686,53 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             return;
         }
 
+        // Добавляем отладочную информацию
+        if (effectType == FieldEffectType.Wind && force.magnitude > 0.1f)
+        {
+            Debug.Log($"[Passenger] {name} получил ветер: сила={force.magnitude:F1}, состояние={_currentState?.GetType().Name}, InCouple={IsInCouple}, IsInitiated={_isInitiated}");
+        }
+
+        // Специальная обработка для ветра
+        if (effectType == FieldEffectType.Wind)
+        {
+            float windStrength = force.magnitude;
+            
+            // Если ветер достаточно сильный, переводим в полет
+            if (windStrength >= 8f && !(_currentState is Flying) && !(_currentState is BeingAbsorbed) && !IsInCouple)
+            {
+                Debug.Log($"[Passenger] {name} переходит в полет! Сила ветра: {windStrength:F1}");
+                ChangeState(flyingState);
+                ((Flying)flyingState).SetFlyingParameters(force, windStrength);
+                return;
+            }
+            
+            // Если уже в полете, обновляем параметры ветра
+            if (_currentState is Flying)
+            {
+                ((Flying)flyingState).UpdateWindEffect(force, windStrength);
+                return;
+            }
+            
+            // Если ветер слабее 8, но все же есть - применяем как обычную силу
+            if (_currentState is Wandering)
+            {
+                // Слабый ветер просто толкает пассажира
+                CurrentMovingDirection = force.normalized;
+                float forceMultiplier = windStrength < 8f ? 0.5f : 2f; // Сильный ветер - больше силы
+                _rigidbody.AddForce(force * forceMultiplier, ForceMode2D.Force);
+                Debug.Log($"[Passenger] {name} толкается ветром: сила={windStrength:F1}, множитель={forceMultiplier}");
+                return;
+            }
+            
+            // Даже если не в Wandering, но ветер очень сильный - применяем принудительно
+            if (windStrength > 5f && _currentState is not Flying && _currentState is not BeingAbsorbed)
+            {
+                _rigidbody.AddForce(force, ForceMode2D.Force);
+                Debug.Log($"[Passenger] {name} принудительно сдувается ветром: {windStrength:F1}");
+                return;
+            }
+        }
+
         if (_currentState is Falling)
         {
             CurrentMovingDirection = force.normalized;
@@ -588,7 +740,14 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         }
         else if (_currentState is Wandering)
         {
+            // Применяем силу для не-ветровых эффектов
             CurrentMovingDirection = force.normalized;
+            _rigidbody.AddForce(force, ForceMode2D.Force);
+        }
+        else if (_currentState is Flying)
+        {
+            // В полете обновляем скорость через состояние Flying
+            ((Flying)flyingState).UpdateWindEffect(force, force.magnitude);
         }
     }
     
@@ -655,7 +814,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             case FieldEffectType.Wind:
             case FieldEffectType.Vortex:
             case FieldEffectType.Magnetic:
-                return _currentState is Wandering || _currentState is Falling;
+                return _currentState is Wandering || _currentState is Falling || _currentState is Flying;
             case FieldEffectType.Slowdown:
             case FieldEffectType.Speedup:
             case FieldEffectType.Friction:

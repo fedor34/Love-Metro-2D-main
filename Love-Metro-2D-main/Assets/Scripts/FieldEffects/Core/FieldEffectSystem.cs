@@ -331,6 +331,10 @@ public class FieldEffectSystem : MonoBehaviour
         }
         
         // Применяем эффект
+        if (_enableDebugMode && effect.GetEffectData().effectType == FieldEffectType.Wind)
+        {
+            Debug.Log($"[FieldEffectSystem] Применяю ветер к {target.GetPosition()}: эффект={effect.GetType().Name}");
+        }
         effect.ApplyEffect(target, deltaTime);
     }
     

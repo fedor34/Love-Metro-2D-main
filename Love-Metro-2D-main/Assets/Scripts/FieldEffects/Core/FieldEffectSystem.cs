@@ -460,9 +460,15 @@ public class FieldEffectSystem : MonoBehaviour
     
     public int GetTotalEffectsCount()
     {
+        if (_effectsByCategory == null)
+        {
+            return 0;
+        }
+
         int count = 0;
         foreach (var effects in _effectsByCategory.Values)
         {
+            if (effects == null) continue;
             count += effects.Count;
         }
         return count;
@@ -476,8 +482,14 @@ public class FieldEffectSystem : MonoBehaviour
     public List<IFieldEffect> GetActiveEffects()
     {
         var allActiveEffects = new List<IFieldEffect>();
+        if (_effectsByCategory == null)
+        {
+            return allActiveEffects;
+        }
+
         foreach (var effects in _effectsByCategory.Values)
         {
+            if (effects == null) continue;
             allActiveEffects.AddRange(effects);
         }
         return allActiveEffects;
@@ -485,10 +497,16 @@ public class FieldEffectSystem : MonoBehaviour
     
     public void ClearAllEffects()
     {
+        if (_effectsByCategory == null)
+        {
+            return;
+        }
+
         // Создаем копию списка эффектов для безопасного удаления
         var effectsToRemove = new List<IFieldEffect>();
         foreach (var effects in _effectsByCategory.Values)
         {
+            if (effects == null) continue;
             effectsToRemove.AddRange(effects);
         }
         

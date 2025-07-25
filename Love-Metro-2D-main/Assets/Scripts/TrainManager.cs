@@ -75,6 +75,16 @@ public class TrainManager : MonoBehaviour
                 Debug.LogError("TrainManager: PassangerSpawner не найден в сцене!");
             }
         }
+
+        // Автопоиск ParallaxEffect, если он не назначен в инспекторе
+        if (_parallaxEffect == null)
+        {
+            _parallaxEffect = FindObjectOfType<ParallaxEffect>();
+            if (_parallaxEffect != null)
+            {
+                Debug.Log("TrainManager: ParallaxEffect найден и назначен автоматически");
+            }
+        }
     }
 
     private void SetSpeed(float newSpeed)
@@ -134,6 +144,9 @@ public class TrainManager : MonoBehaviour
                 startInertia?.Invoke(Vector2.left * _currentSpeed * 0.5f);
                 OnBrakeStart?.Invoke();
                 _isBraking = true; // Включаем режим торможения
+
+                // Сбрасываем таймер параллакса, чтобы избежать обратного движения фона
+                _elapsedTime = 0f;
             }
         }
 
@@ -301,5 +314,8 @@ public class TrainManager : MonoBehaviour
         SetSpeed(_minSpeed);
         _distanceTraveled = 0f; // Сброс расстояния после остановки
         stopCoroutineStarted = false; // Сброс флага
+
+        // Полная остановка — сброс таймера параллакса
+        _elapsedTime = 0f;
     }
 }

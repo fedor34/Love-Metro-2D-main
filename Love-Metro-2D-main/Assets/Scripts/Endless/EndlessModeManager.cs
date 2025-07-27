@@ -107,7 +107,7 @@ namespace EndlessMode
             float radius = 4f;
             float strength = baseStrength * strengthMultiplier;
 
-            BaseFieldEffect.CreateEffect(type, pos, strength, radius);
+            FieldEffectFactory.CreateEffect(type, pos, strength, radius);
         }
     }
 } 

@@ -30,6 +30,14 @@ public class MenuManager : MonoBehaviour
     
     private void InitializeMenu()
     {
+        // Автоматически ищем панели при необходимости
+        if (_mainMenuPanel == null)
+            _mainMenuPanel = GameObject.Find("MainMenuPanel");
+        if (_charactersPanel == null)
+            _charactersPanel = GameObject.Find("CharactersPanel");
+        if (_settingsPanel == null)
+            _settingsPanel = GameObject.Find("SettingsPanel");
+
         // Показываем главное меню
         ShowMainMenu();
         
@@ -40,17 +48,49 @@ public class MenuManager : MonoBehaviour
     
     private void SetupButtonListeners()
     {
+        // Если ссылки не назначены в инспекторе, пытаемся найти по имени
+        if (_playButton == null)
+            _playButton = FindButtonByName("PlayButton");
+        if (_charactersButton == null)
+            _charactersButton = FindButtonByName("CharactersButton");
+        if (_settingsButton == null)
+            _settingsButton = FindButtonByName("SettingsButton");
+        if (_exitButton == null)
+            _exitButton = FindButtonByName("ExitButton");
+
         if (_playButton != null)
             _playButton.onClick.AddListener(OnPlayButtonClicked);
-            
+
         if (_charactersButton != null)
             _charactersButton.onClick.AddListener(OnCharactersButtonClicked);
-            
+
         if (_settingsButton != null)
             _settingsButton.onClick.AddListener(OnSettingsButtonClicked);
-            
+
         if (_exitButton != null)
             _exitButton.onClick.AddListener(OnExitButtonClicked);
+    }
+
+    private UnityEngine.UI.Button FindButtonByName(string name)
+    {
+        // Сначала ищем по точному имени
+        GameObject go = GameObject.Find(name);
+        if (go != null)
+            return go.GetComponent<UnityEngine.UI.Button>();
+
+        // Если не нашли, пытаемся найти среди всех кнопок по тексту
+        foreach (var btn in Resources.FindObjectsOfTypeAll<UnityEngine.UI.Button>())
+        {
+            var txt = btn.GetComponentInChildren<TMPro.TMP_Text>();
+            if (txt != null && (txt.text.Equals("ИГРАТЬ", System.StringComparison.OrdinalIgnoreCase) && name == "PlayButton" ||
+                                txt.text.Equals("ЧЕЛОВЕЧКИ", System.StringComparison.OrdinalIgnoreCase) && name == "CharactersButton" ||
+                                txt.text.Equals("НАСТРОЙКИ", System.StringComparison.OrdinalIgnoreCase) && name == "SettingsButton" ||
+                                txt.text.Equals("ВЫХОД", System.StringComparison.OrdinalIgnoreCase) && name == "ExitButton"))
+            {
+                return btn;
+            }
+        }
+        return null;
     }
     
     #region Button Handlers
@@ -88,11 +128,19 @@ public class MenuManager : MonoBehaviour
     {
         Debug.Log("MenuManager: Выход из игры");
         
-        #if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-        #else
-            Application.Quit();
-        #endif
+        // Используем GameSceneManager если он доступен
+        if (GameSceneManager.Instance != null)
+        {
+            GameSceneManager.Instance.QuitGame();
+        }
+        else
+        {
+            #if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+            #else
+                Application.Quit();
+            #endif
+        }
     }
     
     #endregion
@@ -137,7 +185,12 @@ public class MenuManager : MonoBehaviour
     
     private void LoadGameScene()
     {
-        if (!string.IsNullOrEmpty(_gameSceneName))
+        // Используем GameSceneManager если он доступен
+        if (GameSceneManager.Instance != null)
+        {
+            GameSceneManager.Instance.LoadGameScene();
+        }
+        else if (!string.IsNullOrEmpty(_gameSceneName))
         {
             SceneManager.LoadScene(_gameSceneName);
         }

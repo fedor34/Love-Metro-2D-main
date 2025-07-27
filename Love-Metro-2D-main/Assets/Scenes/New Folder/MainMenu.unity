@@ -721,6 +721,59 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!1 &1297866143
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1297866145}
+  - component: {fileID: 1297866144}
+  m_Layer: 0
+  m_Name: "\u041C\u0435\u043D\u044E\u041C\u0435\u043D\u0435\u0434\u0436\u0435\u0440"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1297866144
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1297866143}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 243fcb6caa49d6748ab962d91b4bdebd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _playButton: {fileID: 1818628733}
+  _charactersButton: {fileID: 1958345408}
+  _settingsButton: {fileID: 942916506}
+  _exitButton: {fileID: 228420498}
+  _mainMenuPanel: {fileID: 0}
+  _charactersPanel: {fileID: 0}
+  _settingsPanel: {fileID: 0}
+  _gameSceneName: Scene2
+  _menuAnimator: {fileID: 0}
+--- !u!4 &1297866145
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1297866143}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.32021248, y: 0.6900436, z: 0.008170119}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1341624499
 GameObject:
   m_ObjectHideFlags: 0
@@ -976,7 +1029,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1818628734}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 0}
+        m_TargetAssemblyTypeName: 
+        m_MethodName: 
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1818628734
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1143,3 +1208,4 @@ SceneRoots:
   - {fileID: 701354848}
   - {fileID: 1341624502}
   - {fileID: 297699638}
+  - {fileID: 1297866145}

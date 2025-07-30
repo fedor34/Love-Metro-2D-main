@@ -5,6 +5,9 @@ using System.Collections.Generic;
 [RequireComponent(typeof(Rigidbody2D), typeof(PassangerAnimator), typeof(Collider2D))]
 public class Passenger : MonoBehaviour, IFieldEffectTarget
 {
+    // Глобальный множитель скорости – можно менять из скриптов или инспектора
+    public static float GlobalSpeedMultiplier = 2f;
+
     private delegate void ReleaseHandrail();
     private ReleaseHandrail releaseHandrail;
 
@@ -59,6 +62,9 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     {
         _initialMovingDirection = initialMovingDirection;
         CurrentMovingDirection = _initialMovingDirection.normalized;
+
+        // Применяем глобальный множитель скорости – все пассажиры будут двигаться быстрее
+        _speed *= GlobalSpeedMultiplier;
 
         _scoreCounter = scoreCounter;
         

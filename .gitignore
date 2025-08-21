@@ -1,0 +1,26 @@
+# Root-level ignores for builds and binaries
+Builds/
+Love Metro 2D_BurstDebugInformation_DoNotShip/
+lovemetro 2_Data/
+LoveMetro_Data/
+MonoBleedingEdge/
+*.exe
+*.dll
+*.log
+*.pdb
+*.mdb
+*.resS
+*.apk
+*.aab
+*.app
+# IDE and temp
+.vs/
+.vscode/
+*.user
+*.csproj
+*.sln
+Temp/
+Library/
+Obj/
+Logs/
+UserSettings/

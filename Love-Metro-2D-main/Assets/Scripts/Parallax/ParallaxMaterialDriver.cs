@@ -12,6 +12,10 @@ public class ParallaxMaterialDriver : MonoBehaviour
     private TrainManager _train;
     private readonly List<SpriteRenderer> _targets = new List<SpriteRenderer>();
     private bool _logged;
+    [Header("Stopping behaviour")]
+    [SerializeField] private bool _freezeWhenStopped = true;
+    [SerializeField] private float _stopEpsilon = 0.02f;
+    private float _frozenElapsedTime;
 
     private void Awake()
     {
@@ -52,7 +56,18 @@ public class ParallaxMaterialDriver : MonoBehaviour
         float s = Mathf.Abs(_train.GetCurrentSpeed());
         float speed01 = Mathf.Clamp01(s / Mathf.Max(0.01f, _speedNormDivisor));
         float speedMod = Mathf.Clamp(_minSpeedMod + s * _speedModScale, _minSpeedMod, _maxSpeedMod);
-        float t = Time.time;
+        bool stopped = _freezeWhenStopped && s <= _stopEpsilon;
+        if (stopped)
+        {
+            if (_frozenElapsedTime <= 0f) _frozenElapsedTime = Time.time;
+            speed01 = 0f;
+            speedMod = 0f;
+        }
+        else
+        {
+            _frozenElapsedTime = Time.time;
+        }
+        float t = stopped ? _frozenElapsedTime : Time.time;
 
         for (int i = 0; i < _targets.Count; i++)
         {

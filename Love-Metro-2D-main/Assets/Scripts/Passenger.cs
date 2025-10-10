@@ -476,7 +476,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
                     passenger.GetRigidbody().velocity = vB_new * passenger._bounceElasticity;
 
             // Совпадение пар — только если противоположные полы, оба матчабельны и не в паре
-            if (passenger.IsFemale != Passanger.IsFemale && passenger.IsMatchable && Passanger.IsMatchable
+            if (passenger.IsFemale != Passanger.IsFemale
                 && !passenger.IsInCouple && !Passanger.IsInCouple)
             {
                 Passanger.ForceToMatchingState(passenger);

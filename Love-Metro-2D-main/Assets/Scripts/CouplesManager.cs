@@ -9,7 +9,12 @@ public class CouplesManager : MonoBehaviour
     public static CouplesManager Instance { get; private set; }
 
     [SerializeField] private int _stationThreshold = 6; // remove couples when this many exist
+    [Header("Auto-stop when no pairs possible")]
+    [SerializeField] private bool _stopWhenNoPairs = true;
+    [SerializeField] private float _checkInterval = 1.0f;
+    [SerializeField] private float _cooldownAfterStop = 2.0f;
     private readonly List<Couple> _activeCouples = new List<Couple>();
+    private float _nextCheckTime = 0f;
 
     private void Awake()
     {
@@ -19,6 +24,31 @@ public class CouplesManager : MonoBehaviour
             return;
         }
         Instance = this;
+    }
+
+    private void Update()
+    {
+        if (!_stopWhenNoPairs) return;
+        if (Time.time < _nextCheckTime) return;
+        _nextCheckTime = Time.time + _checkInterval;
+
+        // If no potential opposite-sex singles remain, trigger station stop
+        var all = Object.FindObjectsOfType<Passenger>();
+        bool maleFree = false, femaleFree = false;
+        for (int i = 0; i < all.Length; i++)
+        {
+            var p = all[i];
+            if (p == null) continue;
+            if (p.IsInCouple) continue;
+            if (p.IsFemale) femaleFree = true; else maleFree = true;
+            if (maleFree && femaleFree) break;
+        }
+        if (!(maleFree && femaleFree))
+        {
+            Debug.Log("[Pair][Station] No more opposite-sex singles. Triggering stop.");
+            DespawnAllCouples();
+            _nextCheckTime = Time.time + _cooldownAfterStop;
+        }
     }
 
     public void RegisterCouple(Couple couple)
@@ -59,4 +89,3 @@ public class CouplesManager : MonoBehaviour
         }
     }
 }
-

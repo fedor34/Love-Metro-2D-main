@@ -220,4 +220,25 @@ public class TrainManager : MonoBehaviour
         float c = Mathf.Cos(rad); float s = Mathf.Sin(rad);
         return new Vector2(c * v.x - s * v.y, s * v.x + c * v.y);
     }
+
+    // Force brief station stop: freeze speed and spawn fresh passengers
+    public void StationStopAndSpawn(float pauseSeconds = 1.0f)
+    {
+        if (stopCoroutineStarted) return;
+        StartCoroutine(StationStopRoutine(pauseSeconds));
+    }
+
+    private System.Collections.IEnumerator StationStopRoutine(float pauseSeconds)
+    {
+        stopCoroutineStarted = true;
+        _isStopped = true;
+        SetSpeed(0f);
+        OnBrakeStart?.Invoke();
+        yield return new WaitForSeconds(Mathf.Max(0.05f, pauseSeconds));
+        if (_spawner == null) _spawner = FindObjectOfType<PassangerSpawner>();
+        _spawner?.spawnPassangers();
+        OnBrakeEnd?.Invoke();
+        _isStopped = false;
+        stopCoroutineStarted = false;
+    }
 }

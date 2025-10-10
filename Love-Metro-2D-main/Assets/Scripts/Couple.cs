@@ -47,5 +47,23 @@ public class Couple : MonoBehaviour
         // Отмечаем, что оба пассажира теперь в паре
         PassangerMain.IsInCouple = true;
         PassangerOther.IsInCouple = true;
+        var mgr = CouplesManager.Instance;
+        if (mgr != null)
+        {
+            mgr.RegisterCouple(this);
+        }
+    }
+
+    public void DespawnAtStation()
+    {
+        if (PassangerMain != null)
+        {
+            PassangerMain.RemoveFromContainerAndDestroy();
+        }
+        if (PassangerOther != null)
+        {
+            PassangerOther.RemoveFromContainerAndDestroy();
+        }
+        Destroy(gameObject);
     }
 }

@@ -32,20 +32,20 @@ public class CouplesManager : MonoBehaviour
         if (Time.time < _nextCheckTime) return;
         _nextCheckTime = Time.time + _checkInterval;
 
-        // If no potential opposite-sex singles remain, trigger station stop
+        // Count potential opposite-sex singles and stop when pairsPossible <= 1
         var all = Object.FindObjectsOfType<Passenger>();
-        bool maleFree = false, femaleFree = false;
+        int maleSingles = 0, femaleSingles = 0;
         for (int i = 0; i < all.Length; i++)
         {
             var p = all[i];
             if (p == null) continue;
             if (p.IsInCouple) continue;
-            if (p.IsFemale) femaleFree = true; else maleFree = true;
-            if (maleFree && femaleFree) break;
+            if (p.IsFemale) femaleSingles++; else maleSingles++;
         }
-        if (!(maleFree && femaleFree))
+        int pairsPossible = Mathf.Min(maleSingles, femaleSingles);
+        if (pairsPossible <= 1)
         {
-            Debug.Log("[Pair][Station] No more opposite-sex singles. Triggering stop.");
+            Debug.Log($"[Pair][Station] Low pairs possible (<=1). males={maleSingles} females={femaleSingles}. Triggering stop.");
             DespawnAllCouples();
             _nextCheckTime = Time.time + _cooldownAfterStop;
         }

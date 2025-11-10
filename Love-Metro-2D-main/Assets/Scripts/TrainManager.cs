@@ -26,6 +26,8 @@ public class TrainManager : MonoBehaviour
     [SerializeField] private float _acceleration = 180f;  // базовое ускорение (x2)
     [SerializeField] private float _deceleration = 10f;   // Замедление
     [SerializeField] private float _brakeDeceleration = 25f; // Торможение при отпускании
+    [Header("Условия выдачи стартового импульса пассажирам")]
+    [SerializeField] private float _startImpulseSpeedThreshold = 2.0f; // считаем поезд почти стоящим ниже этого порога
     [SerializeField] private float _startBoost = 20f; // более сильный старт
 
     [Header("Настройки камеры и фона")]
@@ -77,6 +79,7 @@ public class TrainManager : MonoBehaviour
         if (_maxSpeed < 460f) _maxSpeed = 480f;
         // Гарантируем повышенное ускорение даже если в сцене сохранено старое сериализованное
         if (_acceleration < 180f) _acceleration = 180f;
+        if (_startImpulseSpeedThreshold < 0.5f) _startImpulseSpeedThreshold = 2.0f;
         if (_spawner == null)
         {
             _spawner = FindObjectOfType<PassangerSpawner>();
@@ -120,7 +123,8 @@ public class TrainManager : MonoBehaviour
             if (Input.GetMouseButtonDown(0))
             {
                 // Запоминаем, что были почти в покое до старта
-                bool wasAtRest = _currentSpeed <= _minSpeed + _stopEpsilon;
+                // Считаем поезд "почти стоящим", если текущая скорость ниже порога
+                bool wasAtRest = _currentSpeed <= _startImpulseSpeedThreshold;
                 
                 // Мгновенно устанавливаем скорость = _startBoost (минимум _minSpeed)
                 float boostSpeed = Mathf.Max(_minSpeed, _startBoost);
@@ -184,7 +188,7 @@ public class TrainManager : MonoBehaviour
             SetSpeed(_currentSpeed + accelerationValue * Time.deltaTime);
 
             // Сброс флага «выдан стартовый импульс» когда почти остановились
-            if (_currentSpeed <= _minSpeed + _stopEpsilon)
+            if (_currentSpeed <= _startImpulseSpeedThreshold)
             {
                 _accelImpulseGiven = false;
             }

@@ -79,6 +79,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     [SerializeField] private float _angleSnapDeg = 10f;                // привязка угла для предсказуемости
     [SerializeField] private float _impulseToVelocityScale = 0.45f;     // во сколько раз импульс конвертируется в стартовую скорость полёта
     [SerializeField] private float _maxFlightSpeed = 18f;               // верхний предел скорости полёта
+    [SerializeField] private float _flightSpeedMultiplier = 0.7f;       // глобальный множитель скорости полёта (0.7 = -30%)
 
     [Header("Billiards-style tuning")]
     [SerializeField] private float _magnetRadius = 3.5f;               // радиус магнитного притяжения к цели
@@ -87,6 +88,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     [SerializeField] private float _repelForce = 4.0f;                 // сила отталкивания одноимённых
     [SerializeField] private float _flightDeceleration = 0.65f;         // базовое замедление полёта (меньше — дальше летят)
     [SerializeField] private float _bounceElasticity = 0.95f;          // упругость при соударениях со стенами
+    [SerializeField] private float _wallBounceBoost = 1.0f;            // множитель скорости при ударе о стену (1 = без ускорения)
     [SerializeField] private int _maxBounces = 3;                      // сколько отскоков допускаем до остановки
     [SerializeField] private float _easeOutMinK = 0.985f;               // минимальный коэффициент затухания (при низкой скорости)
     [SerializeField] private float _easeOutMaxK = 0.9985f;              // максимальный коэффициент (при высокой скорости)
@@ -115,6 +117,9 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         if (_angleSnapDeg <= 0f) _angleSnapDeg = 10f;
         if (_impulseToVelocityScale <= 0f) _impulseToVelocityScale = 3.2f; // ещё дальше старт
         if (_maxFlightSpeed <= 0f) _maxFlightSpeed = 56f; // потолок ещё выше
+        if (_flightSpeedMultiplier <= 0f || _flightSpeedMultiplier > 2f) _flightSpeedMultiplier = 0.7f;
+        // Гарантируем отсутствие накапливающегося ускорения от ударов
+        _wallBounceBoost = 1f;
 
         // Принудительно включаем режим 4 (BoidsLite) для теста
         _movementMode = MovementMode.BoidsLite;
@@ -333,7 +338,8 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             float xWeight = Mathf.Pow(Mathf.Abs(deltaXNorm), uniformGamma);
             float yWeight = Mathf.Pow(Mathf.Abs(deltaYNorm), uniformGamma);
             
-            float xFromClick = Mathf.Sign(deltaXNorm) * baseMag * uniformScale * xWeight;
+            // Усиление горизонтальной компоненты на 10%
+            float xFromClick = Mathf.Sign(deltaXNorm) * baseMag * uniformScale * xWeight * 1.1f;
             float yFromClick = Mathf.Sign(deltaYNorm) * baseMag * uniformScale * yWeight;
 
             xFromClick += (Random.value - 0.5f) * 0.1f * Passanger._turbulenceStrength;
@@ -353,11 +359,11 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
                 }
             }
 
-            Vector2 delta = new Vector2(xFromClick, yFromClick);
+            Vector2 delta = new Vector2(xFromClick, yFromClick) * Passanger._flightSpeedMultiplier;
 
             if (delta.magnitude >= Passanger._minImpulseToLaunch)
             {
-                Vector2 startV = delta * Passanger._impulseToVelocityScale;
+                Vector2 startV = delta * Passanger._impulseToVelocityScale * Passanger._flightSpeedMultiplier;
                 if (startV.magnitude > Passanger._maxFlightSpeed)
                     startV = startV.normalized * Passanger._maxFlightSpeed;
 
@@ -457,7 +463,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         public void SetInitialFallingSpeed(Vector2 initialSpeed)
         {
             // Используем скорость напрямую (без дополнительного множителя), чтобы полёт был длиннее
-            currentFallingSpeed = initialSpeed;
+            currentFallingSpeed = initialSpeed * Passanger._flightSpeedMultiplier;
             previousFallingSpeed = currentFallingSpeed;
         }
 
@@ -467,34 +473,40 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
             if (collision.transform.TryGetComponent<Passenger>(out Passenger passenger))
             {
-                // Рикошет между людьми: обмен импульсами по нормали контакта
+                // Совпадение пар — только если противоположные полы, оба матчабельны и не в паре
+                if (passenger.IsFemale != Passanger.IsFemale && !passenger.IsInCouple && !Passanger.IsInCouple)
+                {
+                    Passanger.ForceToMatchingState(passenger);
+                    passenger.ForceToMatchingState(Passanger);
+                    return;
+                }
+
+                // Иначе — рикошет как от стен (с лёгким бустом)
                 Vector2 vA = currentFallingSpeed;
                 Vector2 vB = passenger.GetRigidbody() != null ? passenger.GetRigidbody().velocity : Vector2.zero;
-                // нормаль указывает от другого к нам
-                // Проекции на нормаль
-                float vA_n = Vector2.Dot(vA, n);
-                float vB_n = Vector2.Dot(vB, n);
-                // Обмен проекциями (упругое столкновение равных масс)
-                Vector2 vA_new = vA + (vB_n - vA_n) * n;
-                Vector2 vB_new = vB + (vA_n - vB_n) * (-n);
-                currentFallingSpeed = vA_new * Passanger._bounceElasticity;
-                Passanger._rigidbody.velocity = currentFallingSpeed;
-                if (passenger.GetRigidbody() != null)
-                    passenger.GetRigidbody().velocity = vB_new * passenger._bounceElasticity;
 
-            // Совпадение пар — только если противоположные полы, оба матчабельны и не в паре
-            if (passenger.IsFemale != Passanger.IsFemale
-                && !passenger.IsInCouple && !Passanger.IsInCouple)
-            {
-                Passanger.ForceToMatchingState(passenger);
-                passenger.ForceToMatchingState(Passanger);
-                    return;
+                currentFallingSpeed = Vector2.Reflect(vA, n) * Passanger._bounceElasticity;
+                currentFallingSpeed *= Mathf.Max(1f, Passanger._wallBounceBoost);
+                if (currentFallingSpeed.magnitude > Passanger._maxFlightSpeed)
+                    currentFallingSpeed = currentFallingSpeed.normalized * Passanger._maxFlightSpeed;
+                Passanger._rigidbody.velocity = currentFallingSpeed;
+
+                if (passenger.GetRigidbody() != null)
+                {
+                    Vector2 otherReflected = Vector2.Reflect(vB, -n) * passenger._bounceElasticity;
+                    otherReflected *= Mathf.Max(1f, passenger._wallBounceBoost);
+                    if (otherReflected.magnitude > passenger._maxFlightSpeed)
+                        otherReflected = otherReflected.normalized * passenger._maxFlightSpeed;
+                    passenger.GetRigidbody().velocity = otherReflected;
                 }
             }
             else
             {
-                // Рикошет о стену
+                // Рикошет о стену с небольшим ускорением (эффект боулинга)
                 currentFallingSpeed = Vector2.Reflect(currentFallingSpeed, n) * Passanger._bounceElasticity;
+                currentFallingSpeed *= (Passanger._wallBounceBoost * Passanger._flightSpeedMultiplier);
+                if (currentFallingSpeed.magnitude > Passanger._maxFlightSpeed)
+                    currentFallingSpeed = currentFallingSpeed.normalized * Passanger._maxFlightSpeed;
                 Passanger._rigidbody.velocity = currentFallingSpeed;
             }
 
@@ -600,7 +612,8 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             const float verticalGamma   = 0.65f;
 
             float baseMag = Mathf.Max(force.magnitude, 6f) * sensitivity;
-            float xFromTrain = force.x * sensitivity * horizontalScale;
+            // Усиливаем горизонтальную составляющую на 10%
+            float xFromTrain = force.x * sensitivity * horizontalScale * 1.1f;
 
             float deltaYNorm = 0f;
             var cam = Camera.main;
@@ -662,9 +675,46 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
         public override void OnCollision(Collision2D collision)
         {
-            // При столкновении в полете переходим в падение
+            Vector2 n = collision.contacts.Length > 0 ? collision.contacts[0].normal : Vector2.up;
+
+            // Столкновение с другим пассажиром
+            if (collision.transform.TryGetComponent<Passenger>(out Passenger other))
+            {
+                bool canMatch = (other.IsFemale != Passanger.IsFemale) && !other.IsInCouple && !Passanger.IsInCouple;
+                if (canMatch)
+                {
+                    Passanger.ForceToMatchingState(other);
+                    other.ForceToMatchingState(Passanger);
+                    return;
+                }
+
+                // Иначе — отражаемся друг от друга как от стен (боулинг)
+                Vector2 vA = _flyingVelocity;
+                Vector2 vB = other.GetRigidbody() != null ? other.GetRigidbody().velocity : Vector2.zero;
+
+                Vector2 rA = Vector2.Reflect(vA, n) * Passanger._bounceElasticity;
+                rA *= (Passanger._wallBounceBoost * Passanger._flightSpeedMultiplier);
+                if (rA.magnitude > Passanger._maxFlightSpeed) rA = rA.normalized * Passanger._maxFlightSpeed;
+
+                if (other.GetRigidbody() != null)
+                {
+                    Vector2 rB = Vector2.Reflect(vB, -n) * other._bounceElasticity;
+                    rB *= (other._wallBounceBoost * other._flightSpeedMultiplier);
+                    if (rB.magnitude > other._maxFlightSpeed) rB = rB.normalized * other._maxFlightSpeed;
+                    other.GetRigidbody().velocity = rB;
+                }
+
+                Passanger.ChangeState(Passanger.fallingState);
+                ((Falling)Passanger.fallingState).SetInitialFallingSpeed(rA);
+                return;
+            }
+
+            // Столкновение со стеной — отражаемся и переходим в падение
+            Vector2 r = Vector2.Reflect(_flyingVelocity, n) * Passanger._bounceElasticity;
+            r *= (Passanger._wallBounceBoost * Passanger._flightSpeedMultiplier);
+            if (r.magnitude > Passanger._maxFlightSpeed) r = r.normalized * Passanger._maxFlightSpeed;
             Passanger.ChangeState(Passanger.fallingState);
-            ((Falling)Passanger.fallingState).SetInitialFallingSpeed(_flyingVelocity);
+            ((Falling)Passanger.fallingState).SetInitialFallingSpeed(r);
         }
 
         public override void Exit()
@@ -723,13 +773,13 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
         public void SetFlyingParameters(Vector2 windVelocity, float windStrength)
         {
-            _flyingVelocity = windVelocity;
+            _flyingVelocity = windVelocity * Passanger._flightSpeedMultiplier;
             _windStrength = windStrength;
         }
 
         public void UpdateWindEffect(Vector2 windVelocity, float windStrength)
         {
-            _flyingVelocity = windVelocity;
+            _flyingVelocity = windVelocity * Passanger._flightSpeedMultiplier;
             _windStrength = windStrength;
         }
     }

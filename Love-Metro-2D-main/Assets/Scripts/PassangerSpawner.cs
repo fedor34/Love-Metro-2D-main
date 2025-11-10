@@ -76,9 +76,10 @@ public class PassangerSpawner : MonoBehaviour
         // Перемешиваем точки спавна для более равномерного распределения
         ShuffleList(availableLocations);
         
-        // Определяем количество пассажиров для спавна
-        int maxPossibleSpawn = Mathf.Min(5, availableLocations.Count);
-        int spawnCount = UnityEngine.Random.Range(3, maxPossibleSpawn + 1);
+        // Определяем количество пассажиров для спавна (от 5 до 7, но не больше доступных точек)
+        int maxPossibleSpawn = Mathf.Min(7, availableLocations.Count);
+        int minDesired = Mathf.Min(5, maxPossibleSpawn);
+        int spawnCount = UnityEngine.Random.Range(minDesired, maxPossibleSpawn + 1);
         
         Debug.Log($"PassangerSpawner: Планируем создать {spawnCount} пассажиров из {availableLocations.Count} доступных точек");
         

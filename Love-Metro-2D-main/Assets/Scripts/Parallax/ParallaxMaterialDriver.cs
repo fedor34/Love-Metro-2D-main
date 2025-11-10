@@ -3,19 +3,18 @@ using System.Collections.Generic;
 
 public class ParallaxMaterialDriver : MonoBehaviour
 {
-    [SerializeField] private float _speedNormDivisor = 25f; // умеренная нормализация
-    [SerializeField] private float _speedModScale = 0.6f;   // умеренный масштаб модификатора
-    [SerializeField] private float _minSpeedMod = 1.0f;
-    [SerializeField] private float _maxSpeedMod = 12f;
+    [Header("Speed coupling")]
+    [SerializeField] private float _maxTrainSpeed = 240f;   // скорость, соответствующая полной интенсивности
+    [SerializeField] private float _offsetScale = 0.8f;     // множитель сдвига на единицу норм. скорости
+    [SerializeField] private float _elapsedTimeScale = 1.0f; // базовая скорость времени для шейдера
     [SerializeField] private bool _logOnce = true;
+
+    [SerializeField] private float _baseSpeedMod = 1.4f;   // базовый множитель скорости в шейдере
 
     private TrainManager _train;
     private readonly List<SpriteRenderer> _targets = new List<SpriteRenderer>();
     private bool _logged;
-    [Header("Stopping behaviour")]
-    [SerializeField] private bool _freezeWhenStopped = true;
-    [SerializeField] private float _stopEpsilon = 0.02f;
-    private float _frozenElapsedTime;
+    private float _parallaxOffset = 0f;
 
     private void Awake()
     {
@@ -32,7 +31,19 @@ public class ParallaxMaterialDriver : MonoBehaviour
             var mat = r.sharedMaterial;
             string matName = mat != null ? mat.name.ToLower() : string.Empty;
             string shName = (mat != null && mat.shader != null) ? mat.shader.name.ToLower() : string.Empty;
-            if (matName.Contains("parallax") || shName.Contains("parallax"))
+            bool looksParallaxByName = matName.Contains("parallax") || shName.Contains("parallax");
+            bool hasProps = false;
+            if (mat != null)
+            {
+                try
+                {
+                    hasProps = mat.HasProperty("_elapsedTime") || mat.HasProperty("elapsedTime") ||
+                               mat.HasProperty("_Speed") || mat.HasProperty("Speed");
+                }
+                catch { }
+            }
+
+            if (looksParallaxByName || hasProps)
             {
                 _targets.Add(r);
                 r.gameObject.isStatic = false;
@@ -54,45 +65,32 @@ public class ParallaxMaterialDriver : MonoBehaviour
     {
         if (_train == null || _targets.Count == 0) return;
         float s = Mathf.Abs(_train.GetCurrentSpeed());
-        float speed01 = Mathf.Clamp01(s / Mathf.Max(0.01f, _speedNormDivisor));
-        float speedMod = Mathf.Clamp(_minSpeedMod + s * _speedModScale, _minSpeedMod, _maxSpeedMod);
-        bool stopped = _freezeWhenStopped && s <= _stopEpsilon;
-        if (stopped)
-        {
-            if (_frozenElapsedTime <= 0f) _frozenElapsedTime = Time.time;
-            speed01 = 0f;
-            speedMod = 0f;
-        }
-        else
-        {
-            _frozenElapsedTime = Time.time;
-        }
-        float t = stopped ? _frozenElapsedTime : Time.time;
+        float speed01 = Mathf.Clamp01(s / Mathf.Max(0.01f, _maxTrainSpeed));
+
+        // Время должно всегда идти линейно — шейдер уже умножает его на скорость
+        _parallaxOffset += _elapsedTimeScale * Time.deltaTime;
 
         for (int i = 0; i < _targets.Count; i++)
         {
-            var mat = _targets[i]?.material; // instance
+            var mat = _targets[i]?.material;
             if (mat == null) continue;
 
-            // время
-            SafeSet(mat, "_elapsedTime", t);
-            SafeSet(mat, "elapsedTime", t);
+            SafeSet(mat, "_elapsedTime", _parallaxOffset);
+            SafeSet(mat, "elapsedTime", _parallaxOffset);
 
-            // нормализованная скорость (0..1)
+            // Передаём только нормированную скорость
             SafeSet(mat, "_Speed", speed01);
             SafeSet(mat, "Speed", speed01);
 
-            // сильный модификатор скорости
-            SafeSet(mat, "_SpeedModificator", speedMod);
-            SafeSet(mat, "SpeedModificator", speedMod);
-
-            // Offset не трогаем, чтобы не дублировать движение
+            // Базовый множитель скорости (не зависит от поезда)
+            SafeSet(mat, "_SpeedModificator", _baseSpeedMod);
+            SafeSet(mat, "SpeedModificator", _baseSpeedMod);
         }
 
         if (_logOnce && !_logged)
         {
             _logged = true;
-            Debug.Log($"[ParallaxMaterialDriver] tick: speed={s:F2} speed01={speed01:F2} speedMod={speedMod:F2} targets={_targets.Count}");
+            Debug.Log($"[ParallaxMaterialDriver] tick: speed={s:F2} speed01={speed01:F2} offset(time)={_parallaxOffset:F2} targets={_targets.Count}");
         }
     }
 

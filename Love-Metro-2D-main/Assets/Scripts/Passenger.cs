@@ -303,50 +303,57 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
         public override void OnTrainSpeedChange(Vector2 force)
         {
-            // Разделяем вклад по осям: X — поезд (ослаблен), Y — указание игрока (усилен)
             float sensitivity = Passanger._launchSensitivity;
             Vector2 pos = Passanger.transform.position;
             Vector2 targetWorld = ClickDirectionManager.HasReleasePoint
                 ? ClickDirectionManager.LastReleaseWorld
                 : pos + ClickDirectionManager.GetCurrentDirection() * 5f;
 
-            const float horizontalScale = 0.4f;   // ещё слабее горизонталь
-            const float verticalScale   = 3.8f;    // ещё сильнее вертикаль
-            const float verticalGamma   = 0.65f;   // сильнее усиливаем малые смещения
+            const float uniformScale = 1.8f;
+            const float uniformGamma = 0.75f;
 
-            float baseMag = Mathf.Max(force.magnitude, 6f) * sensitivity; // минимальный порог силы, чтобы полёт всегда был заметным
-            float xFromTrain = force.x * sensitivity * horizontalScale; // OX — только поезд
-
-            // Нормируем вертикаль по экрану, чтобы даже небольшое смещение по Y давало эффект
+            float baseMag = Mathf.Max(force.magnitude, 6f) * sensitivity;
+            
+            float deltaXNorm = 0f;
             float deltaYNorm = 0f;
             var cam = Camera.main;
             if (cam != null)
             {
-                float passengerScreenY = cam.WorldToScreenPoint(pos).y;
-                float releaseScreenY   = cam.WorldToScreenPoint(targetWorld).y;
-                deltaYNorm = Mathf.Clamp((releaseScreenY - passengerScreenY) / Mathf.Max(1f, (float)Screen.height), -1f, 1f);
+                Vector3 passengerScreen = cam.WorldToScreenPoint(pos);
+                Vector3 releaseScreen = cam.WorldToScreenPoint(targetWorld);
+                deltaXNorm = Mathf.Clamp((releaseScreen.x - passengerScreen.x) / Mathf.Max(1f, (float)Screen.width), -1f, 1f);
+                deltaYNorm = Mathf.Clamp((releaseScreen.y - passengerScreen.y) / Mathf.Max(1f, (float)Screen.height), -1f, 1f);
             }
             else
             {
+                deltaXNorm = Mathf.Clamp((targetWorld.x - pos.x), -1f, 1f);
                 deltaYNorm = Mathf.Clamp((targetWorld.y - pos.y), -1f, 1f);
             }
 
-            float yWeight = Mathf.Pow(Mathf.Abs(deltaYNorm), verticalGamma);
-            float yFromClick = Mathf.Sign(deltaYNorm) * baseMag * verticalScale * yWeight;
+            float xWeight = Mathf.Pow(Mathf.Abs(deltaXNorm), uniformGamma);
+            float yWeight = Mathf.Pow(Mathf.Abs(deltaYNorm), uniformGamma);
+            
+            float xFromClick = Mathf.Sign(deltaXNorm) * baseMag * uniformScale * xWeight;
+            float yFromClick = Mathf.Sign(deltaYNorm) * baseMag * uniformScale * yWeight;
 
-            // Лёгкий шум только по Y
+            xFromClick += (Random.value - 0.5f) * 0.1f * Passanger._turbulenceStrength;
             yFromClick += (Random.value - 0.5f) * 0.1f * Passanger._turbulenceStrength;
 
-            // Aim-assist — только по Y
             Passenger target = FindClosestOpposite(Passanger, Passanger._aimAssistRadius);
             if (target != null)
             {
                 Vector2 to = (Vector2)(target.transform.position - Passanger.transform.position);
-                float wy = Mathf.Clamp01(Mathf.Abs(to.y) / Passanger._aimAssistRadius);
-                yFromClick += Mathf.Sign(to.y) * (Passanger._aimAssistMaxStrength * wy);
+                float distNormalized = to.magnitude / Passanger._aimAssistRadius;
+                if (distNormalized < 1f)
+                {
+                    Vector2 toNormalized = to.normalized;
+                    float assistStrength = Passanger._aimAssistMaxStrength * (1f - distNormalized);
+                    xFromClick += toNormalized.x * assistStrength;
+                    yFromClick += toNormalized.y * assistStrength;
+                }
             }
 
-            Vector2 delta = new Vector2(xFromTrain, yFromClick);
+            Vector2 delta = new Vector2(xFromClick, yFromClick);
 
             if (delta.magnitude >= Passanger._minImpulseToLaunch)
             {
@@ -357,7 +364,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             Passanger.ChangeState(Passanger.fallingState);
                 ((Falling)Passanger.fallingState).SetInitialFallingSpeed(startV);
                 Passanger._currentState.OnTrainSpeedChange(delta);
-                Debug.Log($"[Passenger] Launch (X by train, Y by click/screen) startV={startV} x={xFromTrain} y={yFromClick}");
+                Debug.Log($"[Passenger] Launch (uniform X/Y from click direction) startV={startV} x={xFromClick:F2} y={yFromClick:F2}");
             }
         }
 
@@ -671,6 +678,13 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         public override void UpdateState()
         {
             _flyingTime += Time.deltaTime;
+
+            // Постепенно снижаем скорость, чтобы контролировать длительность полёта
+            if (_flyingVelocity.sqrMagnitude > 0.0001f && Passanger._flightDeceleration > 0f)
+            {
+                float speed = Mathf.Max(0f, _flyingVelocity.magnitude - Passanger._flightDeceleration * Time.deltaTime);
+                _flyingVelocity = _flyingVelocity.normalized * speed;
+            }
             
             // Применяем движение от ветра
             Passanger._rigidbody.velocity = _flyingVelocity;
@@ -870,6 +884,11 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         if (container != null)
             container.RemovePassanger(this);
         Destroy(gameObject);
+    }
+
+    public string GetCurrentStateName()
+    {
+        return _currentState != null ? _currentState.GetType().Name : "None";
     }
     
     #region IFieldEffectTarget Implementation

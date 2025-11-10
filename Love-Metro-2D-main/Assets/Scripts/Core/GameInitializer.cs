@@ -63,6 +63,12 @@ public class GameInitializer : MonoBehaviour
             Debug.Log($"[GameInitializer] Created SimpleBackgroundScroller with {layers.Count} layer(s)");
         }
 
+        if (_ensureParallaxSystems && FindObjectOfType<EnsureParallaxLayers>() == null)
+        {
+            new GameObject("EnsureParallaxLayers_Auto", typeof(EnsureParallaxLayers));
+            Debug.Log("[GameInitializer] Created EnsureParallaxLayers");
+        }
+
         if (_ensureParallaxMaterialDriver && FindObjectOfType<ParallaxMaterialDriver>() == null)
         {
             new GameObject("ParallaxMaterialDriver", typeof(ParallaxMaterialDriver));

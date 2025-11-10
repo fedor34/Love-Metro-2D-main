@@ -90,7 +90,8 @@ public class TrainManager : MonoBehaviour
         _currentSpeed = Mathf.Clamp(newSpeed, 0f, _maxSpeed);
     }
 
-    private float _elapsedTime = 0;
+    [SerializeField] private float _stopEpsilon = 0.02f;
+    
     private void Update()
     {
         _previousSpeed = _currentSpeed;
@@ -117,21 +118,22 @@ public class TrainManager : MonoBehaviour
             if (Input.GetMouseButtonDown(0))
             {
                 // Запоминаем, что были почти в покое до старта
-                bool wasAtRest = _currentSpeed <= _minSpeed + 0.05f;
+                bool wasAtRest = _currentSpeed <= _minSpeed + _stopEpsilon;
                 
-                // Мгновенно устанавливаем скорость = 10
-                SetSpeed(10f);
+                // Мгновенно устанавливаем скорость = _startBoost (минимум _minSpeed)
+                float boostSpeed = Mathf.Max(_minSpeed, _startBoost);
+                SetSpeed(boostSpeed);
                 
                 // Однократный импульс пассажирам при отправке — только если стартовали из покоя
                 if (!_accelImpulseGiven && wasAtRest)
                 {
-                    float baseSpeed = 10f;
+                    float baseSpeed = boostSpeed;
                     float accelMag = Mathf.Max(4f, baseSpeed * 1.6f + baseSpeed * baseSpeed * 0.18f);
                     var impulse = Vector2.left * accelMag;
                     impulse = Rotate(impulse, Mathf.Sin(_turnPhase) * _turnAmplitudeDeg);
                     startInertia?.Invoke(impulse);
                     LastInertiaImpulse = impulse;
-                    Debug.Log($"[Train] ACCEL impulse {impulse} (mouse down, set speed=10, quad)");
+                    Debug.Log($"[Train] ACCEL impulse {impulse} (mouse down, set speed={boostSpeed:F1}, quad)");
                     _accelImpulseGiven = true;
                 }
                 OnBrakeEnd?.Invoke();
@@ -148,7 +150,6 @@ public class TrainManager : MonoBehaviour
                 Debug.Log($"[Train] BRAKE impulse {impulse} (mouse up, quad)");
                 OnBrakeStart?.Invoke();
                 _isBraking = true;
-                _elapsedTime = 0f;
             }
         }
 
@@ -181,7 +182,7 @@ public class TrainManager : MonoBehaviour
             SetSpeed(_currentSpeed + accelerationValue * Time.deltaTime);
 
             // Сброс флага «выдан стартовый импульс» когда почти остановились
-            if (_currentSpeed <= _minSpeed + 0.02f)
+            if (_currentSpeed <= _minSpeed + _stopEpsilon)
             {
                 _accelImpulseGiven = false;
             }
@@ -199,17 +200,10 @@ public class TrainManager : MonoBehaviour
             _camera.position = new Vector3(newX, _cameraStartPosition.y + _currentShakeOffset, _cameraStartPosition.z);
         }
 
-        if (_backGround?.material != null)
-        {
-            _backGround.material.SetFloat("_elapsedTime", _elapsedTime);
-            float absSpeed = Mathf.Abs(_currentSpeed);
-            _backGround.material.SetFloat("_Speed", absSpeed / _maxSpeed);
-            _backGround.material.SetFloat("_CurrentSpeed", absSpeed);
-        }
-        _elapsedTime += Time.deltaTime;
-        
-        // Увеличиваем визуальную скорость параллакса
-        _parallaxEffect?.SetTrainSpeed(Mathf.Abs(_currentSpeed) * 14f);
+        float absSpeed = Mathf.Abs(_currentSpeed);
+
+        // Увеличиваем визуальную скорость параллакса — напрямую от скорости поезда
+        _parallaxEffect?.SetTrainSpeed(absSpeed);
         
         _distanceTraveled += Mathf.Abs(_currentSpeed) * Time.deltaTime;
     }

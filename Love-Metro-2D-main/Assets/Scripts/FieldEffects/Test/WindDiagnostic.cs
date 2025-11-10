@@ -128,11 +128,11 @@ public class WindDiagnostic : MonoBehaviour
         var passengers = FindObjectsOfType<Passenger>();
         foreach (var passenger in passengers)
         {
-            string state = "Unknown";
+            string state = passenger.GetCurrentStateName();
             bool canBeAffected = passenger.CanBeAffectedBy(FieldEffectType.Wind);
             Vector3 pos = passenger.GetPosition();
             
-            Debug.Log($"[WindDiagnostic] Пассажир '{passenger.name}': позиция={pos}, может_быть_затронут_ветром={canBeAffected}");
+            Debug.Log($"[WindDiagnostic] Пассажир '{passenger.name}': позиция={pos}, состояние={state}, может_быть_затронут_ветром={canBeAffected}");
         }
         
         Debug.Log("=== КОНЕЦ ДИАГНОСТИКИ ПАССАЖИРОВ ===");

@@ -6,7 +6,7 @@ public class ParallaxEffect : MonoBehaviour
 {
     [Header("Параллакс настройки")]
     [SerializeField] private ParallaxLayer[] _parallaxLayers;
-    [SerializeField] private float _speedMultiplier = 8.0f; // визуально ещё быстрее фон
+    [SerializeField] private float _speedMultiplier = 1.0f; // единичный множитель, скорость напрямую от поезда
     [SerializeField] private bool _updateViaReflection = true; // Можно оставить включённым — будет использоваться только если внешней скорости давно не было
     [SerializeField] private TrainManager _trainManager;
 
@@ -40,7 +40,8 @@ public class ParallaxEffect : MonoBehaviour
             _lastSpeed = _trainManager.GetCurrentSpeed();
         }
         
-        float speedForLayers = _lastSpeed * _speedMultiplier;
+        // Используем скорость поезда напрямую (игнорируя возможные сериализованные множители)
+        float speedForLayers = _lastSpeed;
         foreach (var layer in _parallaxLayers)
         {
             if (layer != null && layer.transform != null)
@@ -62,7 +63,8 @@ public class ParallaxEffect : MonoBehaviour
     {
         _lastSpeed = speed;
         _lastExternalSetTime = Time.time;
-        float speedForLayers = speed * _speedMultiplier;
+        // Используем скорость поезда напрямую
+        float speedForLayers = speed;
         foreach (var layer in _parallaxLayers)
         {
             if (layer != null)

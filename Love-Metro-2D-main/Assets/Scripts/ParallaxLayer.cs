@@ -6,14 +6,14 @@ using UnityEngine;
 public class ParallaxLayer : MonoBehaviour
 {
     [Header("Настройки параллакса")]
-    [SerializeField] private float _parallaxSpeed = 6f; // ещё сильнее визуальная скорость
-    [SerializeField, Tooltip("Нелинейное усиление визуальной скорости")] private float _speedGamma = 1.35f; // используется в формуле ниже
+    [SerializeField] private float _parallaxSpeed = 0.25f; // базовый коэффициент перевода скорости поезда в смещение
+    [SerializeField, Tooltip("Нелинейное усиление визуальной скорости")] private float _speedGamma = 1.0f; // 1 = линейная зависимость
     [SerializeField] private bool _useTrainSpeed = true;
     [SerializeField] private Vector2 _scrollDirection = Vector2.left;
 
     [Header("Режим прокрутки")]
     [SerializeField] private bool _scrollByTransform = true; // если материал/шейдер не тянут offset — двигаем трансформ напрямую
-    [SerializeField] private float _transformScrollScale = 6f; // умеренный множитель (избегаем скачков)
+    [SerializeField] private float _transformScrollScale = 1.0f; // линейная, без усилений
     [SerializeField] private bool _enableLooping = false;      // отключаем зацикливание по умолчанию (для простоты)
     [SerializeField] private bool _tileHorizontally = false;   // тайлинг выключен по умолчанию
     [SerializeField] private int _tilesCount = 3;              // количество тайлов (>=2) если включено
@@ -83,9 +83,9 @@ public class ParallaxLayer : MonoBehaviour
         if (!_useTrainSpeed) return;
         
         float effectiveTrainSpeed = Mathf.Abs(trainSpeed);
-        
-        float effectiveSpeed = (Mathf.Pow(effectiveTrainSpeed, _speedGamma) * 5.0f + effectiveTrainSpeed * effectiveTrainSpeed * 0.12f) * _parallaxSpeed * _nameMultiplier;
-        effectiveSpeed = Mathf.Clamp(effectiveSpeed, 0f, 10000f);
+
+        // Линейная привязка скорости фона к скорости поезда
+        float effectiveSpeed = Mathf.Clamp(effectiveTrainSpeed * _parallaxSpeed * _nameMultiplier, 0f, 1000f);
 
         if (_scrollByTransform)
         {

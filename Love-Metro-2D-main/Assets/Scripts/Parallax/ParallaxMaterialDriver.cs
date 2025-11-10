@@ -4,7 +4,7 @@ using System.Collections.Generic;
 public class ParallaxMaterialDriver : MonoBehaviour
 {
     [Header("Speed coupling")]
-    [SerializeField] private float _maxTrainSpeed = 240f;   // скорость, соответствующая полной интенсивности
+    [SerializeField] private float _maxTrainSpeed = 480f;   // синхронизировано с новым максимумом поезда
     [SerializeField] private float _offsetScale = 0.8f;     // множитель сдвига на единицу норм. скорости
     [SerializeField] private float _elapsedTimeScale = 1.0f; // базовая скорость времени для шейдера
     [SerializeField] private bool _logOnce = true;
@@ -65,7 +65,8 @@ public class ParallaxMaterialDriver : MonoBehaviour
     {
         if (_train == null || _targets.Count == 0) return;
         float s = Mathf.Abs(_train.GetCurrentSpeed());
-        float speed01 = Mathf.Clamp01(s / Mathf.Max(0.01f, _maxTrainSpeed));
+        bool held = ClickDirectionManager.IsMouseHeld;
+        float speed01 = held ? Mathf.Clamp01(s / Mathf.Max(0.01f, _maxTrainSpeed)) : 0f;
 
         // Время должно всегда идти линейно — шейдер уже умножает его на скорость
         _parallaxOffset += _elapsedTimeScale * Time.deltaTime;

@@ -21,9 +21,9 @@ public class TrainManager : MonoBehaviour
     private float _turnPhase = 0f;
 
     [Header("Параметры движения")]
-    [SerializeField] private float _maxSpeed = 240f; // значительно повышен максимум
+    [SerializeField] private float _maxSpeed = 480f; // увеличен максимум вдвое
     [SerializeField] private float _minSpeed = 1f;
-    [SerializeField] private float _acceleration = 90f;  // базовое ускорение
+    [SerializeField] private float _acceleration = 180f;  // базовое ускорение (x2)
     [SerializeField] private float _deceleration = 10f;   // Замедление
     [SerializeField] private float _brakeDeceleration = 25f; // Торможение при отпускании
     [SerializeField] private float _startBoost = 20f; // более сильный старт
@@ -74,7 +74,9 @@ public class TrainManager : MonoBehaviour
         SetSpeed(_minSpeed);
         _cameraStartPosition = _camera.position;
         // Гарантируем высокий максимум, если проект/сцена содержит старое значение
-        if (_maxSpeed < 220f) _maxSpeed = 240f;
+        if (_maxSpeed < 460f) _maxSpeed = 480f;
+        // Гарантируем повышенное ускорение даже если в сцене сохранено старое сериализованное
+        if (_acceleration < 180f) _acceleration = 180f;
         if (_spawner == null)
         {
             _spawner = FindObjectOfType<PassangerSpawner>();
@@ -202,8 +204,8 @@ public class TrainManager : MonoBehaviour
 
         float absSpeed = Mathf.Abs(_currentSpeed);
 
-        // Увеличиваем визуальную скорость параллакса — напрямую от скорости поезда
-        _parallaxEffect?.SetTrainSpeed(absSpeed);
+        // Требование: при отпускании ЛКМ фон мгновенно замирает
+        _parallaxEffect?.SetTrainSpeed(ClickDirectionManager.IsMouseHeld ? absSpeed : 0f);
         
         _distanceTraveled += Mathf.Abs(_currentSpeed) * Time.deltaTime;
     }

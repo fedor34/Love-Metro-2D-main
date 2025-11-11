@@ -54,8 +54,7 @@ public class ClickDirectionManager : MonoBehaviour
         _mainCamera = Camera.main;
         if (_mainCamera == null)
         {
-            Debug.LogError("[ClickDirectionManager] Main camera not found!");
-            return;
+            Debug.LogWarning("[ClickDirectionManager] Main camera not found at Start – will retry.");
         }
         
         _screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
@@ -72,6 +71,12 @@ public class ClickDirectionManager : MonoBehaviour
     
     void Update()
     {
+        // Камера могла измениться/пересоздаться при смене сцены – проверяем каждый кадр
+        if (_mainCamera == null)
+            _mainCamera = Camera.main;
+        if (_mainCamera == null)
+            return; // нет камеры – пропускаем кадр без ввода
+
         HandleInput();
         UpdateVisualFeedback();
     }
@@ -119,7 +124,7 @@ public class ClickDirectionManager : MonoBehaviour
                 }
                 SetDirection(direction);
             }
-            CurrentPointerWorld = _mainCamera.ScreenToWorldPoint(mousePosition);
+            CurrentPointerWorld = _mainCamera != null ? _mainCamera.ScreenToWorldPoint(mousePosition) : Vector2.zero;
         }
 
         // Начало удержания — сбрасываем релиз
@@ -128,8 +133,9 @@ public class ClickDirectionManager : MonoBehaviour
             Vector2 mousePosition = Input.mousePosition;
             _prevMouseX = mousePosition.x;
             _prevMouseY = mousePosition.y;
-            CurrentPointerWorld = _mainCamera.ScreenToWorldPoint(mousePosition);
-            
+            if (_mainCamera != null)
+                CurrentPointerWorld = _mainCamera.ScreenToWorldPoint(mousePosition);
+
             // Вычисляем направление от центра экрана к позиции клика
             Vector2 screenDirection = mousePosition - _screenCenter;
             
@@ -161,7 +167,8 @@ public class ClickDirectionManager : MonoBehaviour
         {
             IsMouseHeld = false;
             Vector2 mousePosition = Input.mousePosition;
-            LastReleaseWorld = _mainCamera.ScreenToWorldPoint(mousePosition);
+            if (_mainCamera != null)
+                LastReleaseWorld = _mainCamera.ScreenToWorldPoint(mousePosition);
             HasReleasePoint = true;
             LastReleaseTime = Time.time;
             Debug.Log($"[ClickDirectionManager] MouseUp at world {LastReleaseWorld}");

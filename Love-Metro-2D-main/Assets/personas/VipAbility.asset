@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de7f215dca897684ea275ae4e53532e8, type: 3}
   m_Name: VipAbility
   m_EditorClassIdentifier: 
-  femaleController: {fileID: 0}
-  maleController: {fileID: 0}
+  femaleController: {fileID: 22100000, guid: 755d5ea8c1e903e44a6bf8895251fccf, type: 2}
+  maleController: {fileID: 22100000, guid: ae9fb1cdb971dae42a68a06396d124c1, type: 2}
   pairBonus: 500

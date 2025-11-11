@@ -11,11 +11,8 @@ public class PassangerSpawner : MonoBehaviour
     [SerializeField] private List<Passenger> _passangerMalePrefs;
     [SerializeField] private SortingLayerEditor _sortingLayerEditor;
     [SerializeField] private ScoreCounter _scoreCounter;
-    [Header("Special pair (VIP)")]
-    [Tooltip("Prefab GameObjects (with Passenger component)")]
-    [SerializeField] private GameObject _specialFemalePrefab;
-    [SerializeField] private GameObject _specialMalePrefab;
-    private bool _specialPairSpawned = false;
+    [Header("Abilities applied to each spawned passenger (optional)")]
+    [SerializeField] private List<PassengerAbility> _globalAbilities;
 
     [SerializeField] private int passangerCount;
     [SerializeField] private Vector3[] _possibleStartMovingDirections;
@@ -128,6 +125,7 @@ public class PassangerSpawner : MonoBehaviour
         ShuffleList(genderDistribution);
         
         // Спавним пассажиров в соответствии с перемешанным распределением
+        var spawnedThisWave = new List<Passenger>();
         for (int i = 0; i < spawnCount; i++)
         {
             if (availableLocations.Count == 0)
@@ -187,7 +185,16 @@ public class PassangerSpawner : MonoBehaviour
                 passenger.Initiate(direction, _trainManager, _scoreCounter);
                 passenger.container = _passiveContainer;
                 _passiveContainer.Passangers.Add(passenger);
+                // Attach optional global abilities
+                if (_globalAbilities != null && _globalAbilities.Count > 0)
+                {
+                    var runner = passenger.GetComponent<PassengerAbilities>();
+                    if (runner == null) runner = passenger.gameObject.AddComponent<PassengerAbilities>();
+                    foreach (var ability in _globalAbilities) runner.AddAbility(ability);
+                    runner.AttachAll();
+                }
                 LogPassengerSummary(passenger, "spawned");
+                spawnedThisWave.Add(passenger);
                 
                 if (createFemale) femalesCreated++;
                 else malesCreated++;
@@ -202,6 +209,9 @@ public class PassangerSpawner : MonoBehaviour
             }
         }
         
+        // Авто-VIP: назначаем способность VIP случайной паре М/Ж в этой волне
+        TryAssignVipPair(spawnedThisWave);
+
         Diagnostics.Log($"========== SPAWN DONE females={femalesCreated} males={malesCreated} ==========");
         Diagnostics.Log($"[Spawner] container total={_passiveContainer.Passangers?.Count ?? 0}");
         
@@ -217,108 +227,36 @@ public class PassangerSpawner : MonoBehaviour
         spawnPassangers();
     }
 
-    // Спавн особой пары (м/ж) с альтернативными моделями и VIP-флагом
-    public void SpawnSpecialPair()
+    [Header("Auto VIP pair per wave")]
+    [SerializeField] private VipAbility _vipAbility;
+    [Range(0f,1f)] [SerializeField] private float _vipPairChance = 1f;
+
+    private void TryAssignVipPair(List<Passenger> spawned)
     {
-        if (_specialPairSpawned) return;
-        if (_spawnLocations == null || _spawnLocations.Count == 0) return;
-        // Берём точки спавна так же, как для обычных пассажиров
-        var available = new List<Transform>();
-        foreach (var loc in _spawnLocations) if (loc != null) available.Add(loc);
-        if (available.Count == 0) return;
-        ShuffleList(available);
-        Transform spotA = available[0];
-        Transform spotB = available.Count > 1 ? available[1] : available[0];
+        if (_vipAbility == null) { Diagnostics.Log("[Spawner][VIP] ability is null — skip"); return; }
+        if (spawned == null || spawned.Count < 2) return;
+        if (UnityEngine.Random.value > _vipPairChance) return;
 
-        // Подстрахуем Y: если сильно ниже «платформы», поднимем к среднему Y обычных
-        // Выставляем Y строго по среднему Y точек спавна (как для обычных)
-        float typicalY = 0f; int cnt = 0;
-        foreach (var t in _spawnLocations)
+        Passenger female = null, male = null;
+        for (int i = 0; i < spawned.Count; i++)
         {
-            if (t == null) continue; typicalY += t.position.y; cnt++;
+            var p = spawned[i]; if (p == null || p.IsInCouple) continue;
+            if (p.IsFemale && female == null) female = p;
+            if (!p.IsFemale && male == null) male = p;
+            if (female != null && male != null) break;
         }
-        if (cnt > 0) typicalY /= cnt; else typicalY = spotA.position.y;
-        Vector3 posA = spotA.position; Vector3 posB = spotB.position;
-        if (posA.y < typicalY - 0.5f) posA.y = typicalY;
-        if (posB.y < typicalY - 0.5f) posB.y = typicalY;
-        Diagnostics.Log($"[Spawner][VIP] typicalY={typicalY:F2}; posA={spotA.position.y:F2}->{posA.y:F2} posB={spotB.position.y:F2}->{posB.y:F2}");
+        if (female == null || male == null) { Diagnostics.Log("[Spawner][VIP] not found both genders in wave"); return; }
 
-        // Выбираем префабы, с запасным вариантом
-        GameObject femaleGO = _specialFemalePrefab != null ? _specialFemalePrefab :
-            (_passangerFemalePrefs.Count > 0 ? _passangerFemalePrefs[0]?.gameObject : null);
-        GameObject maleGO   = _specialMalePrefab != null ? _specialMalePrefab :
-            (_passangerMalePrefs.Count > 0 ? _passangerMalePrefs[0]?.gameObject : null);
-        if (femaleGO == null || maleGO == null) return;
+        ApplyVip(female); ApplyVip(male);
+        Diagnostics.Log($"[Spawner][VIP] Assigned to pair: F={female.name} M={male.name}");
+    }
 
-        // Направления старта — используем первое допустимое
-        Vector3 dirA = (_possibleStartMovingDirections != null && _possibleStartMovingDirections.Length > 0) ? _possibleStartMovingDirections[0] : Vector3.right;
-        Vector3 dirB = (_possibleStartMovingDirections != null && _possibleStartMovingDirections.Length > 0) ? _possibleStartMovingDirections[0] : Vector3.left;
-
-        // Создаём
-        var pfObj = Instantiate(femaleGO, posA, Quaternion.identity);
-        Passenger pf = pfObj.GetComponent<Passenger>();
-        if (pf == null) return;
-        pf.IsVIP = true;
-        pf.IsFemale = true; // гарантируем пол
-        // На всякий случай поправим Z-слой
-        pf.transform.position = new Vector3(pf.transform.position.x, pf.transform.position.y, 0f);
-        pf.Initiate(dirA, _trainManager, _scoreCounter);
-        pf.container = _passiveContainer;
-        _passiveContainer.Passangers.Add(pf);
-        LogPassengerSummary(pf, "VIP-F");
-
-        var pmObj = Instantiate(maleGO, posB, Quaternion.identity);
-        Passenger pm = pmObj.GetComponent<Passenger>();
-        if (pm == null) return;
-        pm.IsVIP = true;
-        pm.IsFemale = false; // гарантируем пол
-        pm.transform.position = new Vector3(pm.transform.position.x, pm.transform.position.y, 0f);
-        pm.Initiate(dirB, _trainManager, _scoreCounter);
-        pm.container = _passiveContainer;
-        _passiveContainer.Passangers.Add(pm);
-
-        // Страховка: если по какой-то причине оба одного пола — пересоздадим одного правильным префабом
-        if (pf.IsFemale == pm.IsFemale)
-        {
-            // Уничтожаем мужскую/женскую и создаём противоположную
-            if (pf.IsFemale)
-            {
-                // оба female -> заменим pm на male
-                if (pmObj != null) Destroy(pmObj);
-                GameObject maleFallback = _specialMalePrefab != null ? _specialMalePrefab :
-                    (_passangerMalePrefs != null && _passangerMalePrefs.Count > 0 ? _passangerMalePrefs[0]?.gameObject : null);
-                if (maleFallback != null)
-                {
-                    pmObj = Instantiate(maleFallback, posB, Quaternion.identity);
-                    pm = pmObj.GetComponent<Passenger>();
-                    pm.IsVIP = true; pm.IsFemale = false;
-                    pm.transform.position = new Vector3(pm.transform.position.x, pm.transform.position.y, 0f);
-                    pm.Initiate(dirB, _trainManager, _scoreCounter);
-                    pm.container = _passiveContainer; _passiveContainer.Passangers.Add(pm);
-                }
-            }
-            else
-            {
-                // оба male -> заменим pf на female
-                if (pfObj != null) Destroy(pfObj);
-                GameObject femaleFallback = _specialFemalePrefab != null ? _specialFemalePrefab :
-                    (_passangerFemalePrefs != null && _passangerFemalePrefs.Count > 0 ? _passangerFemalePrefs[0]?.gameObject : null);
-                if (femaleFallback != null)
-                {
-                    pfObj = Instantiate(femaleFallback, posA, Quaternion.identity);
-                    pf = pfObj.GetComponent<Passenger>();
-                    pf.IsVIP = true; pf.IsFemale = true;
-                    pf.transform.position = new Vector3(pf.transform.position.x, pf.transform.position.y, 0f);
-                    pf.Initiate(dirA, _trainManager, _scoreCounter);
-                    pf.container = _passiveContainer; _passiveContainer.Passangers.Add(pf);
-                }
-            }
-        }
-
-        Diagnostics.Log($"[Spawner][VIP] Female:{pfObj.name} IsFemale={pf.IsFemale} y={pf.transform.position.y:F2}  Male:{pmObj.name} IsFemale={pm.IsFemale} y={pm.transform.position.y:F2} targetY={typicalY:F2}");
-
-        _specialPairSpawned = true;
-        Diagnostics.Log("[Spawner] Special VIP pair spawned");
+    private void ApplyVip(Passenger p)
+    {
+        var runner = p.GetComponent<PassengerAbilities>();
+        if (runner == null) runner = p.gameObject.AddComponent<PassengerAbilities>();
+        runner.AddAbility(_vipAbility);
+        runner.AttachAll();
     }
 
     // Вспомогательный метод для перемешивания списка
@@ -350,7 +288,7 @@ public class PassangerSpawner : MonoBehaviour
         var anim = p.GetComponent<Animator>();
         string ctrlName = anim != null && anim.runtimeAnimatorController != null ? anim.runtimeAnimatorController.name : "<null>";
         string spriteName = sr != null && sr.sprite != null ? sr.sprite.name : "<null>";
-        Diagnostics.Log($"[Spawner][{tag}] name={p.name} VIP={p.IsVIP} female={p.IsFemale} layer={p.gameObject.layer} sprite='{spriteName}' ctrl='{ctrlName}' pos={p.transform.position}");
+        Diagnostics.Log($"[Spawner][{tag}] name={p.name} female={p.IsFemale} layer={p.gameObject.layer} sprite='{spriteName}' ctrl='{ctrlName}' pos={p.transform.position}");
     }
 
 

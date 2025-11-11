@@ -61,9 +61,7 @@ public class TrainManager : MonoBehaviour
     [SerializeField] private PassangerSpawner _spawner;
 
     private bool stopCoroutineStarted = false; // Флаг для задержки остановки
-    [Header("Stations / Special VIP")]
-    [SerializeField] private int _specialPairStation = 3; // на какой остановке появится особая пара
-    private int _stationCounter = 0;
+    // VIP spawns removed; ability system handles types dynamically
 
     // Текущее фактическое ускорение (полезно для отладки или эффектов)
     private float _currentAcceleration = 0f;
@@ -299,13 +297,6 @@ public class TrainManager : MonoBehaviour
         yield return new WaitForSeconds(Mathf.Max(0.05f, pauseSeconds));
         if (_spawner == null) _spawner = FindObjectOfType<PassangerSpawner>();
         _spawner?.spawnPassangers();
-        // На ~третьей остановке спавним особую пару, если ещё не появлялась
-        _stationCounter++;
-        if (_stationCounter == _specialPairStation && _spawner != null)
-        {
-            Diagnostics.Log("[Station] spawning special VIP pair");
-            _spawner.SpawnSpecialPair();
-        }
         OnBrakeEnd?.Invoke();
         _isStopped = false;
         stopCoroutineStarted = false;

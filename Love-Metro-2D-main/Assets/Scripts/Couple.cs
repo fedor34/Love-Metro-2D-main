@@ -133,7 +133,8 @@ public class Couple : MonoBehaviour
         CouplesManager.Instance?.UnregisterCouple(this);
         if (_score != null)
         {
-            _score.ApplyPenalty(penalty, hitPos);
+            // Штрафный попап вылетает из позиции пары, как и плюсовые очки
+            _score.ApplyPenalty(penalty, transform.position);
         }
 
         // Определяем направление кика пропорционально скорости и направлению влетевшего

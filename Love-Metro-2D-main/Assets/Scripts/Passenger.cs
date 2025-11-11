@@ -65,8 +65,6 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     public PassangersContainer container; // Ссылка на контейнер
 
     public bool IsInCouple = false;
-    [Header("Special mechanics")]
-    public bool IsVIP = false; // пометка особых пассажиров для бонусной пары
     private float _rematchEnableTime = 0f;
     [SerializeField] private float _rematchCooldown = 0.35f; // защита от мгновенного слипания после разрыва
     
@@ -118,7 +116,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         var anim0 = GetComponent<Animator>();
         string ctrl0 = anim0 != null && anim0.runtimeAnimatorController != null ? anim0.runtimeAnimatorController.name : "<null>";
         string sprite0 = sr0 != null && sr0.sprite != null ? sr0.sprite.name : "<null>";
-        Diagnostics.Log($"[Passenger][init] name={name} VIP={IsVIP} female={IsFemale} layer={gameObject.layer} sprite='{sprite0}' ctrl='{ctrl0}'");
+        Diagnostics.Log($"[Passenger][init] name={name} female={IsFemale} layer={gameObject.layer} sprite='{sprite0}' ctrl='{ctrl0}'");
 
         // Backward-compatible defaults for newly added serialized fields
         if (_launchSensitivity <= 0f) _launchSensitivity = 1.2f;
@@ -174,6 +172,10 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             Debug.Log($"[Passenger] Subscribed to train inertia. Sens={_launchSensitivity:F2}, MinImp={_minImpulseToLaunch:F2}");
         }
 
+        // Attach abilities if present
+        var abilities = GetComponent<PassengerAbilities>();
+        abilities?.AttachAll();
+
         _isInitiated = true;
         var rb = _rigidbody;
         Diagnostics.Log($"[Passenger][ready] name={name} rb(cdm={rb.collisionDetectionMode}, interp={rb.interpolation}, drag={rb.drag:F2})");
@@ -210,9 +212,13 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             Couple couple = Instantiate(CouplePref).GetComponent<Couple>();
             couple.init(this, partner);
             var pos = Camera.main != null ? Camera.main.WorldToScreenPoint(couple.transform.position) : Vector3.zero;
-            _scoreCounter.UpdateScorePointFromMatching(pos);
-            // Бонус за особую пару (VIP)
-            _scoreCounter.CheckSpecialCoupleBonus(this, partner, pos);
+            // Calculate points with abilities
+            int points = _scoreCounter != null ? _scoreCounter.GetBasePointsPerCouple() : 0;
+            var aSelf = GetComponent<PassengerAbilities>();
+            var aPartner = partner != null ? partner.GetComponent<PassengerAbilities>() : null;
+            aSelf?.InvokeMatched(partner, ref points);
+            aPartner?.InvokeMatched(this, ref points);
+            _scoreCounter?.AwardMatchPoints(pos, Mathf.Max(0, points));
         }
         ChangeState(matchingState);
     }
@@ -986,6 +992,46 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         _rigidbody.freezeRotation = true;
         _rigidbody.gravityScale = 0f; // gameplay is top‑down/side without gravity pulling out of bounds
         Diagnostics.Log($"[Passenger][awake] name={name} cols={allCols?.Length ?? 0} rb(cdm={_rigidbody.collisionDetectionMode}, interp={_rigidbody.interpolation}) layer={gameObject.layer}");
+
+        // VIP collider normalization: if this looks like a VIP prefab, reshape its BoxCollider2D
+        if (ShouldNormalizeVipCollider())
+        {
+            NormalizeVipCollider();
+        }
+    }
+
+    private bool ShouldNormalizeVipCollider()
+    {
+        // Heuristic: normalize when name or controller suggests special visual set (legacy “VIP” naming)
+        if (name.IndexOf("VIP", System.StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        var anim = GetComponent<Animator>();
+        var ctrlName = anim != null && anim.runtimeAnimatorController != null ? anim.runtimeAnimatorController.name : string.Empty;
+        return !string.IsNullOrEmpty(ctrlName) && ctrlName.IndexOf("VIP", System.StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private void NormalizeVipCollider()
+    {
+        var sr = GetComponent<SpriteRenderer>();
+        var sprite = sr != null ? sr.sprite : null;
+        var box = GetComponent<BoxCollider2D>();
+        if (box == null) box = gameObject.AddComponent<BoxCollider2D>();
+        if (sprite == null)
+        {
+            Diagnostics.Warn($"[Passenger][vip-collider] {name}: no sprite — skip");
+            return;
+        }
+
+        // Use sprite bounds to create a foot-aligned, low-profile hitbox similar to base prefабов
+        Vector2 s = sprite.bounds.size; // local units
+        float width = Mathf.Clamp(s.x * 0.92f, 0.6f, s.x * 1.05f);
+        float height = Mathf.Clamp(s.y * 0.13f, 0.35f, s.y * 0.6f);
+        float footMargin = Mathf.Clamp(s.y * 0.02f, 0.02f, 0.2f);
+        float offsetY = (-s.y * 0.5f) + (height * 0.5f) + footMargin;
+        box.size = new Vector2(width, height);
+        box.offset = new Vector2(0f, offsetY);
+        box.isTrigger = false;
+        box.usedByEffector = false;
+        Diagnostics.Log($"[Passenger][vip-collider] {name}: size={box.size} offset={box.offset} spriteSize={s}");
     }
     
     private void Start()
@@ -1032,6 +1078,10 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         // Защита от немедленного повторного совпадения
         IsMatchable = false;
         _rematchEnableTime = Time.time + _rematchCooldown;
+
+        // Inform abilities
+        var abilities = GetComponent<PassengerAbilities>();
+        abilities?.InvokePairBroken(null);
     }
 
     public string GetCurrentStateName()

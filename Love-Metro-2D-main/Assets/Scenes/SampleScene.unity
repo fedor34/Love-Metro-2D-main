@@ -161,7 +161,7 @@ SpriteRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 514540}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -2535,7 +2535,7 @@ EdgeCollider2D:
     serializedVersion: 2
     m_Bits: 4294967295
   m_IsTrigger: 0
-  m_UsedByEffector: 1
+  m_UsedByEffector: 0
   m_UsedByComposite: 0
   m_Offset: {x: 0, y: 0}
   m_EdgeRadius: 0
@@ -2559,7 +2559,7 @@ PlatformEffector2D:
     serializedVersion: 2
     m_Bits: 3063
   m_RotationalOffset: 0
-  m_UseOneWay: 1
+  m_UseOneWay: 0
   m_UseOneWayGrouping: 0
   m_SurfaceArc: 180
   m_UseSideFriction: 0
@@ -10215,7 +10215,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1934744811}
   - component: {fileID: 1934744812}
-  m_Layer: 8
+  m_Layer: 0
   m_Name: Collider Bottom
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -10816,7 +10816,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2059125461}
   - component: {fileID: 2059125462}
-  m_Layer: 8
+  m_Layer: 0
   m_Name: Collider Top
   m_TagString: Untagged
   m_Icon: {fileID: 0}

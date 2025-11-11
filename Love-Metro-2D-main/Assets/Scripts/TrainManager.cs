@@ -30,6 +30,12 @@ public class TrainManager : MonoBehaviour
     [SerializeField] private float _startImpulseSpeedThreshold = 2.0f; // считаем поезд почти стоящим ниже этого порога
     [SerializeField] private float _startBoost = 20f; // более сильный старт
 
+    [Header("Импульс при смене направления (жесты)")]
+    [SerializeField] private float _dirImpulseMin = 6f;        // минимальная сила импульса
+    [SerializeField] private float _dirImpulseScale = 35f;     // множитель от скорости перетаскивания
+    [SerializeField] private float _dirImpulseCooldown = 0.15f;// кулдаун между импульсами
+    [SerializeField] private float _dirFlickThreshold = 0.95f; // порог скорости жеста для повторных импульсов
+
     [Header("Настройки камеры и фона")]
     [SerializeField] private SpriteRenderer _backGround;
     [SerializeField] private PassangersContainer _passangers;
@@ -64,6 +70,10 @@ public class TrainManager : MonoBehaviour
 
     // Время удержания ЛКМ в текущем цикле ускорения
     private float _accelHoldTime = 0f;
+
+    // Трек смены направления для инерционных импульсов
+    private float _lastAxis = 0f;
+    private float _lastDirImpulseTime = -999f;
 
     // Публичный метод для получения текущей скорости
     public float GetCurrentSpeed()
@@ -119,17 +129,16 @@ public class TrainManager : MonoBehaviour
 
         if (!_isStopped)
         {
-            // Начало ускорения: мягкий старт при нажатии ЛКМ
+            // Начало удержания: мягкий старт при нажатии ЛКМ + стартовый импульс, если стояли
             if (Input.GetMouseButtonDown(0))
             {
-                // Запоминаем, что были почти в покое до старта
-                // Считаем поезд "почти стоящим", если текущая скорость ниже порога
-                bool wasAtRest = _currentSpeed <= _startImpulseSpeedThreshold;
-                
-                // Мгновенно устанавливаем скорость = _startBoost (минимум _minSpeed)
+                float prevSpeed = _currentSpeed;
+                bool wasAtRest = prevSpeed <= _startImpulseSpeedThreshold;
+
                 float boostSpeed = Mathf.Max(_minSpeed, _startBoost);
                 SetSpeed(boostSpeed);
-                
+                OnBrakeEnd?.Invoke();
+
                 // Однократный импульс пассажирам при отправке — только если стартовали из покоя
                 if (!_accelImpulseGiven && wasAtRest)
                 {
@@ -139,21 +148,13 @@ public class TrainManager : MonoBehaviour
                     impulse = Rotate(impulse, Mathf.Sin(_turnPhase) * _turnAmplitudeDeg);
                     startInertia?.Invoke(impulse);
                     LastInertiaImpulse = impulse;
-                    Debug.Log($"[Train] ACCEL impulse {impulse} (mouse down, set speed={boostSpeed:F1}, quad)");
                     _accelImpulseGiven = true;
+                    Debug.Log($"[Train] START impulse {impulse} (mouse down from rest)");
                 }
-                OnBrakeEnd?.Invoke();
             }
-            // Конец удержания: торможение при отпускании ЛКМ и однократный импульс пассажирам
+            // На отпускании импульс не даём — управление по направлению
             if (Input.GetMouseButtonUp(0))
             {
-                float s = Mathf.Max(0f, _currentSpeed);
-                float brakeMag = Mathf.Max(8f, s * 2.6f + s * s * 0.45f);
-                var impulse = Vector2.right * brakeMag;
-                impulse = Rotate(impulse, Mathf.Sin(_turnPhase) * _turnAmplitudeDeg);
-                startInertia?.Invoke(impulse);
-                LastInertiaImpulse = impulse;
-                Debug.Log($"[Train] BRAKE impulse {impulse} (mouse up, quad)");
                 OnBrakeStart?.Invoke();
                 _isBraking = true;
             }
@@ -163,25 +164,76 @@ public class TrainManager : MonoBehaviour
         float accelerationValue = 0f;
         if (!_isStopped)
         {
-            if (_isBraking)
+            if (isAccelerating)
             {
-                accelerationValue = -_brakeDeceleration;
-                if (_currentSpeed <= _minSpeed || isAccelerating)
+                // Новый режим: горизонтальное перетаскивание управляет ускорением/торможением
+                float x = ClickDirectionManager.HorizontalAxis; // -1..1
+                float vx = ClickDirectionManager.HorizontalVelocity; // норм. скорость перетаскивания
+                // Мёртвая зона уже учтена в менеджере; здесь только масштабируем
+                if (x > 0f)
                 {
-                    _isBraking = false;
-                    OnBrakeEnd?.Invoke();
+                    accelerationValue = x * _acceleration * 4f; // справа — разгон
                 }
-            }
-            else if (isAccelerating)
-            {
-                // Восстановлен сильный базовый разгон + квадратичный бонус от времени удержания
-                float normHold = Mathf.Clamp01(_accelHoldTime / 1.5f); // 0..1 за ~1.5 c
-                float bonus = 8f * normHold * normHold;                // 0..8
-                accelerationValue = _acceleration * (4f + bonus);
+                else if (x < 0f)
+                {
+                    accelerationValue = x * _brakeDeceleration * 3f; // слева — торможение
+                }
+                else
+                {
+                    accelerationValue = 0f; // палец по центру — скорость сохраняется
+                }
+
+                // Флики: резкий жест вправо/влево усиливает действие
+                if (vx > 0.7f) accelerationValue += _acceleration * 3f * Mathf.Clamp01(vx - 0.7f);
+                if (vx < -0.7f) accelerationValue += -_brakeDeceleration * 4f * Mathf.Clamp01(-0.7f - vx);
+
+                _isBraking = accelerationValue < 0f;
+                if (!_isBraking) OnBrakeEnd?.Invoke();
+
+                // Инерционный импульс пассажирам при резкой смене направления
+                float dead = 0.06f;
+                bool validPrev = Mathf.Abs(_lastAxis) > dead;
+                bool validNow  = Mathf.Abs(x) > dead;
+                if (validPrev && validNow && Mathf.Sign(x) != Mathf.Sign(_lastAxis))
+                {
+                    if (Time.time - _lastDirImpulseTime > _dirImpulseCooldown)
+                    {
+                        float v = Mathf.Abs(vx);
+                        // Асимметрия: при разгоне (x>0) слабее, при торможении (x<0) сильнее
+                        float asym = x > 0f ? 0.75f : 1.35f;
+                        float mag = Mathf.Max(_dirImpulseMin, v * _dirImpulseScale * asym);
+                        Vector2 impulse = (x > 0f ? Vector2.left : Vector2.right) * mag;
+                        impulse = Rotate(impulse, Mathf.Sin(_turnPhase) * _turnAmplitudeDeg);
+                        startInertia?.Invoke(impulse);
+                        LastInertiaImpulse = impulse;
+                        _lastDirImpulseTime = Time.time;
+                        Debug.Log($"[Train] DIR-CHANGE impulse {impulse} (x:{_lastAxis:F2}->{x:F2}, |vx|={v:F2}, mag={mag:F1})");
+                    }
+                }
+
+                // Повторные импульсы по сильным фликам в ту же сторону
+                if (Mathf.Abs(vx) > _dirFlickThreshold)
+                {
+                    if (Time.time - _lastDirImpulseTime > _dirImpulseCooldown)
+                    {
+                        float v = Mathf.Abs(vx);
+                        float asym = vx > 0f ? 0.75f : 1.35f; // вправо (разгон) слабее, влево (тормоз) сильнее
+                        float mag = Mathf.Max(_dirImpulseMin, v * _dirImpulseScale * asym);
+                        Vector2 impulse = (vx > 0f ? Vector2.left : Vector2.right) * mag; // ускорение -> инерция противоположно
+                        impulse = Rotate(impulse, Mathf.Sin(_turnPhase) * _turnAmplitudeDeg);
+                        startInertia?.Invoke(impulse);
+                        LastInertiaImpulse = impulse;
+                        _lastDirImpulseTime = Time.time;
+                        Debug.Log($"[Train] FLICK impulse {impulse} (vx={vx:F2}, mag={mag:F1})");
+                    }
+                }
+                _lastAxis = x;
             }
             else
             {
-                accelerationValue = -_deceleration;
+                // Без удержания — лёгкое естественное замедление
+                accelerationValue = -_deceleration * 0.35f;
+                _lastAxis = 0f;
             }
 
             _currentAcceleration = accelerationValue;

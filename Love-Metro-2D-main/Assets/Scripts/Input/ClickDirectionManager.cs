@@ -20,6 +20,10 @@ public class ClickDirectionManager : MonoBehaviour
     public static Vector2 CurrentClickDirection { get; private set; } = Vector2.zero;
     public static bool HasClickDirection { get; private set; } = false;
     public static bool IsMouseHeld { get; private set; } = false;
+    // Нормализованный горизонтальный ввод [-1..1] (от центра экрана)
+    public static float HorizontalAxis { get; private set; } = 0f;
+    // Нормализованная горизонтальная скорость перетаскивания [-inf..inf]
+    public static float HorizontalVelocity { get; private set; } = 0f;
 
     // Текущая позиция курсора (мир) при удержании и позиция при отпускании
     public static Vector2 CurrentPointerWorld { get; private set; } = Vector2.zero;
@@ -32,6 +36,12 @@ public class ClickDirectionManager : MonoBehaviour
     
     private Camera _mainCamera;
     private Vector2 _screenCenter;
+    private float _prevMouseX;
+    private float _axisS; // сглаженный осевой ввод
+    private float _velS;  // сглаженная скорость
+    [SerializeField] private float _axisDeadZone = 0.05f;   // зона нечувствительности (5% ширины)
+    [SerializeField] private float _axisSmooth = 12f;       // сглаживание оси
+    [SerializeField] private float _velSmooth = 20f;        // сглаживание скорости
     
     void Start()
     {
@@ -68,6 +78,17 @@ public class ClickDirectionManager : MonoBehaviour
             IsMouseHeld = true;
             Vector2 mousePosition = Input.mousePosition;
             Vector2 screenDirection = mousePosition - _screenCenter;
+            // Ось X от центра экрана, нормированная к половине ширины
+            float halfW = Mathf.Max(1f, Screen.width * 0.5f);
+            float rawAxis = Mathf.Clamp(screenDirection.x / halfW, -1f, 1f);
+            if (Mathf.Abs(rawAxis) < _axisDeadZone) rawAxis = 0f;
+            _axisS = Mathf.Lerp(_axisS, rawAxis, _axisSmooth * Time.deltaTime);
+            HorizontalAxis = _axisS;
+            // Горизонтальная скорость перетаскивания (нормированная)
+            float rawVel = ((mousePosition.x - _prevMouseX) / halfW) / Mathf.Max(0.0001f, Time.deltaTime);
+            _velS = Mathf.Lerp(_velS, rawVel, _velSmooth * Time.deltaTime);
+            HorizontalVelocity = _velS;
+            _prevMouseX = mousePosition.x;
             if (screenDirection.sqrMagnitude > 0.0001f)
             {
                 Vector2 direction = screenDirection.normalized;
@@ -88,6 +109,7 @@ public class ClickDirectionManager : MonoBehaviour
         if (Input.GetMouseButtonDown(0))
         {
             Vector2 mousePosition = Input.mousePosition;
+            _prevMouseX = mousePosition.x;
             CurrentPointerWorld = _mainCamera.ScreenToWorldPoint(mousePosition);
             
             // Вычисляем направление от центра экрана к позиции клика
@@ -125,6 +147,8 @@ public class ClickDirectionManager : MonoBehaviour
             HasReleasePoint = true;
             LastReleaseTime = Time.time;
             Debug.Log($"[ClickDirectionManager] MouseUp at world {LastReleaseWorld}");
+            // Сбрасываем ввод
+            HorizontalAxis = 0f; _axisS = 0f; HorizontalVelocity = 0f; _velS = 0f;
         }
     }
     

@@ -10,7 +10,14 @@ public class PassangerAnimator : MonoBehaviour
     private Rigidbody2D _rigidbody;
 
     [SerializeField] private float _movementThreshold = 0.1f; // Минимальная скорость для анимации ходьбы
+    [SerializeField] private float _stopHoldSeconds = 0.9f;   // Задержка перед остановкой анимации (0.8–1.0 с)
+    [Header("Скорость анимации ходьбы")]
+    [SerializeField] private float _animSpeedMin = 0.8f;
+    [SerializeField] private float _animSpeedMax = 1.3f;
+    [SerializeField] private float _animSpeedSmoothing = 8f;
     private bool _isWalkingStateForced = false; // Флаг принудительного состояния ходьбы
+    private float _belowThresholdTimer = 0f;
+    private float _animSpeedSmoothed = 1f;
 
     private const string IsWalking = "IsWalking";
     private const string IsFalling = "IsFalling";
@@ -26,11 +33,31 @@ public class PassangerAnimator : MonoBehaviour
 
     private void Update()
     {
-        // Автоматическое управление анимацией ходьбы на основе реальной скорости
+        // Автоматическое управление анимацией ходьбы с задержкой остановки и изменением скорости кадров
         if (_rigidbody != null && !_isWalkingStateForced)
         {
-            bool shouldWalk = _rigidbody.velocity.magnitude > _movementThreshold;
-            _animator.SetBool(IsWalking, shouldWalk);
+            float v = _rigidbody.velocity.magnitude;
+            bool above = v > _movementThreshold;
+
+            if (above)
+            {
+                _belowThresholdTimer = 0f;
+                _animator.SetBool(IsWalking, true);
+            }
+            else
+            {
+                _belowThresholdTimer += Time.deltaTime;
+                if (_belowThresholdTimer >= _stopHoldSeconds)
+                {
+                    _animator.SetBool(IsWalking, false);
+                }
+            }
+
+            // Плавное изменение скорости анимации в зависимости от реальной скорости
+            float t = Mathf.InverseLerp(_movementThreshold, _movementThreshold * 10f + 0.01f, v);
+            float targetAnimSpeed = Mathf.Lerp(_animSpeedMin, _animSpeedMax, t);
+            _animSpeedSmoothed = Mathf.Lerp(_animSpeedSmoothed, targetAnimSpeed, _animSpeedSmoothing * Time.deltaTime);
+            _animator.speed = _animSpeedSmoothed;
         }
     }
     

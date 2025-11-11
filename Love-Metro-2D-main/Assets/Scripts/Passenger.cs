@@ -6,7 +6,7 @@ using System.Collections.Generic;
 public class Passenger : MonoBehaviour, IFieldEffectTarget
 {
     // Глобальный множитель скорости – можно менять из скриптов или инспектора
-    public static float GlobalSpeedMultiplier = 2f;
+    public static float GlobalSpeedMultiplier = 0.7f; // глобальное замедление ~30%
 
     private delegate void ReleaseHandrail();
     private ReleaseHandrail releaseHandrail;
@@ -80,6 +80,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     [SerializeField] private float _impulseToVelocityScale = 0.45f;     // во сколько раз импульс конвертируется в стартовую скорость полёта
     [SerializeField] private float _maxFlightSpeed = 18f;               // верхний предел скорости полёта
     [SerializeField] private float _flightSpeedMultiplier = 0.7f;       // глобальный множитель скорости полёта (0.7 = -30%)
+    [SerializeField] private float _globalImpulseScale = 0.8f;          // доп. замедление всех импульсов (~-20%)
 
     [Header("Billiards-style tuning")]
     [SerializeField] private float _magnetRadius = 3.5f;               // радиус магнитного притяжения к цели
@@ -88,7 +89,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     [SerializeField] private float _repelForce = 4.0f;                 // сила отталкивания одноимённых
     [SerializeField] private float _flightDeceleration = 0.65f;         // базовое замедление полёта (меньше — дальше летят)
     [SerializeField] private float _bounceElasticity = 0.95f;          // упругость при соударениях со стенами
-    [SerializeField] private float _wallBounceBoost = 1.0f;            // множитель скорости при ударе о стену (1 = без ускорения)
+    [SerializeField] private float _wallBounceBoost = 1.0f;            // без ускорения при ударе
     [SerializeField] private int _maxBounces = 3;                      // сколько отскоков допускаем до остановки
     [SerializeField] private float _easeOutMinK = 0.985f;               // минимальный коэффициент затухания (при низкой скорости)
     [SerializeField] private float _easeOutMaxK = 0.9985f;              // максимальный коэффициент (при высокой скорости)
@@ -118,7 +119,8 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         if (_impulseToVelocityScale <= 0f) _impulseToVelocityScale = 3.2f; // ещё дальше старт
         if (_maxFlightSpeed <= 0f) _maxFlightSpeed = 56f; // потолок ещё выше
         if (_flightSpeedMultiplier <= 0f || _flightSpeedMultiplier > 2f) _flightSpeedMultiplier = 0.7f;
-        // Гарантируем отсутствие накапливающегося ускорения от ударов
+        if (_globalImpulseScale <= 0f || _globalImpulseScale > 2f) _globalImpulseScale = 0.8f;
+        // Без доп. ускорения от рикошета
         _wallBounceBoost = 1f;
 
         // Принудительно включаем режим 4 (BoidsLite) для теста
@@ -338,9 +340,9 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             float xWeight = Mathf.Pow(Mathf.Abs(deltaXNorm), uniformGamma);
             float yWeight = Mathf.Pow(Mathf.Abs(deltaYNorm), uniformGamma);
             
-            // Усиление горизонтальной компоненты на 10%
-            float xFromClick = Mathf.Sign(deltaXNorm) * baseMag * uniformScale * xWeight * 1.1f;
-            float yFromClick = Mathf.Sign(deltaYNorm) * baseMag * uniformScale * yWeight;
+            // Усиление горизонтальной компоненты на 20%, ослабление вертикальной на 20%
+            float xFromClick = Mathf.Sign(deltaXNorm) * baseMag * (uniformScale * 1.2f) * xWeight;
+            float yFromClick = Mathf.Sign(deltaYNorm) * baseMag * (uniformScale * 0.8f) * yWeight;
 
             xFromClick += (Random.value - 0.5f) * 0.1f * Passanger._turbulenceStrength;
             yFromClick += (Random.value - 0.5f) * 0.1f * Passanger._turbulenceStrength;
@@ -359,11 +361,11 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
                 }
             }
 
-            Vector2 delta = new Vector2(xFromClick, yFromClick) * Passanger._flightSpeedMultiplier;
+            Vector2 delta = new Vector2(xFromClick, yFromClick) * (Passanger._flightSpeedMultiplier * Passanger._globalImpulseScale);
 
             if (delta.magnitude >= Passanger._minImpulseToLaunch)
             {
-                Vector2 startV = delta * Passanger._impulseToVelocityScale * Passanger._flightSpeedMultiplier;
+                Vector2 startV = delta * Passanger._impulseToVelocityScale * (Passanger._flightSpeedMultiplier * Passanger._globalImpulseScale);
                 if (startV.magnitude > Passanger._maxFlightSpeed)
                     startV = startV.normalized * Passanger._maxFlightSpeed;
 
@@ -463,7 +465,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         public void SetInitialFallingSpeed(Vector2 initialSpeed)
         {
             // Используем скорость напрямую (без дополнительного множителя), чтобы полёт был длиннее
-            currentFallingSpeed = initialSpeed * Passanger._flightSpeedMultiplier;
+            currentFallingSpeed = initialSpeed * (Passanger._flightSpeedMultiplier * Passanger._globalImpulseScale);
             previousFallingSpeed = currentFallingSpeed;
         }
 
@@ -504,7 +506,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             {
                 // Рикошет о стену с небольшим ускорением (эффект боулинга)
                 currentFallingSpeed = Vector2.Reflect(currentFallingSpeed, n) * Passanger._bounceElasticity;
-                currentFallingSpeed *= (Passanger._wallBounceBoost * Passanger._flightSpeedMultiplier);
+                currentFallingSpeed *= Passanger._wallBounceBoost;
                 if (currentFallingSpeed.magnitude > Passanger._maxFlightSpeed)
                     currentFallingSpeed = currentFallingSpeed.normalized * Passanger._maxFlightSpeed;
                 Passanger._rigidbody.velocity = currentFallingSpeed;
@@ -607,8 +609,8 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
                 ? ClickDirectionManager.LastReleaseWorld
                 : pos + ClickDirectionManager.GetCurrentDirection() * 5f;
 
-            const float horizontalScale = 0.4f;
-            const float verticalScale   = 3.6f;
+            const float horizontalScale = 0.48f; // +20%
+            const float verticalScale   = 2.88f; // -20%
             const float verticalGamma   = 0.65f;
 
             float baseMag = Mathf.Max(force.magnitude, 6f) * sensitivity;
@@ -643,7 +645,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
                 yFromClick += Mathf.Sign(toAim.y) * Mathf.Min(Passanger._aimAssistMaxStrength, toAim.magnitude * 0.2f) * wy;
             }
 
-            Vector2 delta = new Vector2(xFromTrain, yFromClick);
+            Vector2 delta = new Vector2(xFromTrain, yFromClick) * Passanger._globalImpulseScale;
 
             currentFallingSpeed += delta;
             if (currentFallingSpeed.magnitude > Passanger._maxFlightSpeed)
@@ -693,13 +695,13 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
                 Vector2 vB = other.GetRigidbody() != null ? other.GetRigidbody().velocity : Vector2.zero;
 
                 Vector2 rA = Vector2.Reflect(vA, n) * Passanger._bounceElasticity;
-                rA *= (Passanger._wallBounceBoost * Passanger._flightSpeedMultiplier);
+                rA *= Passanger._wallBounceBoost;
                 if (rA.magnitude > Passanger._maxFlightSpeed) rA = rA.normalized * Passanger._maxFlightSpeed;
 
                 if (other.GetRigidbody() != null)
                 {
                     Vector2 rB = Vector2.Reflect(vB, -n) * other._bounceElasticity;
-                    rB *= (other._wallBounceBoost * other._flightSpeedMultiplier);
+                    rB *= other._wallBounceBoost;
                     if (rB.magnitude > other._maxFlightSpeed) rB = rB.normalized * other._maxFlightSpeed;
                     other.GetRigidbody().velocity = rB;
                 }
@@ -711,7 +713,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
             // Столкновение со стеной — отражаемся и переходим в падение
             Vector2 r = Vector2.Reflect(_flyingVelocity, n) * Passanger._bounceElasticity;
-            r *= (Passanger._wallBounceBoost * Passanger._flightSpeedMultiplier);
+            r *= Passanger._wallBounceBoost;
             if (r.magnitude > Passanger._maxFlightSpeed) r = r.normalized * Passanger._maxFlightSpeed;
             Passanger.ChangeState(Passanger.fallingState);
             ((Falling)Passanger.fallingState).SetInitialFallingSpeed(r);
@@ -773,13 +775,13 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
         public void SetFlyingParameters(Vector2 windVelocity, float windStrength)
         {
-            _flyingVelocity = windVelocity * Passanger._flightSpeedMultiplier;
+            _flyingVelocity = windVelocity * (Passanger._flightSpeedMultiplier * Passanger._globalImpulseScale);
             _windStrength = windStrength;
         }
 
         public void UpdateWindEffect(Vector2 windVelocity, float windStrength)
         {
-            _flyingVelocity = windVelocity * Passanger._flightSpeedMultiplier;
+            _flyingVelocity = windVelocity * (Passanger._flightSpeedMultiplier * Passanger._globalImpulseScale);
             _windStrength = windStrength;
         }
     }

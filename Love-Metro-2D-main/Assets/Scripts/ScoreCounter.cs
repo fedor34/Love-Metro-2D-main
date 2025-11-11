@@ -24,6 +24,9 @@ public class ScoreCounter : MonoBehaviour
     private TMP_Text _textDisplay;
     private Animator _animator;
     private RectTransform _rectTransform;
+    [Header("Special pair bonus")]
+    [SerializeField] private int _specialPairBonus = 500;
+    private bool _specialPairAwarded = false;
 
     private void Awake()
     {
@@ -100,6 +103,31 @@ public class ScoreCounter : MonoBehaviour
         }
     }
 
+    // Публичный штраф очков с плавающим текстом
+    public void ApplyPenalty(int amount, Vector3 worldPosition)
+    {
+        if (amount <= 0) return;
+        StartCoroutine(ShowFloatingDelta(-amount, worldPosition, new Color(1f, 0.25f, 0.25f)));
+        _score -= amount;
+        UpdateScoreDisplay();
+    }
+
+    private IEnumerator ShowFloatingDelta(int delta, Vector3 worldPos, Color color)
+    {
+        Vector3 start = worldPos + Vector3.up * _floatingTextSpawnOffsetY;
+        TMP_Text floatingText = Instantiate(_floatingScorePref, start, Quaternion.identity, transform.parent);
+        floatingText.color = color;
+        floatingText.text = delta.ToString();
+        float curSpeed = _floatingTextInitialSpeed;
+        while (Vector3.Distance(floatingText.transform.position, transform.position) >= _minFloatingTextDisapearingDistance)
+        {
+            curSpeed += _floatingTextAcceleration * Time.deltaTime;
+            floatingText.transform.position += (transform.position - start).normalized * curSpeed * Time.deltaTime;
+            yield return null;
+        }
+        Destroy(floatingText.gameObject);
+    }
+
     private IEnumerator ScorePointsFromMatching(Vector3 initialMatchingPosition)
     {
        Vector3 matchingPosition = initialMatchingPosition + Vector3.up * _floatingTextSpawnOffsetY;
@@ -120,5 +148,19 @@ public class ScoreCounter : MonoBehaviour
         _animator.SetTrigger("Jump");
         UpdateScoreDisplay();
         Destroy(floatingText.gameObject);
+    }
+
+    // Бонус за сведение особой пары (VIP)
+    public void CheckSpecialCoupleBonus(Passenger a, Passenger b, Vector3 screenPos)
+    {
+        if (_specialPairAwarded) return;
+        if (a == null || b == null) return;
+        if (!a.IsVIP || !b.IsVIP) return;
+        _specialPairAwarded = true;
+        Diagnostics.Log($"[Score] VIP bonus awarded for pair: A={a.name}(F={a.IsFemale}) B={b.name}(F={b.IsFemale}) +{_specialPairBonus}");
+        _score += _specialPairBonus;
+        UpdateScoreDisplay();
+        // Плавающий зелёный текст бонуса рядом с местом пары
+        StartCoroutine(ShowFloatingDelta(+_specialPairBonus, screenPos, new Color(0.2f, 1f, 0.4f)));
     }
 }

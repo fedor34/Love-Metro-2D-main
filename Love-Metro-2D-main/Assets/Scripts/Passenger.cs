@@ -65,6 +65,10 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     public PassangersContainer container; // Ссылка на контейнер
 
     public bool IsInCouple = false;
+    [Header("Special mechanics")]
+    public bool IsVIP = false; // пометка особых пассажиров для бонусной пары
+    private float _rematchEnableTime = 0f;
+    [SerializeField] private float _rematchCooldown = 0.35f; // защита от мгновенного слипания после разрыва
     
     // Эффекты поля
     private Dictionary<FieldEffectType, Vector2> _activeFieldForces = new Dictionary<FieldEffectType, Vector2>();
@@ -108,6 +112,13 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         if (_rigidbody == null) _rigidbody = GetComponent<Rigidbody2D>();
         if (PassangerAnimator == null) PassangerAnimator = GetComponent<PassangerAnimator>();
         if (_collider == null) _collider = GetComponent<Collider2D>();
+        // Гарантируем базовый слой по умолчанию для корректных коллизий с границами
+        gameObject.layer = LayerMask.NameToLayer(_defaultLayer);
+        var sr0 = GetComponent<SpriteRenderer>();
+        var anim0 = GetComponent<Animator>();
+        string ctrl0 = anim0 != null && anim0.runtimeAnimatorController != null ? anim0.runtimeAnimatorController.name : "<null>";
+        string sprite0 = sr0 != null && sr0.sprite != null ? sr0.sprite.name : "<null>";
+        Diagnostics.Log($"[Passenger][init] name={name} VIP={IsVIP} female={IsFemale} layer={gameObject.layer} sprite='{sprite0}' ctrl='{ctrl0}'");
 
         // Backward-compatible defaults for newly added serialized fields
         if (_launchSensitivity <= 0f) _launchSensitivity = 1.2f;
@@ -164,6 +175,8 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         }
 
         _isInitiated = true;
+        var rb = _rigidbody;
+        Diagnostics.Log($"[Passenger][ready] name={name} rb(cdm={rb.collisionDetectionMode}, interp={rb.interpolation}, drag={rb.drag:F2})");
     }
 
     private void Update()
@@ -171,6 +184,11 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         if (_isInitiated == false || _currentState == null)
             return;
         _currentState.UpdateState();
+        // Возврат возможности матчиться после кулдауна
+        if (!IsMatchable && Time.time >= _rematchEnableTime)
+        {
+            IsMatchable = true;
+        }
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
@@ -191,7 +209,10 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         {
             Couple couple = Instantiate(CouplePref).GetComponent<Couple>();
             couple.init(this, partner);
-            _scoreCounter.UpdateScorePointFromMatching(Camera.main.WorldToScreenPoint(couple.transform.position));
+            var pos = Camera.main != null ? Camera.main.WorldToScreenPoint(couple.transform.position) : Vector3.zero;
+            _scoreCounter.UpdateScorePointFromMatching(pos);
+            // Бонус за особую пару (VIP)
+            _scoreCounter.CheckSpecialCoupleBonus(this, partner, pos);
         }
         ChangeState(matchingState);
     }
@@ -472,11 +493,23 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         public override void OnCollision(Collision2D collision)
         {
             Vector2 n = collision.contacts[0].normal;
+            Diagnostics.Log($"[Passenger][falling][hit] self={Passanger.name} with={(collision.transform!=null?collision.transform.name:"<null>")} normal={n} v={currentFallingSpeed.magnitude:F2}");
 
             if (collision.transform.TryGetComponent<Passenger>(out Passenger passenger))
             {
+                // Если кто-то из участников в паре — разбиваем соответствующую пару
+                if (Passanger.IsInCouple)
+                {
+                    var couple = Passanger.GetComponentInParent<Couple>();
+                    couple?.BreakByHit(passenger);
+                }
+                if (passenger.IsInCouple)
+                {
+                    var coupleOther = passenger.GetComponentInParent<Couple>();
+                    coupleOther?.BreakByHit(Passanger);
+                }
                 // Совпадение пар — только если противоположные полы, оба матчабельны и не в паре
-                if (passenger.IsFemale != Passanger.IsFemale && !passenger.IsInCouple && !Passanger.IsInCouple)
+                if (passenger.IsFemale != Passanger.IsFemale && !passenger.IsInCouple && !Passanger.IsInCouple && passenger.IsMatchable && Passanger.IsMatchable)
                 {
                     Passanger.ForceToMatchingState(passenger);
                     passenger.ForceToMatchingState(Passanger);
@@ -510,6 +543,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
                 if (currentFallingSpeed.magnitude > Passanger._maxFlightSpeed)
                     currentFallingSpeed = currentFallingSpeed.normalized * Passanger._maxFlightSpeed;
                 Passanger._rigidbody.velocity = currentFallingSpeed;
+                Diagnostics.Log($"[Passenger][falling][wall] {Passanger.name} bounce v={currentFallingSpeed.magnitude:F2}");
             }
 
             // Учёт количества отскоков: останавливаемся после лимита
@@ -591,7 +625,8 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         {
             Passanger._rigidbody.bodyType = RigidbodyType2D.Dynamic;
             Passanger.PassangerAnimator.SetFallingState(true);
-            Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._fallingLayer);
+            // Оставляем Default слой, чтобы границы поля работали одинаково
+            Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._defaultLayer);
             _bounceCount = 0;
             
             // Минимальное сопротивление для длинного полёта
@@ -678,11 +713,23 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         public override void OnCollision(Collision2D collision)
         {
             Vector2 n = collision.contacts.Length > 0 ? collision.contacts[0].normal : Vector2.up;
+            Diagnostics.Log($"[Passenger][flying][hit] self={Passanger.name} with={(collision.transform!=null?collision.transform.name:"<null>")} normal={n} v={_flyingVelocity.magnitude:F2}");
 
             // Столкновение с другим пассажиром
             if (collision.transform.TryGetComponent<Passenger>(out Passenger other))
             {
-                bool canMatch = (other.IsFemale != Passanger.IsFemale) && !other.IsInCouple && !Passanger.IsInCouple;
+                // Разбивание пар при ударе
+                if (Passanger.IsInCouple)
+                {
+                    var couple = Passanger.GetComponentInParent<Couple>();
+                    couple?.BreakByHit(other);
+                }
+                if (other.IsInCouple)
+                {
+                    var coupleOther = other.GetComponentInParent<Couple>();
+                    coupleOther?.BreakByHit(Passanger);
+                }
+                bool canMatch = (other.IsFemale != Passanger.IsFemale) && !other.IsInCouple && !Passanger.IsInCouple && other.IsMatchable && Passanger.IsMatchable;
                 if (canMatch)
                 {
                     Passanger.ForceToMatchingState(other);
@@ -717,6 +764,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             if (r.magnitude > Passanger._maxFlightSpeed) r = r.normalized * Passanger._maxFlightSpeed;
             Passanger.ChangeState(Passanger.fallingState);
             ((Falling)Passanger.fallingState).SetInitialFallingSpeed(r);
+            Diagnostics.Log($"[Passenger][flying->falling] {Passanger.name} after wall bounce v={r.magnitude:F2}");
         }
 
         public override void Exit()
@@ -758,7 +806,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         {
             Passanger.IsMatchable = false;
             Passanger.PassangerAnimator.SetFallingState(true); // Используем анимацию падения для полета
-            Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._fallingLayer);
+            Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._defaultLayer);
             _flyingTime = 0f;
         }
 
@@ -811,7 +859,19 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
         public override void OnCollision(Collision2D collision){}
 
-        public override void Exit(){}
+        public override void Exit()
+        {
+            // Полный сброс состояний, оставшихся от пары
+            Passanger.IsMatchable = true;
+            if (Passanger._rigidbody != null)
+                Passanger._rigidbody.bodyType = RigidbodyType2D.Dynamic;
+            if (Passanger._collider != null)
+                Passanger._collider.enabled = true;
+            Passanger.PassangerAnimator.SetHoldingState(false);
+            Passanger.PassangerAnimator.SetFallingState(false);
+            Passanger.PassangerAnimator.EnableAutomaticWalkingAnimation();
+            Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._defaultLayer);
+        }
 
         public override void UpdateState(){}
 
@@ -880,7 +940,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         {
             Passanger._rigidbody.bodyType = RigidbodyType2D.Dynamic;
             Passanger.PassangerAnimator.SetFallingState(true);
-            Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._fallingLayer);
+            Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._defaultLayer);
             Passanger.IsMatchable = false; // Не может больше создавать пары
             _timeInAbsorption = 0f;
         }
@@ -898,19 +958,34 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
     private void Awake()
     {
-        var boxCollider = GetComponent<BoxCollider2D>();
-        if (boxCollider != null)
+        // Ensure all colliders block motion (no triggers)
+        // Some generated VIP prefabs might inherit different collider types, so cover all.
+        var allCols = GetComponentsInChildren<Collider2D>(includeInactive: true);
+        for (int i = 0; i < allCols.Length; i++)
         {
-            boxCollider.isTrigger = false;
+            if (allCols[i] != null) allCols[i].isTrigger = false;
         }
 
         _rigidbody = GetComponent<Rigidbody2D>();
         PassangerAnimator = GetComponent<PassangerAnimator>();
         _collider = GetComponent<Collider2D>();
 
-        if (_rigidbody == null) gameObject.AddComponent<Rigidbody2D>();
-        if (PassangerAnimator == null) gameObject.AddComponent<PassangerAnimator>();
-        if (_collider == null) gameObject.AddComponent<Collider2D>();
+        if (_rigidbody == null) _rigidbody = gameObject.AddComponent<Rigidbody2D>();
+        if (PassangerAnimator == null) PassangerAnimator = gameObject.AddComponent<PassangerAnimator>();
+        if (_collider == null)
+        {
+            // Fallback collider if prefab somehow lacks one
+            var cc = gameObject.AddComponent<CircleCollider2D>();
+            cc.isTrigger = false;
+            _collider = cc;
+        }
+
+        // Harden physics against tunneling and drifting outside the play area
+        _rigidbody.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        _rigidbody.interpolation = RigidbodyInterpolation2D.Interpolate;
+        _rigidbody.freezeRotation = true;
+        _rigidbody.gravityScale = 0f; // gameplay is top‑down/side without gravity pulling out of bounds
+        Diagnostics.Log($"[Passenger][awake] name={name} cols={allCols?.Length ?? 0} rb(cdm={_rigidbody.collisionDetectionMode}, interp={_rigidbody.interpolation}) layer={gameObject.layer}");
     }
     
     private void Start()
@@ -936,6 +1011,27 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         if (container != null)
             container.RemovePassanger(this);
         Destroy(gameObject);
+    }
+
+    // Разрыв пары с возвратом в активное состояние
+    public void BreakFromCouple(Vector2 kickVelocity)
+    {
+        IsInCouple = false;
+        if (_collider != null) _collider.enabled = true;
+        if (_rigidbody != null)
+        {
+            _rigidbody.bodyType = RigidbodyType2D.Dynamic;
+        }
+        // Сброс возможных флагов/триггеров анимации от пары
+        if (PassangerAnimator != null)
+        {
+            PassangerAnimator.ResetAfterPairBreak();
+        }
+        // Запускаем в полёт с заданной начальной скоростью
+        Launch(kickVelocity);
+        // Защита от немедленного повторного совпадения
+        IsMatchable = false;
+        _rematchEnableTime = Time.time + _rematchCooldown;
     }
 
     public string GetCurrentStateName()

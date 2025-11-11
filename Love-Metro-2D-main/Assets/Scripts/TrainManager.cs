@@ -61,6 +61,9 @@ public class TrainManager : MonoBehaviour
     [SerializeField] private PassangerSpawner _spawner;
 
     private bool stopCoroutineStarted = false; // Флаг для задержки остановки
+    [Header("Stations / Special VIP")]
+    [SerializeField] private int _specialPairStation = 3; // на какой остановке появится особая пара
+    private int _stationCounter = 0;
 
     // Текущее фактическое ускорение (полезно для отладки или эффектов)
     private float _currentAcceleration = 0f;
@@ -202,7 +205,10 @@ public class TrainManager : MonoBehaviour
                         // Асимметрия: при разгоне (x>0) слабее, при торможении (x<0) сильнее
                         float asym = x > 0f ? 0.75f : 1.35f;
                         float mag = Mathf.Max(_dirImpulseMin, v * _dirImpulseScale * asym);
-                        Vector2 impulse = (x > 0f ? Vector2.left : Vector2.right) * mag;
+                        // 2D-импульс: противоположно жесту по X и Y
+                        float signX = x > 0f ? -1f : 1f;
+                        float signY = ClickDirectionManager.VerticalAxis > 0f ? -1f : 1f;
+                        Vector2 impulse = new Vector2(signX * mag, signY * mag * 0.6f);
                         impulse = Rotate(impulse, Mathf.Sin(_turnPhase) * _turnAmplitudeDeg);
                         startInertia?.Invoke(impulse);
                         LastInertiaImpulse = impulse;
@@ -219,7 +225,9 @@ public class TrainManager : MonoBehaviour
                         float v = Mathf.Abs(vx);
                         float asym = vx > 0f ? 0.75f : 1.35f; // вправо (разгон) слабее, влево (тормоз) сильнее
                         float mag = Mathf.Max(_dirImpulseMin, v * _dirImpulseScale * asym);
-                        Vector2 impulse = (vx > 0f ? Vector2.left : Vector2.right) * mag; // ускорение -> инерция противоположно
+                        float signX = vx > 0f ? -1f : 1f;
+                        float signY = ClickDirectionManager.VerticalVelocity > 0f ? -1f : 1f;
+                        Vector2 impulse = new Vector2(signX * mag, signY * mag * 0.6f);
                         impulse = Rotate(impulse, Mathf.Sin(_turnPhase) * _turnAmplitudeDeg);
                         startInertia?.Invoke(impulse);
                         LastInertiaImpulse = impulse;
@@ -277,6 +285,7 @@ public class TrainManager : MonoBehaviour
     public void StationStopAndSpawn(float pauseSeconds = 1.0f)
     {
         if (stopCoroutineStarted) return;
+        Diagnostics.Log($"[Station] stop+spawn requested pause={pauseSeconds:F2}");
         StartCoroutine(StationStopRoutine(pauseSeconds));
     }
 
@@ -285,12 +294,21 @@ public class TrainManager : MonoBehaviour
         stopCoroutineStarted = true;
         _isStopped = true;
         SetSpeed(0f);
+        Diagnostics.Log("[Station] stop begin");
         OnBrakeStart?.Invoke();
         yield return new WaitForSeconds(Mathf.Max(0.05f, pauseSeconds));
         if (_spawner == null) _spawner = FindObjectOfType<PassangerSpawner>();
         _spawner?.spawnPassangers();
+        // На ~третьей остановке спавним особую пару, если ещё не появлялась
+        _stationCounter++;
+        if (_stationCounter == _specialPairStation && _spawner != null)
+        {
+            Diagnostics.Log("[Station] spawning special VIP pair");
+            _spawner.SpawnSpecialPair();
+        }
         OnBrakeEnd?.Invoke();
         _isStopped = false;
         stopCoroutineStarted = false;
+        Diagnostics.Log("[Station] stop end");
     }
 }

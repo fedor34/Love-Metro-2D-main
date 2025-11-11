@@ -106,4 +106,19 @@ public class PassangerAnimator : MonoBehaviour
     {
         _animator.SetTrigger(Bumping);
     }
+
+    // Жёсткий сброс визуала после разрыва пары/нестандартных состояний
+    public void ResetAfterPairBreak()
+    {
+        // Сбрасываем все флаги и триггеры
+        _animator.ResetTrigger(Bumping);
+        _animator.SetBool(IsHolding, false);
+        _animator.SetBool(IsFalling, false);
+        _animator.SetBool(IsWalking, true); // кратко принудим ходьбу, чтобы уйти из возможной позы
+        _isWalkingStateForced = false;      // вернём автоматику
+        _animator.speed = 1f;
+        // Пересоберём стейт-машину, чтобы не залипала в предыдущем клипе
+        _animator.Rebind();
+        _animator.Update(0f);
+    }
 }

@@ -49,6 +49,8 @@ public class ClickDirectionManager : MonoBehaviour
     [SerializeField] private float _axisSmooth = 12f;       // сглаживание оси
     [SerializeField] private float _velSmooth = 20f;        // сглаживание скорости
     
+    private bool _inputBlocked = false;
+
     void Start()
     {
         _mainCamera = Camera.main;
@@ -83,6 +85,66 @@ public class ClickDirectionManager : MonoBehaviour
     
     void HandleInput()
     {
+        // Начало удержания — сбрасываем релиз
+        if (Input.GetMouseButtonDown(0))
+        {
+            // Check for manual pairing interaction first
+            if (ManualPairingManager.Instance != null && ManualPairingManager.Instance.HandleClick(Input.mousePosition))
+            {
+                _inputBlocked = true;
+                return;
+            }
+
+            Vector2 mousePosition = Input.mousePosition;
+            _prevMouseX = mousePosition.x;
+            _prevMouseY = mousePosition.y;
+            if (_mainCamera != null)
+                CurrentPointerWorld = _mainCamera.ScreenToWorldPoint(mousePosition);
+
+            // Вычисляем направление от центра экрана к позиции клика
+            Vector2 screenDirection = mousePosition - _screenCenter;
+            
+            // Ограничиваем максимальное расстояние
+            if (screenDirection.magnitude > _maxClickDistance * 100f) // 100f для перевода в пиксели
+            {
+                screenDirection = screenDirection.normalized * _maxClickDistance * 100f;
+            }
+            
+            // Переводим в мировые координаты и нормализуем
+            Vector2 direction = screenDirection.normalized;
+            
+            if (!_normalizeDirection)
+            {
+                direction = screenDirection * _directionStrength / 100f;
+            }
+            else
+            {
+                direction *= _directionStrength;
+            }
+            
+            SetDirection(direction);
+            HasReleasePoint = false; // новый цикл удержания
+            Debug.Log($"[ClickDirectionManager] MouseDown at {mousePosition}, direction: {direction}");
+        }
+
+        // Отпускание — фиксируем мировую точку и помечаем релиз
+        if (Input.GetMouseButtonUp(0))
+        {
+            _inputBlocked = false;
+            IsMouseHeld = false;
+            Vector2 mousePosition = Input.mousePosition;
+            if (_mainCamera != null)
+                LastReleaseWorld = _mainCamera.ScreenToWorldPoint(mousePosition);
+            HasReleasePoint = true;
+            LastReleaseTime = Time.time;
+            Debug.Log($"[ClickDirectionManager] MouseUp at world {LastReleaseWorld}");
+            // Сбрасываем ввод
+            HorizontalAxis = 0f; _axisS = 0f; HorizontalVelocity = 0f; _velS = 0f;
+            VerticalAxis = 0f; _axisYS = 0f; VerticalVelocity = 0f; _velYS = 0f;
+        }
+
+        if (_inputBlocked) return;
+
         // Удержание ЛКМ — обновляем направление в реальном времени
         if (Input.GetMouseButton(0))
         {
@@ -125,56 +187,6 @@ public class ClickDirectionManager : MonoBehaviour
                 SetDirection(direction);
             }
             CurrentPointerWorld = _mainCamera != null ? _mainCamera.ScreenToWorldPoint(mousePosition) : Vector2.zero;
-        }
-
-        // Начало удержания — сбрасываем релиз
-        if (Input.GetMouseButtonDown(0))
-        {
-            Vector2 mousePosition = Input.mousePosition;
-            _prevMouseX = mousePosition.x;
-            _prevMouseY = mousePosition.y;
-            if (_mainCamera != null)
-                CurrentPointerWorld = _mainCamera.ScreenToWorldPoint(mousePosition);
-
-            // Вычисляем направление от центра экрана к позиции клика
-            Vector2 screenDirection = mousePosition - _screenCenter;
-            
-            // Ограничиваем максимальное расстояние
-            if (screenDirection.magnitude > _maxClickDistance * 100f) // 100f для перевода в пиксели
-            {
-                screenDirection = screenDirection.normalized * _maxClickDistance * 100f;
-            }
-            
-            // Переводим в мировые координаты и нормализуем
-            Vector2 direction = screenDirection.normalized;
-            
-            if (!_normalizeDirection)
-            {
-                direction = screenDirection * _directionStrength / 100f;
-            }
-            else
-            {
-                direction *= _directionStrength;
-            }
-            
-            SetDirection(direction);
-            HasReleasePoint = false; // новый цикл удержания
-            Debug.Log($"[ClickDirectionManager] MouseDown at {mousePosition}, direction: {direction}");
-        }
-
-        // Отпускание — фиксируем мировую точку и помечаем релиз
-        if (Input.GetMouseButtonUp(0))
-        {
-            IsMouseHeld = false;
-            Vector2 mousePosition = Input.mousePosition;
-            if (_mainCamera != null)
-                LastReleaseWorld = _mainCamera.ScreenToWorldPoint(mousePosition);
-            HasReleasePoint = true;
-            LastReleaseTime = Time.time;
-            Debug.Log($"[ClickDirectionManager] MouseUp at world {LastReleaseWorld}");
-            // Сбрасываем ввод
-            HorizontalAxis = 0f; _axisS = 0f; HorizontalVelocity = 0f; _velS = 0f;
-            VerticalAxis = 0f; _axisYS = 0f; VerticalVelocity = 0f; _velYS = 0f;
         }
     }
     

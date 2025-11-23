@@ -9,6 +9,7 @@ public class GameInitializer : MonoBehaviour
     [SerializeField] private bool _createClickDirectionManager = true;
     [SerializeField] private bool _createInertiaArrowHUD = true;
     [SerializeField] private bool _ensureParallaxSystems = false; // выключаем старый автопараллакс
+    [SerializeField] private bool _createManualPairingManager = true;
     [SerializeField] private bool _ensureBackgroundScroller = false;
     [SerializeField] private bool _ensureParallaxMaterialDriver = true;
     [SerializeField] private bool _replaceParallaxMaterialsWithDefault = false; // если true — насильно отключим шейдерный параллакс
@@ -30,6 +31,13 @@ public class GameInitializer : MonoBehaviour
             GameObject clickManager = new GameObject("ClickDirectionManager", typeof(ClickDirectionManager));
             DontDestroyOnLoad(clickManager);
             Debug.Log("[GameInitializer] Created ClickDirectionManager");
+        }
+
+        if (_createManualPairingManager && FindObjectOfType<ManualPairingManager>() == null)
+        {
+            GameObject pairingManager = new GameObject("ManualPairingManager", typeof(ManualPairingManager));
+            DontDestroyOnLoad(pairingManager);
+            Debug.Log("[GameInitializer] Created ManualPairingManager");
         }
 
         if (_replaceParallaxMaterialsWithDefault && FindObjectOfType<BackgroundMaterialOverride>() == null)

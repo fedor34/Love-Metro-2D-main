@@ -118,12 +118,18 @@ public class BoidsLiteStrategy : IPassengerMovementStrategy
     private const float SeparationStrength = 2.5f;
     private const float AlignmentStrength = 0.35f;
     private const float ForwardBias = 0.8f;
+    private const float CenteringForce = 1.5f; // Сила возврата к центру Y
 
     public Vector2 ComputeDesiredVelocity(Passenger passenger, Vector2 naturalVelocity, Vector2 currentVelocity, float deltaTime)
     {
         Vector2 separation = Vector2.zero;
         Vector2 alignment = Vector2.zero;
         int alignmentCount = 0;
+
+        // Возврат к центру Y (y=0 в локальных координатах или мира, если вагон центрирован)
+        // Предполагаем что центр вагона по Y ~ 0. Если нет, нужно передавать центр.
+        float yOffset = passenger.transform.position.y;
+        Vector2 centering = new Vector2(0, -yOffset * CenteringForce);
 
         foreach (var other in Object.FindObjectsOfType<Passenger>())
         {
@@ -152,7 +158,8 @@ public class BoidsLiteStrategy : IPassengerMovementStrategy
 
         Vector2 desired = naturalVelocity * ForwardBias
                           + separation * SeparationStrength
-                          + alignment * AlignmentStrength;
+                          + alignment * AlignmentStrength
+                          + centering; // Добавляем центрирующую силу
 
         // Smooth towards desired to reduce jitter
         desired = Vector2.Lerp(currentVelocity, desired, Mathf.Clamp01(deltaTime * 5f));

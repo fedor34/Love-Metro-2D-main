@@ -178,6 +178,11 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
         _isInitiated = true;
         var rb = _rigidbody;
+        // Применяем параметры скользкого пола при необходимости
+        if (LevelGameplaySettings.SlipperyFloorEnabled)
+        {
+            _rigidbody.drag = LevelGameplaySettings.SlipperyLinearDrag;
+        }
         Diagnostics.Log($"[Passenger][ready] name={name} rb(cdm={rb.collisionDetectionMode}, interp={rb.interpolation}, drag={rb.drag:F2})");
     }
 
@@ -307,8 +312,12 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             Vector2 naturalVelocity = Passanger.CurrentMovingDirection * Passanger._speed;
             
             // Стоим на месте (без самодвижения) и ждём толчков поезда
+            // Если включён скользкий пол — сохраняем инерцию и не гасим скорость
             Vector2 desired = Vector2.zero;
-            Passanger._rigidbody.velocity = desired;
+            if (!LevelGameplaySettings.SlipperyFloorEnabled)
+            {
+                Passanger._rigidbody.velocity = desired;
+            }
             
             Passanger.PassangerAnimator.ChangeFacingDirection(
                 Vector3.Dot(Vector3.Project(Passanger.CurrentMovingDirection, Vector3.right).normalized, Vector3.right) == 1);

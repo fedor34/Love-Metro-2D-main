@@ -26,6 +26,7 @@ public class TrainManager : MonoBehaviour
     [SerializeField] private float _acceleration = 180f;  // базовое ускорение (x2)
     [SerializeField] private float _deceleration = 10f;   // Замедление
     [SerializeField] private float _brakeDeceleration = 25f; // Торможение при отпускании
+
     [Header("Условия выдачи стартового импульса пассажирам")]
     [SerializeField] private float _startImpulseSpeedThreshold = 2.0f; // считаем поезд почти стоящим ниже этого порога
     [SerializeField] private float _startBoost = 20f; // более сильный старт

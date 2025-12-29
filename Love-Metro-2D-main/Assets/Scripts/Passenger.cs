@@ -604,15 +604,36 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             }
 
             // Отталкивание от одноимённых
-            foreach (var other in GameObject.FindObjectsOfType<Passenger>())
+            // ОПТИМИЗИРОВАНО: Использует PassengerRegistry вместо FindObjectsOfType
+            if (PassengerRegistry.Instance != null)
             {
-                if (other == Passanger) continue;
-                if (other.IsFemale != Passanger.IsFemale) continue;
-                Vector2 toOther = (Vector2)(other.transform.position - Passanger.transform.position);
-                float d = toOther.magnitude;
-                if (d < 0.001f || d > Passanger._repelRadius) continue;
-                float w = Mathf.InverseLerp(Passanger._repelRadius, 0f, d);
-                currentFallingSpeed -= toOther.normalized * (Passanger._repelForce * w) * Time.deltaTime;
+                var sameGender = Passanger.IsFemale
+                    ? PassengerRegistry.Instance.Females
+                    : PassengerRegistry.Instance.Males;
+                for (int i = 0; i < sameGender.Count; i++)
+                {
+                    var other = sameGender[i];
+                    if (other == Passanger || other == null) continue;
+                    Vector2 toOther = (Vector2)(other.transform.position - Passanger.transform.position);
+                    float d = toOther.magnitude;
+                    if (d < 0.001f || d > Passanger._repelRadius) continue;
+                    float w = Mathf.InverseLerp(Passanger._repelRadius, 0f, d);
+                    currentFallingSpeed -= toOther.normalized * (Passanger._repelForce * w) * Time.deltaTime;
+                }
+            }
+            else
+            {
+                // Fallback
+                foreach (var other in GameObject.FindObjectsOfType<Passenger>())
+                {
+                    if (other == Passanger) continue;
+                    if (other.IsFemale != Passanger.IsFemale) continue;
+                    Vector2 toOther = (Vector2)(other.transform.position - Passanger.transform.position);
+                    float d = toOther.magnitude;
+                    if (d < 0.001f || d > Passanger._repelRadius) continue;
+                    float w = Mathf.InverseLerp(Passanger._repelRadius, 0f, d);
+                    currentFallingSpeed -= toOther.normalized * (Passanger._repelForce * w) * Time.deltaTime;
+                }
             }
 
             // Клэмп скорости
@@ -850,8 +871,16 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     }
 
     // Вспомогательно: ближайший пассажир противоположного пола
+    // ОПТИМИЗИРОВАНО: Использует PassengerRegistry вместо FindObjectsOfType
     private static Passenger FindClosestOpposite(Passenger self, float radius)
     {
+        // Используем PassengerRegistry если доступен
+        if (PassengerRegistry.Instance != null)
+        {
+            return PassengerRegistry.Instance.FindClosestOpposite(self, radius);
+        }
+
+        // Fallback на старый метод
         Passenger best = null;
         float bestDist = radius;
         foreach (var p in GameObject.FindObjectsOfType<Passenger>())
@@ -1045,6 +1074,12 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     
     private void Start()
     {
+        // Регистрируем себя в PassengerRegistry для оптимизации поиска
+        if (PassengerRegistry.Instance != null)
+        {
+            PassengerRegistry.Instance.Register(this);
+        }
+
         // Регистрируем себя в системе эффектов поля
         if (FieldEffectSystem.Instance != null)
         {
@@ -1054,6 +1089,24 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     
     private void OnDestroy()
     {
+        // Отписываемся от инерции поезда, чтобы TrainManager не вызывал колбэки на уничтоженных пассажирах
+        if (_train != null && _currentState != null)
+        {
+            _train.startInertia -= _currentState.OnTrainSpeedChange;
+        }
+
+        // Удаляемся из контейнера, даже если уничтожение произошло не через RemoveFromContainerAndDestroy
+        if (container != null)
+        {
+            container.RemovePassanger(this);
+        }
+
+        // Отменяем регистрацию в PassengerRegistry
+        if (PassengerRegistry.Instance != null)
+        {
+            PassengerRegistry.Instance.Unregister(this);
+        }
+
         // Отменяем регистрацию в системе эффектов поля
         if (FieldEffectSystem.Instance != null)
         {

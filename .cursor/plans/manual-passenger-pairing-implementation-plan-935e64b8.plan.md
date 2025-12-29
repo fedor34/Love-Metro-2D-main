@@ -1,4 +1,18 @@
-<!-- 935e64b8-7f76-4abe-804a-f8831c60fa35 a333b345-422c-4eb7-bdd8-35c15ef6f462 -->
+---
+name: Manual Passenger Pairing Implementation Plan
+overview: ""
+todos:
+  - id: 94ad8a36-e799-49ef-a24b-9527763be958
+    content: Modify TrainManager.cs to include fuel logic and consumption
+    status: pending
+  - id: 7e9856b2-ef97-49d8-96e0-928a6c4dff78
+    content: Create FuelHUD.cs to display the fuel bar
+    status: pending
+  - id: 7a3b0304-b0e3-4151-a343-71e4e237a65e
+    content: Integrate Game Over state when fuel runs out
+    status: pending
+---
+
 # Manual Passenger Pairing Implementation Plan
 
 This plan introduces a mechanic to manually pair adjacent passengers by clicking on them, allowing players to fix "near-miss" matches before the train moves.
@@ -29,11 +43,3 @@ This plan introduces a mechanic to manually pair adjacent passengers by clicking
 - Add `PassengerSelectionManager` to the auto-creation list to ensure it exists in the scene.
 
 ## 4. Integration with `ClickDirectionManager`
-
-- Ensure clicking a passenger doesn't accidentally trigger unwanted train movement (or accept that a quick click is negligible). Ideally, if a passenger is clicked, we might want to suppress the train input for that frame, but for a simple "click" (tap), the train impulse is usually small/ignored if it's just a tap without drag.
-
-### To-dos
-
-- [ ] Modify TrainManager.cs to include fuel logic and consumption
-- [ ] Create FuelHUD.cs to display the fuel bar
-- [ ] Integrate Game Over state when fuel runs out

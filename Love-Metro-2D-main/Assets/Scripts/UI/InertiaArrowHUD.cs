@@ -56,6 +56,12 @@ public class InertiaArrowHUD : MonoBehaviour
         // Assign default UI sprite
         var img = arrowGo.GetComponent<Image>();
         var builtin = Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd");
+        if (builtin == null)
+        {
+            // На некоторых билдах UISprite.psd отсутствует — создаём простой белый спрайт без спама ошибок
+            var tex = Texture2D.whiteTexture;
+            builtin = Sprite.Create(tex, new Rect(0f, 0f, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+        }
         img.sprite = builtin;
         img.color = color;
         img.raycastTarget = false;
@@ -109,4 +115,3 @@ public class InertiaArrowHUD : MonoBehaviour
         arrowTransform.sizeDelta = sd;
     }
 }
-

@@ -11,4 +11,23 @@ public class PassangersContainer : MonoBehaviour
         if (Passangers.Contains(p))
             Passangers.Remove(p);
     }
+
+    /// <summary>
+    /// Полностью очищает контейнер: удаляет null-записи и уничтожает живые объекты.
+    /// </summary>
+    public void DestroyAllPassengers()
+    {
+        if (Passangers == null) return;
+
+        // Сначала убираем null-ы, затем уничтожаем оставшихся.
+        Passangers.RemoveAll(x => x == null);
+        for (int i = Passangers.Count - 1; i >= 0; i--)
+        {
+            var p = Passangers[i];
+            if (p == null) continue;
+            p.container = null; // предотвращаем повторное удаление в RemoveFromContainerAndDestroy
+            Destroy(p.gameObject);
+        }
+        Passangers.Clear();
+    }
 }

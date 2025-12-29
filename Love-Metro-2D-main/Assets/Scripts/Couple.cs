@@ -1,70 +1,81 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Представляет пару пассажиров в игре, управляет их позиционированием и взаимоотношениями
+/// Представляет пару пассажиров в игре, управляет их позиционированием и взаимоотношениями.
+/// Оптимизирован: убраны вызовы FindObjectOfType, добавлено кеширование ScoreCounter.
 /// </summary>
 public class Couple : MonoBehaviour
 {
-    // Расстояние, которое должно поддерживаться между двумя пассажирами
     [SerializeField] private float _socialDistance;
-    
-    // Ссылки на двух пассажиров, образующих пару
-    private Passenger PassangerMain;
-    private Passenger PassangerOther;
-    private ScoreCounter _score;
+
     [Header("Разбивание пары (кик)")]
-    [SerializeField] private float _breakupBase = 3f;          // базовая сила
-    [SerializeField] private float _breakupSpeedScale = 0.6f;   // добавка от скорости влетевшего
-    [SerializeField] private float _breakupMax = 12f;           // потолок силы
-    [SerializeField] private float _breakMinSpeed = 2.0f;       // минимальная скорость, чтобы действительно разбить пару
+    [SerializeField] private float _breakupBase = 3f;
+    [SerializeField] private float _breakupSpeedScale = 0.6f;
+    [SerializeField] private float _breakupMax = 12f;
+    [SerializeField] private float _breakMinSpeed = 2.0f;
     [SerializeField] private int _penaltyMin = 20;
     [SerializeField] private int _penaltyMax = 50;
+
+    private Passenger _passengerMain;
+    private Passenger _passengerOther;
+    private ScoreCounter _score;
+
+    // Статический кеш для ScoreCounter (один на сцену)
+    private static ScoreCounter _cachedScoreCounter;
 
     /// <summary>
     /// Инициализирует пару, позиционируя пассажиров относительно друг друга
     /// </summary>
-    /// <param name="PassangerMain">Главный пассажир пары</param>
-    /// <param name="PassangerOther">Второй пассажир в паре</param>
-    public void init(Passenger PassangerMain, Passenger PassangerOther)
+    public void init(Passenger passengerMain, Passenger passengerOther)
     {
-        // Присваиваем ссылки в поля, чтобы использовать их позже при разрыве
-        this.PassangerMain = PassangerMain;
-        this.PassangerOther = PassangerOther;
-        // Получаем текущие позиции обоих пассажиров
-        Vector3 mainPosition = PassangerMain.transform.position;
-        Vector3 otherPosition = PassangerOther.transform.position;
+        _passengerMain = passengerMain;
+        _passengerOther = passengerOther;
 
-        // Устанавливаем позицию пары на позицию главного пассажира
+        Vector3 mainPosition = passengerMain.transform.position;
+        Vector3 otherPosition = passengerOther.transform.position;
+
+        // Устанавливаем позицию пары
         transform.position = mainPosition;
-        
-        // Определяем направление, в котором должен смотреть второй пассажир, основываясь на их относительных позициях
-        Vector3 OtherPlayerDirection = mainPosition.x - otherPosition.x <= 0 ? Vector3.right : Vector3.left;
 
-        // Перемещаем второго пассажира для поддержания социальной дистанции от главного пассажира
-        PassangerOther.Transport(new Vector3(
-            mainPosition.x + OtherPlayerDirection.x * _socialDistance,
+        // Определяем направление для второго пассажира
+        Vector3 otherDirection = mainPosition.x - otherPosition.x <= 0 ? Vector3.right : Vector3.left;
+
+        // Перемещаем второго пассажира
+        passengerOther.Transport(new Vector3(
+            mainPosition.x + otherDirection.x * _socialDistance,
             mainPosition.y));
 
-        // Устанавливаем направления взгляда обоих пассажиров
-        PassangerMain.PassangerAnimator.ChangeFacingDirection(true);
-        PassangerOther.PassangerAnimator.ChangeFacingDirection(false);
+        // Устанавливаем направления взгляда
+        passengerMain.PassangerAnimator.ChangeFacingDirection(true);
+        passengerOther.PassangerAnimator.ChangeFacingDirection(false);
 
-        // Делаем обоих пассажиров дочерними объектами этой пары
-        PassangerMain.transform.parent = transform;
-        PassangerOther.transform.parent = transform;
+        // Делаем пассажиров дочерними объектами
+        passengerMain.transform.parent = transform;
+        passengerOther.transform.parent = transform;
 
-        // Отмечаем, что оба пассажира теперь в паре
-        PassangerMain.IsInCouple = true;
-        PassangerOther.IsInCouple = true;
-        var mgr = CouplesManager.Instance;
-        if (mgr != null)
+        // Отмечаем, что оба в паре
+        passengerMain.IsInCouple = true;
+        passengerOther.IsInCouple = true;
+
+        // Обновляем статус в реестре
+        if (PassengerRegistry.Instance != null)
         {
-            mgr.RegisterCouple(this);
+            PassengerRegistry.Instance.UpdateCoupleStatus(passengerMain);
+            PassengerRegistry.Instance.UpdateCoupleStatus(passengerOther);
         }
 
-        // Подготовим триггер для ловли влетевших пассажиров
+        // Регистрируем пару
+        CouplesManager.Instance?.RegisterCouple(this);
+
+        // Настраиваем триггер
+        SetupTrigger();
+
+        // Кешируем ScoreCounter
+        _score = GetCachedScoreCounter();
+    }
+
+    private void SetupTrigger()
+    {
         var trigger = GetComponent<Collider2D>();
         if (trigger == null)
         {
@@ -74,36 +85,46 @@ public class Couple : MonoBehaviour
         }
         else
         {
-            trigger.isTrigger = true; // гарантируем режим триггера, если коллайдер уже есть
+            trigger.isTrigger = true;
         }
+    }
 
-        _score = FindObjectOfType<ScoreCounter>();
+    /// <summary>
+    /// Возвращает закешированный ScoreCounter или ищет его один раз
+    /// </summary>
+    private static ScoreCounter GetCachedScoreCounter()
+    {
+        if (_cachedScoreCounter == null)
+        {
+            _cachedScoreCounter = Object.FindObjectOfType<ScoreCounter>();
+        }
+        return _cachedScoreCounter;
     }
 
     public void DespawnAtStation()
     {
-        if (PassangerMain != null)
+        if (_passengerMain != null)
         {
-            PassangerMain.RemoveFromContainerAndDestroy();
+            _passengerMain.RemoveFromContainerAndDestroy();
         }
-        if (PassangerOther != null)
+        if (_passengerOther != null)
         {
-            PassangerOther.RemoveFromContainerAndDestroy();
+            _passengerOther.RemoveFromContainerAndDestroy();
         }
         Destroy(gameObject);
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (!enabled) return;
-        if (other == null) return;
-        var p = other.GetComponent<Passenger>();
-        if (p == null) return;
-        // Игнор если это наши собственные пассажиры
-        if (p == PassangerMain || p == PassangerOther) return;
+        if (!enabled || other == null) return;
 
-        // Разбиваем пару и начисляем штраф
-        BreakByHit(p);
+        var passenger = other.GetComponent<Passenger>();
+        if (passenger == null) return;
+
+        // Игнорируем собственных пассажиров
+        if (passenger == _passengerMain || passenger == _passengerOther) return;
+
+        BreakByHit(passenger);
     }
 
     public void BreakByHit(Passenger hitter)
@@ -111,36 +132,38 @@ public class Couple : MonoBehaviour
         int penalty = _penaltyMin;
         Vector3 hitPos = transform.position;
         float speed = 0f;
+
         if (hitter != null)
         {
             hitPos = hitter.transform.position;
             var rb = hitter.GetRigidbody();
             if (rb != null)
             {
-                float spd = rb.velocity.magnitude;
-                speed = spd;
-                float t = Mathf.Clamp01(spd / 10f);
+                speed = rb.velocity.magnitude;
+                float t = Mathf.Clamp01(speed / 10f);
                 penalty = Mathf.RoundToInt(Mathf.Lerp(_penaltyMin, _penaltyMax, t));
             }
         }
-        // Не разбиваем пару при медленном касании
+
+        // Не разбиваем при медленном касании
         if (speed < _breakMinSpeed) return;
+
         BreakPairInternal(penalty, hitter, hitPos);
     }
 
     private void BreakPairInternal(int penalty, Passenger hitter, Vector3 hitPos)
     {
         CouplesManager.Instance?.UnregisterCouple(this);
+
         if (_score != null)
         {
-            // Штрафный попап вылетает из позиции пары, как и плюсовые очки
             _score.ApplyPenalty(penalty, transform.position);
         }
 
-        // Определяем направление кика пропорционально скорости и направлению влетевшего
         Vector2 hitterVel = Vector2.zero;
         Vector3 hitterPos = hitPos;
-        var hitterRb = hitter != null ? hitter.GetRigidbody() : null;
+
+        var hitterRb = hitter?.GetRigidbody();
         if (hitterRb != null)
         {
             hitterVel = hitterRb.velocity;
@@ -150,27 +173,29 @@ public class Couple : MonoBehaviour
         float speed = hitterVel.magnitude;
         float mag = Mathf.Clamp(_breakupBase + speed * _breakupSpeedScale, _breakupBase, _breakupMax);
 
-        if (PassangerMain != null)
-        {
-            Vector2 dir = (PassangerMain.transform.position - hitterPos).sqrMagnitude > 0.0001f
-                ? (Vector2)(PassangerMain.transform.position - hitterPos).normalized
-                : Vector2.left;
-            SafeRelease(PassangerMain, dir * mag);
-        }
-        if (PassangerOther != null)
-        {
-            Vector2 dir = (PassangerOther.transform.position - hitterPos).sqrMagnitude > 0.0001f
-                ? (Vector2)(PassangerOther.transform.position - hitterPos).normalized
-                : Vector2.right;
-            SafeRelease(PassangerOther, dir * mag);
-        }
+        ReleasePassenger(_passengerMain, hitterPos, mag, Vector2.left);
+        ReleasePassenger(_passengerOther, hitterPos, mag, Vector2.right);
+
         Destroy(gameObject);
     }
 
-    private void SafeRelease(Passenger p, Vector2 kickVelocity)
+    private void ReleasePassenger(Passenger passenger, Vector3 hitterPos, float magnitude, Vector2 fallbackDir)
     {
-        if (p == null) return;
-        p.transform.parent = null;
-        p.BreakFromCouple(kickVelocity);
+        if (passenger == null) return;
+
+        Vector2 dir = (passenger.transform.position - hitterPos).sqrMagnitude > 0.0001f
+            ? (Vector2)(passenger.transform.position - hitterPos).normalized
+            : fallbackDir;
+
+        passenger.transform.parent = null;
+        passenger.BreakFromCouple(dir * magnitude);
+    }
+
+    /// <summary>
+    /// Очищает статический кеш (вызывать при смене сцены)
+    /// </summary>
+    public static void ClearCache()
+    {
+        _cachedScoreCounter = null;
     }
 }

@@ -92,6 +92,15 @@ public class TrainManager : MonoBehaviour
         // Гарантируем повышенное ускорение даже если в сцене сохранено старое сериализованное
         if (_acceleration < 180f) _acceleration = 180f;
         if (_startImpulseSpeedThreshold < 0.5f) _startImpulseSpeedThreshold = 2.0f;
+        // Кешируем ссылки один раз при старте
+        CacheReferences();
+    }
+
+    /// <summary>
+    /// Кеширует ссылки на зависимости. Вызывается один раз при старте.
+    /// </summary>
+    private void CacheReferences()
+    {
         if (_spawner == null)
         {
             _spawner = FindObjectOfType<PassangerSpawner>();
@@ -296,7 +305,26 @@ public class TrainManager : MonoBehaviour
         Diagnostics.Log("[Station] stop begin");
         OnBrakeStart?.Invoke();
         yield return new WaitForSeconds(Mathf.Max(0.05f, pauseSeconds));
-        if (_spawner == null) _spawner = FindObjectOfType<PassangerSpawner>();
+
+        // Полностью очищаем прошлую волну перед новым спавном
+        if (_passangers == null)
+        {
+            _passangers = FindObjectOfType<PassangersContainer>();
+        }
+        if (_passangers != null)
+        {
+            _passangers.DestroyAllPassengers();
+        }
+        else
+        {
+            Diagnostics.Warn("[Station] PassangersContainer not found before spawn");
+        }
+
+        // Spawner уже закеширован в Start(), fallback только если null
+        if (_spawner == null)
+        {
+            _spawner = FindObjectOfType<PassangerSpawner>();
+        }
         _spawner?.spawnPassangers();
         OnBrakeEnd?.Invoke();
         _isStopped = false;

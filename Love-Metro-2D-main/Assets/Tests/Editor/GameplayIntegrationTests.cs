@@ -251,13 +251,18 @@ public class GameplayIntegrationTests
         var passenger = go.AddComponent<Passenger>();
 
         var type = typeof(Passenger);
-        var isFemaleField = type.GetField("IsFemale") ?? type.GetProperty("IsFemale");
-        if (isFemaleField != null)
+        var field = type.GetField("IsFemale");
+        if (field != null)
         {
-            if (isFemaleField is System.Reflection.FieldInfo field)
-                field.SetValue(passenger, isFemale);
-            else if (isFemaleField is System.Reflection.PropertyInfo prop)
+            field.SetValue(passenger, isFemale);
+        }
+        else
+        {
+            var prop = type.GetProperty("IsFemale");
+            if (prop != null)
+            {
                 prop.SetValue(passenger, isFemale);
+            }
         }
 
         passenger.IsInCouple = isInCouple;

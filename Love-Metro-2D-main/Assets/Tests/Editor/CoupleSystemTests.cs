@@ -15,12 +15,7 @@ public class CoupleSystemTests
     {
         coupleManagerObject = new GameObject("TestCouplesManager");
         couplesManager = coupleManagerObject.AddComponent<CouplesManager>();
-        CouplesManager.Instance = null;
-
-        // Manually call Awake to set instance
-        var awakeMethod = typeof(CouplesManager).GetMethod("Awake",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        awakeMethod?.Invoke(couplesManager, null);
+        // Awake is called automatically by Unity when component is added
     }
 
     [TearDown]
@@ -30,7 +25,6 @@ public class CoupleSystemTests
         {
             Object.DestroyImmediate(coupleManagerObject);
         }
-        CouplesManager.Instance = null;
     }
 
     [Test]
@@ -178,13 +172,18 @@ public class CoupleSystemTests
         var passenger = go.AddComponent<Passenger>();
 
         var type = typeof(Passenger);
-        var isFemaleField = type.GetField("IsFemale") ?? type.GetProperty("IsFemale");
-        if (isFemaleField != null)
+        var field = type.GetField("IsFemale");
+        if (field != null)
         {
-            if (isFemaleField is System.Reflection.FieldInfo field)
-                field.SetValue(passenger, isFemale);
-            else if (isFemaleField is System.Reflection.PropertyInfo prop)
+            field.SetValue(passenger, isFemale);
+        }
+        else
+        {
+            var prop = type.GetProperty("IsFemale");
+            if (prop != null)
+            {
                 prop.SetValue(passenger, isFemale);
+            }
         }
 
         return passenger;

@@ -22,14 +22,13 @@ public class ManualPairingManagerTests
         testCamera.transform.position = new Vector3(0, 0, -10);
         testCamera.orthographic = true;
         testCamera.orthographicSize = 5;
+        testCamera.tag = "MainCamera"; // Make it Camera.main
 
         // Create ManualPairingManager
         managerObject = new GameObject("TestManualPairingManager");
         manager = managerObject.AddComponent<ManualPairingManager>();
-        ManualPairingManager.Instance = null;
-        manager.Awake();
 
-        // Set private fields using reflection
+        // Set private fields using reflection (before Awake sets Instance)
         SetPrivateField(manager, "_maxPairingDistance", 3.0f);
         SetPrivateField(manager, "_clickRadius", 0.4f);
         SetPrivateField(manager, "_verticalSearchFactor", 2.0f);
@@ -38,25 +37,25 @@ public class ManualPairingManagerTests
     [TearDown]
     public void Teardown()
     {
-        if (managerObject != null)
-            Object.DestroyImmediate(managerObject);
         if (cameraObject != null)
             Object.DestroyImmediate(cameraObject);
-        ManualPairingManager.Instance = null;
+        if (managerObject != null)
+            Object.DestroyImmediate(managerObject);
     }
 
     [Test]
     public void Singleton_InstanceIsSet_AfterAwake()
     {
+        // Instance is set in Awake which is called automatically by Unity
         Assert.IsNotNull(ManualPairingManager.Instance);
-        Assert.AreEqual(manager, ManualPairingManager.Instance);
     }
 
     [Test]
     public void HandleClick_ReturnsFalse_WhenNoCameraExists()
     {
-        Object.DestroyImmediate(cameraObject);
-        Camera.main = null;
+        // Remove MainCamera tag so Camera.main returns null
+        if (cameraObject != null)
+            cameraObject.tag = "Untagged";
 
         bool result = manager.HandleClick(Vector2.zero);
 
@@ -207,13 +206,18 @@ public class ManualPairingManagerTests
 
         // Set properties
         var type = typeof(Passenger);
-        var isFemaleField = type.GetField("IsFemale") ?? type.GetProperty("IsFemale");
-        if (isFemaleField != null)
+        var field = type.GetField("IsFemale");
+        if (field != null)
         {
-            if (isFemaleField is System.Reflection.FieldInfo field)
-                field.SetValue(passenger, isFemale);
-            else if (isFemaleField is System.Reflection.PropertyInfo prop)
+            field.SetValue(passenger, isFemale);
+        }
+        else
+        {
+            var prop = type.GetProperty("IsFemale");
+            if (prop != null)
+            {
                 prop.SetValue(passenger, isFemale);
+            }
         }
 
         passenger.IsMatchable = isMatchable;

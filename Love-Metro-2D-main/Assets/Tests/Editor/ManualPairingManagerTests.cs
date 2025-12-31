@@ -201,9 +201,13 @@ public class ManualPairingManagerTests
         var go = new GameObject($"MockPassenger_{(isFemale ? "F" : "M")}");
         go.transform.position = position;
 
-        var passenger = go.AddComponent<Passenger>();
+        // Add required components before Passenger (Passenger has [RequireComponent])
+        go.AddComponent<Rigidbody2D>();
         var collider = go.AddComponent<BoxCollider2D>();
         collider.size = new Vector2(0.5f, 1f);
+        go.AddComponent<PassangerAnimator>();
+
+        var passenger = go.AddComponent<Passenger>();
 
         // IsFemale is a public field, so assign directly
         passenger.IsFemale = isFemale;

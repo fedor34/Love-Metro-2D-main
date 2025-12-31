@@ -239,6 +239,12 @@ public class GameplayIntegrationTests
     {
         var go = new GameObject($"Passenger_{(isFemale ? "F" : "M")}");
         go.transform.position = position;
+
+        // Add required components before Passenger (Passenger has [RequireComponent])
+        go.AddComponent<Rigidbody2D>();
+        go.AddComponent<BoxCollider2D>();
+        var passangerAnimator = go.AddComponent<PassangerAnimator>();
+
         var passenger = go.AddComponent<Passenger>();
 
         // IsFemale is a public field, so assign directly

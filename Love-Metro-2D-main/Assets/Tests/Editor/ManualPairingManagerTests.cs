@@ -201,7 +201,10 @@ public class ManualPairingManagerTests
         var go = new GameObject($"MockPassenger_{(isFemale ? "F" : "M")}");
         go.transform.position = position;
 
-        // Add required components before Passenger (Passenger has [RequireComponent])
+        // Add required components before Passenger
+        // PassangerAnimator requires Animator and SpriteRenderer
+        go.AddComponent<Animator>();
+        go.AddComponent<SpriteRenderer>();
         go.AddComponent<Rigidbody2D>();
         var collider = go.AddComponent<BoxCollider2D>();
         collider.size = new Vector2(0.5f, 1f);

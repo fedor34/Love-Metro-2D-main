@@ -179,7 +179,10 @@ public class CoupleSystemTests
         var go = new GameObject($"MockPassenger_{(isFemale ? "F" : "M")}");
         go.transform.position = position;
 
-        // Add required components before Passenger (Passenger has [RequireComponent])
+        // Add required components before Passenger
+        // PassangerAnimator requires Animator and SpriteRenderer
+        go.AddComponent<Animator>();
+        go.AddComponent<SpriteRenderer>();
         go.AddComponent<Rigidbody2D>();
         go.AddComponent<BoxCollider2D>();
         go.AddComponent<PassangerAnimator>();

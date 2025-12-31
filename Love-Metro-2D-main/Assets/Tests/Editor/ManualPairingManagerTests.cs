@@ -139,20 +139,21 @@ public class ManualPairingManagerTests
     }
 
     [Test]
-    public void CanPair_ReturnsFalse_WhenOneIsInCouple()
+    public void CanPair_DoesNotCheckCoupleStatus_ReturnsTrue()
     {
+        // This test verifies that CanPair() only checks gender and distance,
+        // NOT couple status. Couple status is checked in AttemptOverlapPairing().
         var male = CreateMockPassenger(false, Vector3.zero, isMatchable: true, isInCouple: true);
         var female = CreateMockPassenger(true, new Vector3(1, 0, 0), isMatchable: true, isInCouple: false);
 
         var canPairMethod = typeof(ManualPairingManager).GetMethod("CanPair",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-        // IsInCouple check is in HandleClick/AttemptOverlapPairing, not CanPair
-        // But the distance check should still work
         bool result = (bool)canPairMethod.Invoke(manager, new object[] { male, female });
 
         // CanPair only checks gender and distance, not couple status
-        Assert.IsTrue(result); // This will be filtered by AttemptOverlapPairing
+        // The IsInCouple filter is applied in AttemptOverlapPairing
+        Assert.IsTrue(result);
 
         CleanupPassenger(male);
         CleanupPassenger(female);
@@ -204,22 +205,8 @@ public class ManualPairingManagerTests
         var collider = go.AddComponent<BoxCollider2D>();
         collider.size = new Vector2(0.5f, 1f);
 
-        // Set properties
-        var type = typeof(Passenger);
-        var field = type.GetField("IsFemale");
-        if (field != null)
-        {
-            field.SetValue(passenger, isFemale);
-        }
-        else
-        {
-            var prop = type.GetProperty("IsFemale");
-            if (prop != null)
-            {
-                prop.SetValue(passenger, isFemale);
-            }
-        }
-
+        // IsFemale is a public field, so assign directly
+        passenger.IsFemale = isFemale;
         passenger.IsMatchable = isMatchable;
         passenger.IsInCouple = isInCouple;
 

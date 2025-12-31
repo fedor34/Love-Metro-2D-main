@@ -180,20 +180,9 @@ public class CoupleSystemTests
         go.transform.position = position;
         var passenger = go.AddComponent<Passenger>();
 
-        var type = typeof(Passenger);
-        var field = type.GetField("IsFemale");
-        if (field != null)
-        {
-            field.SetValue(passenger, isFemale);
-        }
-        else
-        {
-            var prop = type.GetProperty("IsFemale");
-            if (prop != null)
-            {
-                prop.SetValue(passenger, isFemale);
-            }
-        }
+        // IsFemale is a public field, so assign directly
+        passenger.IsFemale = isFemale;
+        passenger.IsMatchable = true;
 
         return passenger;
     }

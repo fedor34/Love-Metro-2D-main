@@ -397,23 +397,10 @@ public class PassengerRegistryTests
         var go = new GameObject($"MockPassenger_{(isFemale ? "F" : "M")}");
         var passenger = go.AddComponent<Passenger>();
 
-        // Set IsFemale using reflection since it might be private
-        var type = typeof(Passenger);
-        var field = type.GetField("IsFemale");
-        if (field != null)
-        {
-            field.SetValue(passenger, isFemale);
-        }
-        else
-        {
-            var prop = type.GetProperty("IsFemale");
-            if (prop != null)
-            {
-                prop.SetValue(passenger, isFemale);
-            }
-        }
-
+        // IsFemale is a public field, so assign directly
+        passenger.IsFemale = isFemale;
         passenger.IsInCouple = isInCouple;
+        passenger.IsMatchable = true;
 
         return passenger;
     }

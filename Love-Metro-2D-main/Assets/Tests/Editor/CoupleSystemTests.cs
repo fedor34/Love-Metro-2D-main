@@ -178,6 +178,12 @@ public class CoupleSystemTests
     {
         var go = new GameObject($"MockPassenger_{(isFemale ? "F" : "M")}");
         go.transform.position = position;
+
+        // Add required components before Passenger (Passenger has [RequireComponent])
+        go.AddComponent<Rigidbody2D>();
+        go.AddComponent<BoxCollider2D>();
+        go.AddComponent<PassangerAnimator>();
+
         var passenger = go.AddComponent<Passenger>();
 
         // IsFemale is a public field, so assign directly

@@ -124,6 +124,12 @@ public class ScoreCounter : MonoBehaviour
 
     private IEnumerator ShowFloatingDelta(int delta, Vector3 screenPos, Color color)
     {
+        // Check if prefab is assigned before instantiating
+        if (_floatingScorePref == null)
+        {
+            yield break;
+        }
+
         Vector3 start = screenPos + Vector3.up * _floatingTextSpawnOffsetY;
         TMP_Text floatingText = Instantiate(_floatingScorePref, start, Quaternion.identity, transform.parent);
         floatingText.color = color;
@@ -141,12 +147,25 @@ public class ScoreCounter : MonoBehaviour
 
     private IEnumerator ScorePointsFromMatching(Vector3 initialMatchingPosition, int basePoints)
     {
-       Vector3 matchingPosition = initialMatchingPosition + Vector3.up * _floatingTextSpawnOffsetY;
+        // Award points even if floating text prefab is not assigned
+        _score += (int)(basePoints * _currentScoreMultiplier);
+        UpdateScoreDisplay();
+
+        // Check if prefab is assigned before instantiating
+        if (_floatingScorePref == null)
+        {
+            if (_animator != null)
+            {
+                _animator.SetTrigger("Jump");
+            }
+            yield break;
+        }
+
+        Vector3 matchingPosition = initialMatchingPosition + Vector3.up * _floatingTextSpawnOffsetY;
         TMP_Text floatingText = Instantiate(_floatingScorePref, matchingPosition, Quaternion.identity, transform.parent);
         RectTransform floatingTextTransform = floatingText.GetComponent<RectTransform>();
         float currentSpeed = basePoints * 0.5f; // замедлим стартовую скорость в 2 раза
         floatingText.text = (basePoints * _currentScoreMultiplier).ToString();
-        _score += (int)(basePoints * _currentScoreMultiplier);
 
         while(Vector3.Distance(floatingText.transform.position, transform.position) >= _minFloatingTextDisapearingDistance)
         {
@@ -156,8 +175,10 @@ public class ScoreCounter : MonoBehaviour
             yield return new WaitForEndOfFrame();
         }
 
-        _animator.SetTrigger("Jump");
-        UpdateScoreDisplay();
+        if (_animator != null)
+        {
+            _animator.SetTrigger("Jump");
+        }
         Destroy(floatingText.gameObject);
     }
 

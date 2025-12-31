@@ -48,13 +48,17 @@ public class VipAbility : PassengerAbility
 
     public override void OnMatched(Passenger self, Passenger partner, ref int points)
     {
-        if (partner == null) return;
-        var pr = partner.GetComponent<PassengerAbilities>();
-        if (pr == null) return;
-        // Bonus only if both have VIP ability
-        if (pr.HasAbility<VipAbility>())
+        // VIP ability always doubles the points for this passenger
+        points *= 2;
+
+        // Additional bonus if both partners have VIP ability
+        if (partner != null)
         {
-            points += Mathf.Max(0, pairBonus);
+            var pr = partner.GetComponent<PassengerAbilities>();
+            if (pr != null && pr.HasAbility<VipAbility>())
+            {
+                points += Mathf.Max(0, pairBonus);
+            }
         }
     }
 }

@@ -8,6 +8,10 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     // Глобальный множитель скорости – можно менять из скриптов или инспектора
     public static float GlobalSpeedMultiplier = 0.7f; // глобальное замедление ~30%
 
+    [Header("Настройки (опционально)")]
+    [Tooltip("Опциональный ScriptableObject с настройками. Если не задан, используются значения из инспектора.")]
+    [SerializeField] private PassengerSettings _settings;
+
     private delegate void ReleaseHandrail();
     private ReleaseHandrail releaseHandrail;
 
@@ -96,8 +100,68 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     [SerializeField] private float _easeOutMinK = 0.985f;               // минимальный коэффициент затухания (при низкой скорости)
     [SerializeField] private float _easeOutMaxK = 0.9985f;              // максимальный коэффициент (при высокой скорости)
 
+    /// <summary>
+    /// Применяет настройки из PassengerSettings ScriptableObject.
+    /// Если _settings не задан в инспекторе, настройки остаются из сериализованных полей.
+    /// </summary>
+    private void ApplySettingsFromAsset()
+    {
+        if (_settings == null) return;
+
+        // Базовые настройки
+        GlobalSpeedMultiplier = _settings.globalSpeedMultiplier;
+        _speed = _settings.baseSpeed;
+        _minFallingSpeed = _settings.minFallingSpeed;
+
+        // Поручни
+        _grabingHandrailChance = _settings.handrailGrabChance;
+        _handrailMinGrabbingSpeed = _settings.handrailMinGrabbingSpeed;
+        _handrailCooldown = _settings.handrailCooldown;
+        HandrailStandingTimeInterval = _settings.handrailStandingTimeInterval;
+
+        // Импульс
+        _launchSensitivity = _settings.launchSensitivity;
+        _minImpulseToLaunch = _settings.minImpulseToLaunch;
+        _impulseToVelocityScale = _settings.impulseToVelocityScale;
+        _globalImpulseScale = _settings.globalImpulseScale;
+
+        // Полёт
+        _maxFlightSpeed = _settings.maxFlightSpeed;
+        _flightSpeedMultiplier = _settings.flightSpeedMultiplier;
+        _flightDeceleration = _settings.flightDeceleration;
+        _maxBounces = _settings.maxBounces;
+        _bounceElasticity = _settings.bounceElasticity;
+        _wallBounceBoost = _settings.wallBounceBoost;
+
+        // Ease-out
+        _easeOutMinK = _settings.easeOutMinK;
+        _easeOutMaxK = _settings.easeOutMaxK;
+
+        // Aim assist
+        _aimAssistRadius = _settings.aimAssistRadius;
+        _aimAssistMaxStrength = _settings.aimAssistMaxStrength;
+        _turbulenceStrength = _settings.turbulenceStrength;
+        _angleSnapDeg = _settings.angleSnapDeg;
+
+        // Магнитное притяжение
+        _magnetRadius = _settings.magnetRadius;
+        _magnetForce = _settings.magnetForce;
+        _repelRadius = _settings.repelRadius;
+        _repelForce = _settings.repelForce;
+
+        // Matching
+        _rematchCooldown = _settings.rematchCooldown;
+
+        // Слои
+        _fallingLayer = _settings.fallingLayer;
+        _defaultLayer = _settings.defaultLayer;
+    }
+
     public void Initiate(Vector3 initialMovingDirection, TrainManager train, ScoreCounter scoreCounter)
     {
+        // Применяем настройки из ScriptableObject, если задан
+        ApplySettingsFromAsset();
+
         _initialMovingDirection = initialMovingDirection;
         CurrentMovingDirection = _initialMovingDirection.normalized;
 

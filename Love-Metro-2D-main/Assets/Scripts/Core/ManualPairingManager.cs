@@ -15,9 +15,17 @@ public class ManualPairingManager : MonoBehaviour
     [SerializeField] private float _clickRadius = 0.4f; // Radius to find overlapping passengers
     [SerializeField] private float _verticalSearchFactor = 2.0f; // Множитель для "вытягивания" области поиска по вертикали (Z/Y)
 
+    // Кешируем ScoreCounter для избежания FindObjectOfType каждый раз
+    private ScoreCounter _cachedScoreCounter;
+
     private void Awake()
     {
         Instance = this;
+    }
+
+    private void Start()
+    {
+        _cachedScoreCounter = FindObjectOfType<ScoreCounter>();
     }
 
     /// <summary>
@@ -106,25 +114,27 @@ public class ManualPairingManager : MonoBehaviour
     private void PairPassengers(Passenger p1, Passenger p2)
     {
         Debug.Log($"[ManualPairing] Pairing {p1.name} and {p2.name}");
-        
-        // Calculate points
-        ScoreCounter sc = FindObjectOfType<ScoreCounter>();
-        if (sc != null)
+
+        // Используем кешированный ScoreCounter
+        if (_cachedScoreCounter == null)
+            _cachedScoreCounter = FindObjectOfType<ScoreCounter>();
+
+        if (_cachedScoreCounter != null)
         {
             // Calculate screen position for score popup
             Vector3 midPoint = (p1.transform.position + p2.transform.position) * 0.5f;
             Vector3 screenPos = Camera.main != null ? Camera.main.WorldToScreenPoint(midPoint) : Vector3.zero;
             
             // Use base points from score counter or abilities
-            int points = sc.GetBasePointsPerCouple();
-            
+            int points = _cachedScoreCounter.GetBasePointsPerCouple();
+
             // Check abilities (similar to Passenger.ForceToMatchingState)
             var a1 = p1.GetComponent<PassengerAbilities>();
             var a2 = p2.GetComponent<PassengerAbilities>();
             a1?.InvokeMatched(p2, ref points);
             a2?.InvokeMatched(p1, ref points);
-            
-            sc.AwardMatchPoints(screenPos, Mathf.Max(0, points));
+
+            _cachedScoreCounter.AwardMatchPoints(screenPos, Mathf.Max(0, points));
         }
 
         p1.ForceToMatchingState(p2);

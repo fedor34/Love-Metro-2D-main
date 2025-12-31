@@ -23,6 +23,10 @@ public class PassengerRegistry : MonoBehaviour
     public int MaleSinglesCount { get; private set; }
     public int FemaleSinglesCount { get; private set; }
 
+    // Периодическая очистка null-ссылок
+    private float _cleanupInterval = 2f;
+    private float _nextCleanupTime = 0f;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -37,6 +41,16 @@ public class PassengerRegistry : MonoBehaviour
     {
         if (Instance == this)
             Instance = null;
+    }
+
+    private void Update()
+    {
+        // Периодическая очистка null-ссылок
+        if (Time.time >= _nextCleanupTime)
+        {
+            _nextCleanupTime = Time.time + _cleanupInterval;
+            CleanupNullReferences();
+        }
     }
 
     /// <summary>
@@ -178,10 +192,25 @@ public class PassengerRegistry : MonoBehaviour
     /// </summary>
     public void CleanupNullReferences()
     {
-        _allPassengers.RemoveAll(p => p == null);
-        _males.RemoveAll(p => p == null);
-        _females.RemoveAll(p => p == null);
-        _singles.RemoveAll(p => p == null);
+        // В Unity уничтоженные объекты == null через перегруженный оператор
+        // Но для надёжности используем также !p (неявное преобразование в bool)
+        _allPassengers.RemoveAll(p => p == null || !p);
+        _males.RemoveAll(p => p == null || !p);
+        _females.RemoveAll(p => p == null || !p);
+        _singles.RemoveAll(p => p == null || !p);
         UpdateSinglesCounts();
+    }
+
+    /// <summary>
+    /// Полностью очищает реестр (вызывать при смене сцены)
+    /// </summary>
+    public void ClearAll()
+    {
+        _allPassengers.Clear();
+        _males.Clear();
+        _females.Clear();
+        _singles.Clear();
+        MaleSinglesCount = 0;
+        FemaleSinglesCount = 0;
     }
 }

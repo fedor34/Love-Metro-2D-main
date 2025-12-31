@@ -8,8 +8,16 @@ public class PassangersContainer : MonoBehaviour
 
     public void RemovePassanger(Passenger p)
     {
-        if (Passangers.Contains(p))
+        if (p != null && Passangers != null && Passangers.Contains(p))
             Passangers.Remove(p);
+    }
+
+    /// <summary>
+    /// Удаляет все null-ссылки из списка
+    /// </summary>
+    public void CleanupNullReferences()
+    {
+        Passangers?.RemoveAll(p => p == null);
     }
 
     /// <summary>

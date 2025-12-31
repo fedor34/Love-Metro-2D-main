@@ -41,5 +41,3 @@ This plan introduces a mechanic to manually pair adjacent passengers by clicking
 ## 3. Update `GameInitializer.cs`
 
 - Add `PassengerSelectionManager` to the auto-creation list to ensure it exists in the scene.
-
-## 4. Integration with `ClickDirectionManager`

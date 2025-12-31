@@ -16,6 +16,10 @@ public class PassangerSpawner : MonoBehaviour
 
     [SerializeField] private int passangerCount;
     [SerializeField] private Vector3[] _possibleStartMovingDirections;
+
+    [Header("Лимиты")]
+    [SerializeField] private int _maxPassengersInScene = 20;
+
     public void spawnPassangers()
     {
         Diagnostics.Log("========== SPAWN PASSENGERS BEGIN ==========");
@@ -54,8 +58,18 @@ public class PassangerSpawner : MonoBehaviour
             Debug.LogError("PassangerSpawner: Контейнер пассажиров не назначен!");
             return;
         }
+        // Очищаем null-ссылки перед подсчётом
+        _passiveContainer.CleanupNullReferences();
         Diagnostics.Log($"[Spawner] container assigned. count={_passiveContainer.Passangers?.Count ?? 0}");
-        
+
+        // Проверяем лимит пассажиров
+        int currentCount = _passiveContainer.Passangers?.Count ?? 0;
+        if (currentCount >= _maxPassengersInScene)
+        {
+            Diagnostics.Log($"[Spawner] SKIP: already {currentCount} passengers (max={_maxPassengersInScene})");
+            return;
+        }
+
         if (_trainManager == null)
         {
             Debug.LogError("PassangerSpawner: TrainManager не назначен!");
@@ -88,7 +102,9 @@ public class PassangerSpawner : MonoBehaviour
         Diagnostics.Log($"[Spawner] typicalY={typicalY:F2}; minY={MinY(availableLocations):F2}; maxY={MaxY(availableLocations):F2}");
         
         // Определяем количество пассажиров для спавна (от 5 до 7, но не больше доступных точек)
-        int maxPossibleSpawn = Mathf.Min(7, availableLocations.Count);
+        // И учитываем лимит пассажиров в сцене
+        int remainingSlots = _maxPassengersInScene - currentCount;
+        int maxPossibleSpawn = Mathf.Min(7, availableLocations.Count, remainingSlots);
         int minDesired = Mathf.Min(5, maxPossibleSpawn);
         int spawnCount = UnityEngine.Random.Range(minDesired, maxPossibleSpawn + 1);
         
@@ -224,6 +240,11 @@ public class PassangerSpawner : MonoBehaviour
 
     private void Start()
     {
+        // Очищаем контейнер перед первым спавном
+        if (_passiveContainer != null)
+        {
+            _passiveContainer.Passangers?.Clear();
+        }
         spawnPassangers();
     }
 

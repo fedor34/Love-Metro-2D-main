@@ -183,7 +183,7 @@ public class GameplayIntegrationTests
     {
         var scoreCounterObject = new GameObject("ScoreCounter");
         var scoreCounter = scoreCounterObject.AddComponent<ScoreCounter>();
-        SetPrivateField(scoreCounter, "_basePointsPerCouple", 100);
+        SetPrivateField(scoreCounter, "_initialScorePointsPerCouple", 100);
 
         var male = CreatePassenger(false, Vector3.zero);
         var vipAbility = ScriptableObject.CreateInstance<VipAbility>();

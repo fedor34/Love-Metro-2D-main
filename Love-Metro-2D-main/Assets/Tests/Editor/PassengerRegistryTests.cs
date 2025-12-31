@@ -18,8 +18,7 @@ public class PassengerRegistryTests
         // Create a fresh PassengerRegistry for each test
         registryObject = new GameObject("TestRegistry");
         registry = registryObject.AddComponent<PassengerRegistry>();
-        PassengerRegistry.Instance = null; // Reset static instance
-        registry.Awake(); // Manually call Awake to set instance
+        // Awake is called automatically by Unity when component is added
     }
 
     [TearDown]
@@ -30,7 +29,6 @@ public class PassengerRegistryTests
         {
             Object.DestroyImmediate(registryObject);
         }
-        PassengerRegistry.Instance = null;
     }
 
     [Test]
@@ -399,7 +397,7 @@ public class PassengerRegistryTests
         var go = new GameObject($"MockPassenger_{(isFemale ? "F" : "M")}");
         var passenger = go.AddComponent<Passenger>();
 
-        // Set properties using reflection since they might be private
+        // Set IsFemale using reflection since it might be private
         var type = typeof(Passenger);
         var field = type.GetField("IsFemale");
         if (field != null)

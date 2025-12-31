@@ -18,18 +18,12 @@ public class GameplayIntegrationTests
         // Setup PassengerRegistry
         registryObject = new GameObject("TestRegistry");
         registry = registryObject.AddComponent<PassengerRegistry>();
-        PassengerRegistry.Instance = null;
-        var awakeMethod = typeof(PassengerRegistry).GetMethod("Awake",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        awakeMethod?.Invoke(registry, null);
+        // Awake is called automatically by Unity when component is added
 
         // Setup CouplesManager
         couplesManagerObject = new GameObject("TestCouplesManager");
         couplesManager = couplesManagerObject.AddComponent<CouplesManager>();
-        CouplesManager.Instance = null;
-        var cmAwake = typeof(CouplesManager).GetMethod("Awake",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        cmAwake?.Invoke(couplesManager, null);
+        // Awake is called automatically by Unity when component is added
     }
 
     [TearDown]
@@ -39,9 +33,6 @@ public class GameplayIntegrationTests
             Object.DestroyImmediate(registryObject);
         if (couplesManagerObject != null)
             Object.DestroyImmediate(couplesManagerObject);
-
-        PassengerRegistry.Instance = null;
-        CouplesManager.Instance = null;
     }
 
     [Test]

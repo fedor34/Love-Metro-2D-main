@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 /// <summary>
 /// Unit tests for ScoreCounter class
@@ -17,7 +18,7 @@ public class ScoreCounterTests
         scoreCounterObject = new GameObject("TestScoreCounter");
 
         // Add required TMP_Text component first (ScoreCounter requires it)
-        var tmpText = scoreCounterObject.AddComponent<TMPro.TextMeshProUGUI>();
+        var tmpText = scoreCounterObject.AddComponent<TextMeshProUGUI>();
 
         // Add Animator component (also required)
         scoreCounterObject.AddComponent<Animator>();

@@ -39,5 +39,3 @@ This plan introduces a mechanic to manually pair adjacent passengers by clicking
 - Add a helper property or method `IsAvailableForMatching()` to check `!IsInCouple`, `IsMatchable`, and current state (e.g., allow if `Wandering` or `StayingOnHandrail`, maybe not `Falling`).
 
 ## 3. Update `GameInitializer.cs`
-
-- Add `PassengerSelectionManager` to the auto-creation list to ensure it exists in the scene.

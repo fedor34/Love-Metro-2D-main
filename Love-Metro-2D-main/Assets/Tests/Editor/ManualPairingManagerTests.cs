@@ -16,20 +16,20 @@ public class ManualPairingManagerTests
     [SetUp]
     public void Setup()
     {
-        // Create camera for screen-to-world conversions
         cameraObject = new GameObject("TestCamera");
         testCamera = cameraObject.AddComponent<Camera>();
         testCamera.transform.position = new Vector3(0, 0, -10);
         testCamera.orthographic = true;
         testCamera.orthographicSize = 5;
 
-        // Create ManualPairingManager
+        SetStaticProperty(typeof(ManualPairingManager), "Instance", null);
         managerObject = new GameObject("TestManualPairingManager");
         manager = managerObject.AddComponent<ManualPairingManager>();
-        ManualPairingManager.Instance = null;
-        manager.Awake();
+        
+        var awakeMethod = typeof(ManualPairingManager).GetMethod("Awake",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        awakeMethod?.Invoke(manager, null);
 
-        // Set private fields using reflection
         SetPrivateField(manager, "_maxPairingDistance", 3.0f);
         SetPrivateField(manager, "_clickRadius", 0.4f);
         SetPrivateField(manager, "_verticalSearchFactor", 2.0f);
@@ -42,7 +42,7 @@ public class ManualPairingManagerTests
             Object.DestroyImmediate(managerObject);
         if (cameraObject != null)
             Object.DestroyImmediate(cameraObject);
-        ManualPairingManager.Instance = null;
+        SetStaticProperty(typeof(ManualPairingManager), "Instance", null);
     }
 
     [Test]
@@ -56,7 +56,7 @@ public class ManualPairingManagerTests
     public void HandleClick_ReturnsFalse_WhenNoCameraExists()
     {
         Object.DestroyImmediate(cameraObject);
-        Camera.main = null;
+        cameraObject = null;
 
         bool result = manager.HandleClick(Vector2.zero);
 
@@ -94,14 +94,14 @@ public class ManualPairingManagerTests
     public void CanPair_ReturnsFalse_WhenTooFarApart()
     {
         var male = CreateMockPassenger(false, Vector3.zero);
-        var female = CreateMockPassenger(true, new Vector3(10, 0, 0)); // 10 units apart
+        var female = CreateMockPassenger(true, new Vector3(10, 0, 0));
 
         var canPairMethod = typeof(ManualPairingManager).GetMethod("CanPair",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
         bool result = (bool)canPairMethod.Invoke(manager, new object[] { male, female });
 
-        Assert.IsFalse(result); // Should be false since distance > _maxPairingDistance (3.0)
+        Assert.IsFalse(result);
 
         CleanupPassenger(male);
         CleanupPassenger(female);
@@ -148,12 +148,9 @@ public class ManualPairingManagerTests
         var canPairMethod = typeof(ManualPairingManager).GetMethod("CanPair",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
 
-        // IsInCouple check is in HandleClick/AttemptOverlapPairing, not CanPair
-        // But the distance check should still work
         bool result = (bool)canPairMethod.Invoke(manager, new object[] { male, female });
 
-        // CanPair only checks gender and distance, not couple status
-        Assert.IsTrue(result); // This will be filtered by AttemptOverlapPairing
+        Assert.IsTrue(result);
 
         CleanupPassenger(male);
         CleanupPassenger(female);
@@ -181,7 +178,7 @@ public class ManualPairingManagerTests
     {
         var passengers = new System.Collections.Generic.List<Passenger>();
         passengers.Add(CreateMockPassenger(false, Vector3.zero));
-        passengers.Add(CreateMockPassenger(false, new Vector3(1, 0, 0))); // Same gender
+        passengers.Add(CreateMockPassenger(false, new Vector3(1, 0, 0)));
 
         var method = typeof(ManualPairingManager).GetMethod("AttemptOverlapPairing",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -194,27 +191,23 @@ public class ManualPairingManagerTests
             CleanupPassenger(p);
     }
 
-    // Helper methods
     private Passenger CreateMockPassenger(bool isFemale, Vector3 position,
         bool isMatchable = true, bool isInCouple = false)
     {
-        var go = new GameObject($"MockPassenger_{(isFemale ? "F" : "M")}");
+        var go = new GameObject("MockPassenger_" + (isFemale ? "F" : "M"));
         go.transform.position = position;
 
         var passenger = go.AddComponent<Passenger>();
         var collider = go.AddComponent<BoxCollider2D>();
         collider.size = new Vector2(0.5f, 1f);
 
-        // Set properties
         var type = typeof(Passenger);
-        var isFemaleField = type.GetField("IsFemale") ?? type.GetProperty("IsFemale");
-        if (isFemaleField != null)
-        {
-            if (isFemaleField is System.Reflection.FieldInfo field)
-                field.SetValue(passenger, isFemale);
-            else if (isFemaleField is System.Reflection.PropertyInfo prop)
-                prop.SetValue(passenger, isFemale);
-        }
+        var field = type.GetField("IsFemale");
+        var prop = type.GetProperty("IsFemale");
+        if (field != null)
+            field.SetValue(passenger, isFemale);
+        else if (prop != null)
+            prop.SetValue(passenger, isFemale);
 
         passenger.IsMatchable = isMatchable;
         passenger.IsInCouple = isInCouple;
@@ -238,5 +231,12 @@ public class ManualPairingManagerTests
         {
             field.SetValue(obj, value);
         }
+    }
+
+    private void SetStaticProperty(System.Type type, string propertyName, object value)
+    {
+        var prop = type.GetProperty(propertyName,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        prop?.SetValue(null, value);
     }
 }

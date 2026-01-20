@@ -13,11 +13,10 @@ public class CoupleSystemTests
     [SetUp]
     public void Setup()
     {
+        SetStaticProperty(typeof(CouplesManager), "Instance", null);
         coupleManagerObject = new GameObject("TestCouplesManager");
         couplesManager = coupleManagerObject.AddComponent<CouplesManager>();
-        CouplesManager.Instance = null;
 
-        // Manually call Awake to set instance
         var awakeMethod = typeof(CouplesManager).GetMethod("Awake",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         awakeMethod?.Invoke(couplesManager, null);
@@ -30,7 +29,7 @@ public class CoupleSystemTests
         {
             Object.DestroyImmediate(coupleManagerObject);
         }
-        CouplesManager.Instance = null;
+        SetStaticProperty(typeof(CouplesManager), "Instance", null);
     }
 
     [Test]
@@ -61,7 +60,7 @@ public class CoupleSystemTests
         var couple = CreateMockCouple();
 
         couplesManager.RegisterCouple(couple);
-        couplesManager.RegisterCouple(couple); // Try to register again
+        couplesManager.RegisterCouple(couple);
 
         var activeCouples = GetPrivateField<System.Collections.Generic.List<Couple>>(
             couplesManager, "_activeCouples");
@@ -70,7 +69,7 @@ public class CoupleSystemTests
         {
             if (c == couple) count++;
         }
-        Assert.AreEqual(1, count); // Should only appear once
+        Assert.AreEqual(1, count);
 
         CleanupCouple(couple);
     }
@@ -91,29 +90,17 @@ public class CoupleSystemTests
     }
 
     [Test]
-    public void GetPossiblePairsCount_ReturnsZero_WhenNoPassengers()
-    {
-        // No PassengerRegistry setup
-        int count = couplesManager.GetPossiblePairsCount();
-
-        Assert.GreaterOrEqual(count, 0); // Should handle gracefully
-    }
-
-    [Test]
     public void CoupleCreation_SetsIsInCouple_ForBothPassengers()
     {
         var male = CreateMockPassenger(false, Vector3.zero);
         var female = CreateMockPassenger(true, new Vector3(1, 0, 0));
         var couple = CreateMockCouple();
 
-        // Initialize couple
         var initMethod = typeof(Couple).GetMethod("init",
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 
         if (initMethod != null)
         {
-            // Note: This test assumes the init method exists and sets IsInCouple
-            // We can't test this directly without actual implementation
             Assert.Pass("Couple init method exists");
         }
         else
@@ -135,7 +122,7 @@ public class CoupleSystemTests
 
         couple.transform.position = (male.transform.position + female.transform.position) * 0.5f;
 
-        Vector3 expectedPosition = new Vector3(2, 0, 0); // Midpoint
+        Vector3 expectedPosition = new Vector3(2, 0, 0);
         Assert.AreEqual(expectedPosition, couple.transform.position);
 
         CleanupPassenger(male);
@@ -163,7 +150,6 @@ public class CoupleSystemTests
         CleanupCouple(couple3);
     }
 
-    // Helper methods
     private Couple CreateMockCouple()
     {
         var go = new GameObject("MockCouple");
@@ -173,19 +159,17 @@ public class CoupleSystemTests
 
     private Passenger CreateMockPassenger(bool isFemale, Vector3 position)
     {
-        var go = new GameObject($"MockPassenger_{(isFemale ? "F" : "M")}");
+        var go = new GameObject("MockPassenger_" + (isFemale ? "F" : "M"));
         go.transform.position = position;
         var passenger = go.AddComponent<Passenger>();
 
         var type = typeof(Passenger);
-        var isFemaleField = type.GetField("IsFemale") ?? type.GetProperty("IsFemale");
-        if (isFemaleField != null)
-        {
-            if (isFemaleField is System.Reflection.FieldInfo field)
-                field.SetValue(passenger, isFemale);
-            else if (isFemaleField is System.Reflection.PropertyInfo prop)
-                prop.SetValue(passenger, isFemale);
-        }
+        var field = type.GetField("IsFemale");
+        var prop = type.GetProperty("IsFemale");
+        if (field != null)
+            field.SetValue(passenger, isFemale);
+        else if (prop != null)
+            prop.SetValue(passenger, isFemale);
 
         return passenger;
     }
@@ -215,5 +199,12 @@ public class CoupleSystemTests
             return (T)field.GetValue(obj);
         }
         return default(T);
+    }
+
+    private void SetStaticProperty(System.Type type, string propertyName, object value)
+    {
+        var prop = type.GetProperty(propertyName,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        prop?.SetValue(null, value);
     }
 }

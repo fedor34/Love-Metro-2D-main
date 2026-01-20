@@ -16,17 +16,17 @@ public class GameplayIntegrationTests
     public void Setup()
     {
         // Setup PassengerRegistry
+        SetStaticProperty(typeof(PassengerRegistry), "Instance", null);
         registryObject = new GameObject("TestRegistry");
         registry = registryObject.AddComponent<PassengerRegistry>();
-        PassengerRegistry.Instance = null;
         var awakeMethod = typeof(PassengerRegistry).GetMethod("Awake",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         awakeMethod?.Invoke(registry, null);
 
         // Setup CouplesManager
+        SetStaticProperty(typeof(CouplesManager), "Instance", null);
         couplesManagerObject = new GameObject("TestCouplesManager");
         couplesManager = couplesManagerObject.AddComponent<CouplesManager>();
-        CouplesManager.Instance = null;
         var cmAwake = typeof(CouplesManager).GetMethod("Awake",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         cmAwake?.Invoke(couplesManager, null);
@@ -40,8 +40,8 @@ public class GameplayIntegrationTests
         if (couplesManagerObject != null)
             Object.DestroyImmediate(couplesManagerObject);
 
-        PassengerRegistry.Instance = null;
-        CouplesManager.Instance = null;
+        SetStaticProperty(typeof(PassengerRegistry), "Instance", null);
+        SetStaticProperty(typeof(CouplesManager), "Instance", null);
     }
 
     [Test]
@@ -74,7 +74,7 @@ public class GameplayIntegrationTests
 
         int possiblePairs = registry.GetPossiblePairsCount();
 
-        Assert.AreEqual(1, possiblePairs); // Min(2 males, 1 female) = 1
+        Assert.AreEqual(1, possiblePairs);
 
         CleanupPassenger(male1);
         CleanupPassenger(male2);
@@ -109,7 +109,6 @@ public class GameplayIntegrationTests
 
         Assert.AreEqual(2, registry.Singles.Count);
 
-        // Simulate pairing
         male.IsInCouple = true;
         female.IsInCouple = true;
         registry.UpdateCoupleStatus(male);
@@ -176,10 +175,7 @@ public class GameplayIntegrationTests
 
         Assert.AreEqual(2, registry.AllPassengers.Count);
 
-        // Destroy one passenger (simulating game destruction)
         Object.DestroyImmediate(male.gameObject);
-
-        // Cleanup should remove null reference
         registry.CleanupNullReferences();
 
         Assert.AreEqual(1, registry.AllPassengers.Count);
@@ -205,7 +201,7 @@ public class GameplayIntegrationTests
         int points = scoreCounter.GetBasePointsPerCouple();
         abilities.InvokeMatched(female, ref points);
 
-        Assert.AreEqual(200, points); // VIP doubles to 200
+        Assert.AreEqual(200, points);
 
         Object.DestroyImmediate(scoreCounterObject);
         Object.DestroyImmediate(vipAbility);
@@ -218,7 +214,6 @@ public class GameplayIntegrationTests
     {
         var passengers = new System.Collections.Generic.List<Passenger>();
 
-        // Create 5 males and 5 females
         for (int i = 0; i < 5; i++)
         {
             passengers.Add(CreatePassenger(false, new Vector3(i, 0, 0)));
@@ -243,22 +238,19 @@ public class GameplayIntegrationTests
         }
     }
 
-    // Helper methods
     private Passenger CreatePassenger(bool isFemale, Vector3 position, bool isInCouple = false)
     {
-        var go = new GameObject($"Passenger_{(isFemale ? "F" : "M")}");
+        var go = new GameObject("Passenger_" + (isFemale ? "F" : "M"));
         go.transform.position = position;
         var passenger = go.AddComponent<Passenger>();
 
         var type = typeof(Passenger);
-        var isFemaleField = type.GetField("IsFemale") ?? type.GetProperty("IsFemale");
-        if (isFemaleField != null)
-        {
-            if (isFemaleField is System.Reflection.FieldInfo field)
-                field.SetValue(passenger, isFemale);
-            else if (isFemaleField is System.Reflection.PropertyInfo prop)
-                prop.SetValue(passenger, isFemale);
-        }
+        var field = type.GetField("IsFemale");
+        var prop = type.GetProperty("IsFemale");
+        if (field != null)
+            field.SetValue(passenger, isFemale);
+        else if (prop != null)
+            prop.SetValue(passenger, isFemale);
 
         passenger.IsInCouple = isInCouple;
         return passenger;
@@ -280,5 +272,12 @@ public class GameplayIntegrationTests
         {
             field.SetValue(obj, value);
         }
+    }
+
+    private void SetStaticProperty(System.Type type, string propertyName, object value)
+    {
+        var prop = type.GetProperty(propertyName,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        prop?.SetValue(null, value);
     }
 }

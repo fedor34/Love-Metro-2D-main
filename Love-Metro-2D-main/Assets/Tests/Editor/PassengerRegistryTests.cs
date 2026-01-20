@@ -15,22 +15,23 @@ public class PassengerRegistryTests
     [SetUp]
     public void Setup()
     {
-        // Create a fresh PassengerRegistry for each test
+        SetStaticProperty(typeof(PassengerRegistry), "Instance", null);
         registryObject = new GameObject("TestRegistry");
         registry = registryObject.AddComponent<PassengerRegistry>();
-        PassengerRegistry.Instance = null; // Reset static instance
-        registry.Awake(); // Manually call Awake to set instance
+        
+        var awakeMethod = typeof(PassengerRegistry).GetMethod("Awake",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        awakeMethod?.Invoke(registry, null);
     }
 
     [TearDown]
     public void Teardown()
     {
-        // Clean up after each test
         if (registryObject != null)
         {
             Object.DestroyImmediate(registryObject);
         }
-        PassengerRegistry.Instance = null;
+        SetStaticProperty(typeof(PassengerRegistry), "Instance", null);
     }
 
     [Test]
@@ -43,7 +44,7 @@ public class PassengerRegistryTests
     [Test]
     public void Register_AddsPassengerToAllList()
     {
-        var passenger = CreateMockPassenger(true); // female
+        var passenger = CreateMockPassenger(true);
 
         registry.Register(passenger);
 
@@ -137,7 +138,7 @@ public class PassengerRegistryTests
         var passenger = CreateMockPassenger(true);
 
         registry.Register(passenger);
-        registry.Register(passenger); // Try to register again
+        registry.Register(passenger);
 
         Assert.AreEqual(1, registry.AllPassengers.Count);
 
@@ -231,7 +232,7 @@ public class PassengerRegistryTests
         var male = CreateMockPassenger(false);
         var female = CreateMockPassenger(true);
         male.transform.position = Vector3.zero;
-        female.transform.position = new Vector3(100, 0, 0); // Far away
+        female.transform.position = new Vector3(100, 0, 0);
 
         registry.Register(male);
         registry.Register(female);
@@ -272,7 +273,7 @@ public class PassengerRegistryTests
 
         male.transform.position = Vector3.zero;
         female1.transform.position = new Vector3(5, 0, 0);
-        female2.transform.position = new Vector3(2, 0, 0); // Closer
+        female2.transform.position = new Vector3(2, 0, 0);
 
         registry.Register(male);
         registry.Register(female1);
@@ -348,7 +349,7 @@ public class PassengerRegistryTests
 
         int count = registry.GetPossiblePairsCount();
 
-        Assert.AreEqual(1, count); // Min(2 males, 1 female) = 1
+        Assert.AreEqual(1, count);
 
         CleanupPassenger(male1);
         CleanupPassenger(male2);
@@ -393,22 +394,18 @@ public class PassengerRegistryTests
         CleanupPassenger(female);
     }
 
-    // Helper methods
     private Passenger CreateMockPassenger(bool isFemale, bool isInCouple = false)
     {
-        var go = new GameObject($"MockPassenger_{(isFemale ? "F" : "M")}");
+        var go = new GameObject("MockPassenger_" + (isFemale ? "F" : "M"));
         var passenger = go.AddComponent<Passenger>();
 
-        // Set properties using reflection since they might be private
         var type = typeof(Passenger);
-        var isFemaleField = type.GetField("IsFemale") ?? type.GetProperty("IsFemale");
-        if (isFemaleField != null)
-        {
-            if (isFemaleField is System.Reflection.FieldInfo field)
-                field.SetValue(passenger, isFemale);
-            else if (isFemaleField is System.Reflection.PropertyInfo prop)
-                prop.SetValue(passenger, isFemale);
-        }
+        var field = type.GetField("IsFemale");
+        var prop = type.GetProperty("IsFemale");
+        if (field != null)
+            field.SetValue(passenger, isFemale);
+        else if (prop != null)
+            prop.SetValue(passenger, isFemale);
 
         passenger.IsInCouple = isInCouple;
 
@@ -421,5 +418,12 @@ public class PassengerRegistryTests
         {
             Object.DestroyImmediate(passenger.gameObject);
         }
+    }
+
+    private void SetStaticProperty(System.Type type, string propertyName, object value)
+    {
+        var prop = type.GetProperty(propertyName,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        prop?.SetValue(null, value);
     }
 }

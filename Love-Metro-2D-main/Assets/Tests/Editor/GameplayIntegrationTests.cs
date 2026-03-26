@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using TMPro;
 using UnityEngine;
 
 /// <summary>
@@ -184,27 +185,33 @@ public class GameplayIntegrationTests
     }
 
     [Test]
-    public void VIPAbility_Integration_DoublesScore()
+    public void VIPAbility_Integration_AddsBothPairBonuses()
     {
-        var scoreCounterObject = new GameObject("ScoreCounter");
-        var scoreCounter = scoreCounterObject.AddComponent<ScoreCounter>();
-        SetPrivateField(scoreCounter, "_basePointsPerCouple", 100);
-
         var male = CreatePassenger(false, Vector3.zero);
-        var vipAbility = ScriptableObject.CreateInstance<VipAbility>();
-        var abilities = male.gameObject.AddComponent<PassengerAbilities>();
-        abilities.AddAbility(vipAbility);
-        abilities.AttachAll();
-
         var female = CreatePassenger(true, new Vector3(1, 0, 0));
+        var maleAbilities = male.gameObject.AddComponent<PassengerAbilities>();
+        var femaleAbilities = female.gameObject.AddComponent<PassengerAbilities>();
+        var canvas = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
+        var scoreObject = new GameObject("ScoreCounter", typeof(RectTransform), typeof(Animator), typeof(TextMeshProUGUI));
+        scoreObject.transform.SetParent(canvas.transform);
+        var scoreCounter = scoreObject.AddComponent<ScoreCounter>();
+        SetPrivateField(scoreCounter, "_initialScorePointsPerCouple", 100);
 
-        int points = scoreCounter.GetBasePointsPerCouple();
-        abilities.InvokeMatched(female, ref points);
+        var maleVip = ScriptableObject.CreateInstance<VipAbility>();
+        var femaleVip = ScriptableObject.CreateInstance<VipAbility>();
+        maleVip.pairBonus = 150;
+        femaleVip.pairBonus = 200;
+        maleAbilities.AddAbility(maleVip);
+        femaleAbilities.AddAbility(femaleVip);
 
-        Assert.AreEqual(200, points);
+        int points = male.CalculateMatchPointsWith(female, scoreCounter);
 
-        Object.DestroyImmediate(scoreCounterObject);
-        Object.DestroyImmediate(vipAbility);
+        Assert.AreEqual(450, points);
+
+        Object.DestroyImmediate(maleVip);
+        Object.DestroyImmediate(femaleVip);
+        Object.DestroyImmediate(scoreObject);
+        Object.DestroyImmediate(canvas);
         CleanupPassenger(male);
         CleanupPassenger(female);
     }

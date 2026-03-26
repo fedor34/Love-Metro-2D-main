@@ -24,7 +24,7 @@ public class PassengerRegistry : MonoBehaviour
     public int FemaleSinglesCount { get; private set; }
 
     // Периодическая очистка null-ссылок
-    private float _cleanupInterval = 2f;
+    [SerializeField] private float _cleanupInterval = 2f;
     private float _nextCleanupTime = 0f;
 
     private void Awake()
@@ -62,16 +62,8 @@ public class PassengerRegistry : MonoBehaviour
             return;
 
         _allPassengers.Add(passenger);
-
-        if (passenger.IsFemale)
-            _females.Add(passenger);
-        else
-            _males.Add(passenger);
-
-        if (!passenger.IsInCouple)
-            _singles.Add(passenger);
-
-        UpdateSinglesCounts();
+        GetGenderList(passenger).Add(passenger);
+        SetSingleMembership(passenger, !passenger.IsInCouple);
     }
 
     /// <summary>
@@ -85,9 +77,7 @@ public class PassengerRegistry : MonoBehaviour
         _allPassengers.Remove(passenger);
         _males.Remove(passenger);
         _females.Remove(passenger);
-        _singles.Remove(passenger);
-
-        UpdateSinglesCounts();
+        SetSingleMembership(passenger, false);
     }
 
     /// <summary>
@@ -99,19 +89,42 @@ public class PassengerRegistry : MonoBehaviour
         if (passenger == null)
             return;
 
-        if (passenger.IsInCouple)
-        {
-            _singles.Remove(passenger);
-        }
-        else if (!_singles.Contains(passenger))
-        {
-            _singles.Add(passenger);
-        }
-
-        UpdateSinglesCounts();
+        SetSingleMembership(passenger, !passenger.IsInCouple);
     }
 
-    private void UpdateSinglesCounts()
+    private List<Passenger> GetGenderList(Passenger passenger)
+    {
+        return passenger.IsFemale ? _females : _males;
+    }
+
+    private void SetSingleMembership(Passenger passenger, bool shouldBeSingle)
+    {
+        if (passenger == null)
+            return;
+
+        if (shouldBeSingle)
+        {
+            if (_singles.Contains(passenger))
+                return;
+
+            _singles.Add(passenger);
+            AdjustSinglesCount(passenger, 1);
+            return;
+        }
+
+        if (_singles.Remove(passenger))
+            AdjustSinglesCount(passenger, -1);
+    }
+
+    private void AdjustSinglesCount(Passenger passenger, int delta)
+    {
+        if (passenger.IsFemale)
+            FemaleSinglesCount = Mathf.Max(0, FemaleSinglesCount + delta);
+        else
+            MaleSinglesCount = Mathf.Max(0, MaleSinglesCount + delta);
+    }
+
+    private void RecalculateSinglesCounts()
     {
         MaleSinglesCount = 0;
         FemaleSinglesCount = 0;
@@ -159,6 +172,9 @@ public class PassengerRegistry : MonoBehaviour
     /// </summary>
     public void GetSameGenderInRadius(Passenger self, float radius, List<Passenger> results)
     {
+        if (results == null)
+            return;
+
         results.Clear();
         if (self == null) return;
 
@@ -194,11 +210,11 @@ public class PassengerRegistry : MonoBehaviour
     {
         // В Unity уничтоженные объекты == null через перегруженный оператор
         // Но для надёжности используем также !p (неявное преобразование в bool)
-        _allPassengers.RemoveAll(p => p == null || !p);
-        _males.RemoveAll(p => p == null || !p);
-        _females.RemoveAll(p => p == null || !p);
-        _singles.RemoveAll(p => p == null || !p);
-        UpdateSinglesCounts();
+        _allPassengers.RemoveAll(IsMissingPassenger);
+        _males.RemoveAll(IsMissingPassenger);
+        _females.RemoveAll(IsMissingPassenger);
+        _singles.RemoveAll(IsMissingPassenger);
+        RecalculateSinglesCounts();
     }
 
     /// <summary>
@@ -212,5 +228,10 @@ public class PassengerRegistry : MonoBehaviour
         _singles.Clear();
         MaleSinglesCount = 0;
         FemaleSinglesCount = 0;
+    }
+
+    private static bool IsMissingPassenger(Passenger passenger)
+    {
+        return passenger == null || !passenger;
     }
 }

@@ -1,130 +1,98 @@
 using NUnit.Framework;
+using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 /// <summary>
-/// Unit tests for ScoreCounter class
-/// Tests score calculation, award methods, and display updates
+/// Unit tests for score bookkeeping and braking-session counters.
 /// </summary>
 public class ScoreCounterTests
 {
-    private GameObject scoreCounterObject;
-    private ScoreCounter scoreCounter;
+    private GameObject _canvasObject;
+    private GameObject _scoreCounterObject;
+    private ScoreCounter _scoreCounter;
 
     [SetUp]
     public void Setup()
     {
-        scoreCounterObject = new GameObject("TestScoreCounter");
-        scoreCounter = scoreCounterObject.AddComponent<ScoreCounter>();
+        _canvasObject = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
 
-        // Set base points using reflection
-        SetPrivateField(scoreCounter, "_basePointsPerCouple", 100);
-        SetPrivateField(scoreCounter, "_totalScore", 0);
+        _scoreCounterObject = new GameObject("TestScoreCounter");
+        _scoreCounterObject.transform.SetParent(_canvasObject.transform);
+        _scoreCounterObject.AddComponent<RectTransform>();
+        _scoreCounterObject.AddComponent<Animator>();
+        _scoreCounterObject.AddComponent<TextMeshProUGUI>();
+        _scoreCounter = _scoreCounterObject.AddComponent<ScoreCounter>();
+
+        SetPrivateField(_scoreCounter, "_initialScorePointsPerCouple", 100);
     }
 
     [TearDown]
     public void Teardown()
     {
-        if (scoreCounterObject != null)
-        {
-            Object.DestroyImmediate(scoreCounterObject);
-        }
+        if (_scoreCounterObject != null)
+            Object.DestroyImmediate(_scoreCounterObject);
+
+        if (_canvasObject != null)
+            Object.DestroyImmediate(_canvasObject);
     }
 
     [Test]
-    public void GetBasePointsPerCouple_ReturnsCorrectValue()
+    public void GetBasePointsPerCouple_ReturnsConfiguredValue()
     {
-        int points = scoreCounter.GetBasePointsPerCouple();
-
-        Assert.AreEqual(100, points);
+        Assert.AreEqual(100, _scoreCounter.GetBasePointsPerCouple());
     }
 
     [Test]
-    public void AwardMatchPoints_IncreasesTotalScore()
+    public void AwardMatchPoints_IncreasesCurrentScore()
     {
-        int initialScore = GetPrivateField<int>(scoreCounter, "_totalScore");
+        _scoreCounter.AwardMatchPoints(Vector3.zero, 125);
 
-        scoreCounter.AwardMatchPoints(Vector3.zero, 100);
-
-        int finalScore = GetPrivateField<int>(scoreCounter, "_totalScore");
-        Assert.AreEqual(initialScore + 100, finalScore);
+        Assert.AreEqual(125, _scoreCounter.CurrentScore);
     }
 
     [Test]
-    public void AwardMatchPoints_HandlesMultipleAwards()
+    public void AwardMatchPoints_ClampsNegativePointsToZero()
     {
-        scoreCounter.AwardMatchPoints(Vector3.zero, 100);
-        scoreCounter.AwardMatchPoints(Vector3.zero, 200);
-        scoreCounter.AwardMatchPoints(Vector3.zero, 50);
+        _scoreCounter.AwardMatchPoints(Vector3.zero, -50);
 
-        int totalScore = GetPrivateField<int>(scoreCounter, "_totalScore");
-        Assert.AreEqual(350, totalScore);
+        Assert.AreEqual(0, _scoreCounter.CurrentScore);
     }
 
     [Test]
-    public void AwardMatchPoints_HandlesZeroPoints()
+    public void UpdateScorePointFromMatching_UsesConfiguredBasePoints()
     {
-        scoreCounter.AwardMatchPoints(Vector3.zero, 0);
+        _scoreCounter.UpdateScorePointFromMatching(Vector3.zero);
 
-        int totalScore = GetPrivateField<int>(scoreCounter, "_totalScore");
-        Assert.AreEqual(0, totalScore);
+        Assert.AreEqual(100, _scoreCounter.CurrentScore);
     }
 
     [Test]
-    public void AwardMatchPoints_HandlesNegativePoints_AsZero()
+    public void BrakingSession_TracksOnlyMatchesMadeWhileBraking()
     {
-        // Most implementations clamp negative to 0
-        scoreCounter.AwardMatchPoints(Vector3.zero, -50);
+        _scoreCounter.StartBrakingSession();
+        _scoreCounter.AwardMatchPoints(Vector3.zero, 100);
+        _scoreCounter.EndBrakingSession();
+        _scoreCounter.AwardMatchPoints(Vector3.zero, 100);
 
-        int totalScore = GetPrivateField<int>(scoreCounter, "_totalScore");
-        // Should not decrease score
-        Assert.GreaterOrEqual(totalScore, 0);
+        Assert.AreEqual(1, _scoreCounter.MatchesInCurrentBrake);
+        Assert.IsFalse(_scoreCounter.IsBrakingInProgress);
+        Assert.AreEqual(200, _scoreCounter.CurrentScore);
     }
 
     [Test]
-    public void AwardMatchPoints_VIPBonus_DoublesPoints()
+    public void ApplyPenalty_SubtractsFromCurrentScoreWithoutFloatingTextPrefab()
     {
-        // Simulate VIP scenario where points are doubled before calling AwardMatchPoints
-        int basePoints = scoreCounter.GetBasePointsPerCouple();
-        int vipPoints = basePoints * 2; // VIP doubles the points
+        _scoreCounter.AwardMatchPoints(Vector3.zero, 200);
 
-        scoreCounter.AwardMatchPoints(Vector3.zero, vipPoints);
+        _scoreCounter.ApplyPenalty(75, Vector3.zero);
 
-        int totalScore = GetPrivateField<int>(scoreCounter, "_totalScore");
-        Assert.AreEqual(200, totalScore); // 100 * 2 = 200
+        Assert.AreEqual(125, _scoreCounter.CurrentScore);
     }
 
-    [Test]
-    public void ScoreAccumulation_WorksCorrectly()
-    {
-        // Test typical gameplay scenario
-        scoreCounter.AwardMatchPoints(Vector3.zero, 100); // Normal couple
-        scoreCounter.AwardMatchPoints(Vector3.zero, 100); // Normal couple
-        scoreCounter.AwardMatchPoints(Vector3.zero, 200); // VIP couple
-
-        int totalScore = GetPrivateField<int>(scoreCounter, "_totalScore");
-        Assert.AreEqual(400, totalScore);
-    }
-
-    // Helper methods
-    private void SetPrivateField(object obj, string fieldName, object value)
+    private static void SetPrivateField(object obj, string fieldName, object value)
     {
         var field = obj.GetType().GetField(fieldName,
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        if (field != null)
-        {
-            field.SetValue(obj, value);
-        }
-    }
-
-    private T GetPrivateField<T>(object obj, string fieldName)
-    {
-        var field = obj.GetType().GetField(fieldName,
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        if (field != null)
-        {
-            return (T)field.GetValue(obj);
-        }
-        return default(T);
+        field?.SetValue(obj, value);
     }
 }

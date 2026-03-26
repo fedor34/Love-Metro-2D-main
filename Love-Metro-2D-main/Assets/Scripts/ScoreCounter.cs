@@ -14,24 +14,27 @@ public class ScoreCounter : MonoBehaviour
     [SerializeField] private float _floatingTextAcceleration;
     [SerializeField] private float _floatingTextInitialSpeed;
     [SerializeField] private float _floatingTextSpawnOffsetY;
-    
-    [SerializeField] private TMP_Text _matchesPerBrakeText; // Текст для отображения пар за торможение
-    [SerializeField] private TrainManager _trainManager; // Прямая ссылка на TrainManager
-    
-    private int _matchesInCurrentBrake = 0; // Счетчик пар за текущее торможение
-    private bool _brakingInProgress = false; // Флаг активного торможения
+
+    [SerializeField] private TMP_Text _matchesPerBrakeText;
+    [SerializeField] private TrainManager _trainManager;
+
+    private int _matchesInCurrentBrake;
+    private bool _brakingInProgress;
 
     private TMP_Text _textDisplay;
     private Animator _animator;
     private RectTransform _rectTransform;
+
+    public int CurrentScore => _score;
+    public int MatchesInCurrentBrake => _matchesInCurrentBrake;
+    public bool IsBrakingInProgress => _brakingInProgress;
 
     private void Awake()
     {
         _textDisplay = GetComponent<TMP_Text>();
         _animator = GetComponent<Animator>();
         _rectTransform = GetComponent<RectTransform>();
-        
-        // Устанавливаем позицию в левый верхний угол, если не задано другое
+
         if (_rectTransform != null)
         {
             _rectTransform.anchorMin = new Vector2(0, 1);
@@ -39,125 +42,187 @@ public class ScoreCounter : MonoBehaviour
             _rectTransform.pivot = new Vector2(0, 1);
             _rectTransform.anchoredPosition = new Vector2(20, -20);
         }
-        
-        // Обновляем отображение при старте
+
         UpdateScoreDisplay();
         UpdateMatchesPerBrakeDisplay();
     }
-    
+
     private void Start()
     {
-        // Добавляем подписку на события торможения в TrainManager
-        if (_trainManager != null)
-        {
-            _trainManager.OnBrakeStart += StartBrakingSession;
-            _trainManager.OnBrakeEnd += EndBrakingSession;
-        }
+        SubscribeToTrainManager();
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeFromTrainManager();
     }
 
     public void UpdateScorePointFromMatching(Vector3 matchingPosition)
     {
-        // Если идет торможение, увеличиваем счетчик пар
-        if (_brakingInProgress)
-        {
-            _matchesInCurrentBrake++;
-            UpdateMatchesPerBrakeDisplay();
-        }
-        
-        StartCoroutine(ScorePointsFromMatching(matchingPosition, _initialScorePointsPerCouple));
+        AwardMatchPoints(matchingPosition, _initialScorePointsPerCouple);
     }
 
-    // Award provided points (abilities may modify base value)
     public void AwardMatchPoints(Vector3 matchingPosition, int basePoints)
     {
-        if (_brakingInProgress)
+        RegisterBrakeMatch();
+
+        int awardedPoints = GetScaledPoints(basePoints);
+        _score += awardedPoints;
+
+        if (_floatingScorePref == null)
         {
-            _matchesInCurrentBrake++;
-            UpdateMatchesPerBrakeDisplay();
+            FinalizeMatchAward();
+            return;
         }
-        StartCoroutine(ScorePointsFromMatching(matchingPosition, basePoints));
+
+        StartCoroutine(ScorePointsFromMatching(matchingPosition, awardedPoints));
     }
-    
-    // Метод для начала новой сессии торможения
+
     public void StartBrakingSession()
     {
         _brakingInProgress = true;
         _matchesInCurrentBrake = 0;
         UpdateMatchesPerBrakeDisplay();
     }
-    
-    // Метод для завершения сессии торможения
+
     public void EndBrakingSession()
     {
         _brakingInProgress = false;
-        // Счетчик пар не сбрасываем, чтобы показывать результат последнего торможения
     }
-    
-    // Обновление отображения счета
+
     private void UpdateScoreDisplay()
     {
         if (_textDisplay != null)
-        {
             _textDisplay.text = _score.ToString();
-        }
     }
-    
-    // Обновление отображения количества пар за торможение
+
     private void UpdateMatchesPerBrakeDisplay()
     {
         if (_matchesPerBrakeText != null)
-        {
             _matchesPerBrakeText.text = $"Пары за торможение: {_matchesInCurrentBrake}";
-        }
     }
 
-    // Публичный штраф очков с плавающим текстом
     public void ApplyPenalty(int amount, Vector3 worldPosition)
     {
-        if (amount <= 0) return;
-        // Конвертируем мировые координаты удара в экранные, чтобы UI текст появлялся в нужной точке
+        int penalty = Mathf.Max(0, amount);
+        if (penalty == 0)
+            return;
+
         Vector3 screenPos = Camera.main != null ? Camera.main.WorldToScreenPoint(worldPosition) : worldPosition;
-        StartCoroutine(ShowFloatingDelta(-amount, screenPos, new Color(1f, 0.25f, 0.25f)));
-        _score -= amount;
+        if (_floatingScorePref != null)
+            StartCoroutine(ShowFloatingDelta(-penalty, screenPos, new Color(1f, 0.25f, 0.25f)));
+
+        _score -= penalty;
+        UpdateScoreDisplay();
+    }
+
+    private void SubscribeToTrainManager()
+    {
+        if (_trainManager == null)
+            return;
+
+        _trainManager.OnBrakeStart -= StartBrakingSession;
+        _trainManager.OnBrakeEnd -= EndBrakingSession;
+        _trainManager.OnBrakeStart += StartBrakingSession;
+        _trainManager.OnBrakeEnd += EndBrakingSession;
+    }
+
+    private void UnsubscribeFromTrainManager()
+    {
+        if (_trainManager == null)
+            return;
+
+        _trainManager.OnBrakeStart -= StartBrakingSession;
+        _trainManager.OnBrakeEnd -= EndBrakingSession;
+    }
+
+    private void RegisterBrakeMatch()
+    {
+        if (!_brakingInProgress)
+            return;
+
+        _matchesInCurrentBrake++;
+        UpdateMatchesPerBrakeDisplay();
+    }
+
+    private int GetScaledPoints(int basePoints)
+    {
+        return Mathf.Max(0, Mathf.RoundToInt(basePoints * _currentScoreMultiplier));
+    }
+
+    private TMP_Text CreateFloatingText(Vector3 startPosition)
+    {
+        if (_floatingScorePref == null)
+            return null;
+
+        return Instantiate(_floatingScorePref, startPosition, Quaternion.identity, transform.parent);
+    }
+
+    private void FinalizeMatchAward()
+    {
+        if (_animator != null)
+            _animator.SetTrigger("Jump");
+
         UpdateScoreDisplay();
     }
 
     private IEnumerator ShowFloatingDelta(int delta, Vector3 screenPos, Color color)
     {
         Vector3 start = screenPos + Vector3.up * _floatingTextSpawnOffsetY;
-        TMP_Text floatingText = Instantiate(_floatingScorePref, start, Quaternion.identity, transform.parent);
+        TMP_Text floatingText = CreateFloatingText(start);
+        if (floatingText == null)
+            yield break;
+
         floatingText.color = color;
         floatingText.text = delta.ToString();
-        // Стартовая скорость штрафа равна скорости плюса: пропорциональна величине очков
-        float curSpeed = Mathf.Abs(delta) * 0.5f;
+
+        if (Vector3.Distance(start, transform.position) < Mathf.Max(0.001f, _minFloatingTextDisapearingDistance))
+        {
+            Destroy(floatingText.gameObject);
+            yield break;
+        }
+
+        float curSpeed = Mathf.Max(_floatingTextInitialSpeed, Mathf.Abs(delta) * 0.5f);
         while (Vector3.Distance(floatingText.transform.position, transform.position) >= _minFloatingTextDisapearingDistance)
         {
-            curSpeed += _floatingTextAcceleration * 0.5f * Time.deltaTime; // замедлим ускорение в 2 раза
-            floatingText.transform.position += (transform.position - start).normalized * curSpeed * Time.deltaTime;
+            Vector3 direction = (transform.position - floatingText.transform.position).normalized;
+            curSpeed += _floatingTextAcceleration * 0.5f * Time.deltaTime;
+            floatingText.transform.position += direction * curSpeed * Time.deltaTime;
             yield return null;
         }
+
         Destroy(floatingText.gameObject);
     }
 
-    private IEnumerator ScorePointsFromMatching(Vector3 initialMatchingPosition, int basePoints)
+    private IEnumerator ScorePointsFromMatching(Vector3 initialMatchingPosition, int awardedPoints)
     {
-       Vector3 matchingPosition = initialMatchingPosition + Vector3.up * _floatingTextSpawnOffsetY;
-        TMP_Text floatingText = Instantiate(_floatingScorePref, matchingPosition, Quaternion.identity, transform.parent);
-        RectTransform floatingTextTransform = floatingText.GetComponent<RectTransform>();
-        float currentSpeed = basePoints * 0.5f; // замедлим стартовую скорость в 2 раза
-        floatingText.text = (basePoints * _currentScoreMultiplier).ToString();
-        _score += (int)(basePoints * _currentScoreMultiplier);
-
-        while(Vector3.Distance(floatingText.transform.position, transform.position) >= _minFloatingTextDisapearingDistance)
+        Vector3 matchingPosition = initialMatchingPosition + Vector3.up * _floatingTextSpawnOffsetY;
+        TMP_Text floatingText = CreateFloatingText(matchingPosition);
+        if (floatingText == null)
         {
-            currentSpeed += _floatingTextAcceleration * Time.deltaTime * 0.25f; // суммарно ускорение вдвое меньше
-            floatingText.transform.position += (transform.position - matchingPosition).normalized * currentSpeed * Time.deltaTime;
-            currentSpeed += _floatingTextAcceleration * Time.deltaTime * 0.25f;
+            FinalizeMatchAward();
+            yield break;
+        }
+
+        floatingText.text = awardedPoints.ToString();
+
+        if (Vector3.Distance(matchingPosition, transform.position) < Mathf.Max(0.001f, _minFloatingTextDisapearingDistance))
+        {
+            FinalizeMatchAward();
+            Destroy(floatingText.gameObject);
+            yield break;
+        }
+
+        float currentSpeed = Mathf.Max(_floatingTextInitialSpeed, awardedPoints * 0.5f);
+        while (Vector3.Distance(floatingText.transform.position, transform.position) >= _minFloatingTextDisapearingDistance)
+        {
+            Vector3 direction = (transform.position - floatingText.transform.position).normalized;
+            currentSpeed += _floatingTextAcceleration * Time.deltaTime * 0.5f;
+            floatingText.transform.position += direction * currentSpeed * Time.deltaTime;
             yield return new WaitForEndOfFrame();
         }
 
-        _animator.SetTrigger("Jump");
-        UpdateScoreDisplay();
+        FinalizeMatchAward();
         Destroy(floatingText.gameObject);
     }
 

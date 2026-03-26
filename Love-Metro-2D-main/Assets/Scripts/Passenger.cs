@@ -3,7 +3,7 @@ using UnityEngine.Events;
 using System.Collections.Generic;
 
 [RequireComponent(typeof(Rigidbody2D), typeof(PassangerAnimator), typeof(Collider2D))]
-public class Passenger : MonoBehaviour, IFieldEffectTarget
+public partial class Passenger : MonoBehaviour, IFieldEffectTarget
 {
     // Глобальный множитель скорости – можно менять из скриптов или инспектора
     public static float GlobalSpeedMultiplier = 0.7f; // глобальное замедление ~30%
@@ -237,8 +237,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         }
 
         // Attach abilities if present
-        var abilities = GetComponent<PassengerAbilities>();
-        abilities?.AttachAll();
+        GetAbilities()?.AttachAll();
 
         _isInitiated = true;
         var rb = _rigidbody;
@@ -276,18 +275,17 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
 
     public void ForceToMatchingState(Passenger partner)
     {
+        if (partner == null)
+        {
+            ChangeState(matchingState);
+            return;
+        }
+
         if (transform.position.x <= partner.transform.position.x)
         {
             Couple couple = Instantiate(CouplePref).GetComponent<Couple>();
             couple.init(this, partner);
-            var pos = Camera.main != null ? Camera.main.WorldToScreenPoint(couple.transform.position) : Vector3.zero;
-            // Calculate points with abilities
-            int points = _scoreCounter != null ? _scoreCounter.GetBasePointsPerCouple() : 0;
-            var aSelf = GetComponent<PassengerAbilities>();
-            var aPartner = partner != null ? partner.GetComponent<PassengerAbilities>() : null;
-            aSelf?.InvokeMatched(partner, ref points);
-            aPartner?.InvokeMatched(this, ref points);
-            _scoreCounter?.AwardMatchPoints(pos, Mathf.Max(0, points));
+            AwardMatchPointsFor(partner, couple.transform.position);
         }
         ChangeState(matchingState);
     }
@@ -295,8 +293,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
     // Запуск пассажира с заданной начальной скоростью (переводит в состояние падения)
     public void Launch(Vector2 initialVelocity)
     {
-        ChangeState(fallingState);
-        ((Falling)fallingState).SetInitialFallingSpeed(initialVelocity);
+        EnterFallingState(initialVelocity);
     }
 
     public void Transport(Vector3 position)
@@ -469,8 +466,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
                 if (startV.magnitude > Passanger._maxFlightSpeed)
                     startV = startV.normalized * Passanger._maxFlightSpeed;
 
-            Passanger.ChangeState(Passanger.fallingState);
-                ((Falling)Passanger.fallingState).SetInitialFallingSpeed(startV);
+                Passanger.EnterFallingState(startV);
                 Passanger._currentState.OnTrainSpeedChange(delta);
                 Debug.Log($"[Passenger] Launch (uniform X/Y from click direction) startV={startV} x={xFromClick:F2} y={yFromClick:F2}");
             }
@@ -577,50 +573,24 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             if (collision.transform.TryGetComponent<Passenger>(out Passenger passenger))
             {
                 // Если кто-то из участников в паре — разбиваем соответствующую пару
-                if (Passanger.IsInCouple)
-                {
-                    var couple = Passanger.GetComponentInParent<Couple>();
-                    couple?.BreakByHit(passenger);
-                }
-                if (passenger.IsInCouple)
-                {
-                    var coupleOther = passenger.GetComponentInParent<Couple>();
-                    coupleOther?.BreakByHit(Passanger);
-                }
+                Passanger.BreakCoupleOnImpact(passenger);
+                passenger.BreakCoupleOnImpact(Passanger);
                 // Совпадение пар — только если противоположные полы, оба матчабельны и не в паре
-                if (passenger.IsFemale != Passanger.IsFemale && !passenger.IsInCouple && !Passanger.IsInCouple && passenger.IsMatchable && Passanger.IsMatchable)
-                {
-                    Passanger.ForceToMatchingState(passenger);
-                    passenger.ForceToMatchingState(Passanger);
+                if (Passanger.TryMatchWith(passenger))
                     return;
-                }
 
                 // Иначе — рикошет как от стен (с лёгким бустом)
                 Vector2 vA = currentFallingSpeed;
-                Vector2 vB = passenger.GetRigidbody() != null ? passenger.GetRigidbody().velocity : Vector2.zero;
+                Vector2 vB = passenger.GetCurrentVelocity();
 
-                currentFallingSpeed = Vector2.Reflect(vA, n) * Passanger._bounceElasticity;
-                currentFallingSpeed *= Mathf.Max(1f, Passanger._wallBounceBoost);
-                if (currentFallingSpeed.magnitude > Passanger._maxFlightSpeed)
-                    currentFallingSpeed = currentFallingSpeed.normalized * Passanger._maxFlightSpeed;
+                currentFallingSpeed = Passanger.ReflectVelocity(vA, n, Mathf.Max(1f, Passanger._wallBounceBoost));
                 Passanger._rigidbody.velocity = currentFallingSpeed;
-
-                if (passenger.GetRigidbody() != null)
-                {
-                    Vector2 otherReflected = Vector2.Reflect(vB, -n) * passenger._bounceElasticity;
-                    otherReflected *= Mathf.Max(1f, passenger._wallBounceBoost);
-                    if (otherReflected.magnitude > passenger._maxFlightSpeed)
-                        otherReflected = otherReflected.normalized * passenger._maxFlightSpeed;
-                    passenger.GetRigidbody().velocity = otherReflected;
-                }
+                passenger.ApplyReflectedVelocity(vB, -n, Mathf.Max(1f, passenger._wallBounceBoost));
             }
             else
             {
                 // Рикошет о стену с небольшим ускорением (эффект боулинга)
-                currentFallingSpeed = Vector2.Reflect(currentFallingSpeed, n) * Passanger._bounceElasticity;
-                currentFallingSpeed *= Passanger._wallBounceBoost;
-                if (currentFallingSpeed.magnitude > Passanger._maxFlightSpeed)
-                    currentFallingSpeed = currentFallingSpeed.normalized * Passanger._maxFlightSpeed;
+                currentFallingSpeed = Passanger.ReflectVelocity(currentFallingSpeed, n, Passanger._wallBounceBoost);
                 Passanger._rigidbody.velocity = currentFallingSpeed;
                 Diagnostics.Log($"[Passenger][falling][wall] {Passanger.name} bounce v={currentFallingSpeed.magnitude:F2}");
             }
@@ -701,8 +671,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             }
 
             // Клэмп скорости
-            if (currentFallingSpeed.magnitude > Passanger._maxFlightSpeed)
-                currentFallingSpeed = currentFallingSpeed.normalized * Passanger._maxFlightSpeed;
+            currentFallingSpeed = Passanger.ClampFlightVelocity(currentFallingSpeed);
 
             Passanger._rigidbody.velocity = (Vector3)currentFallingSpeed;
 
@@ -783,8 +752,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             Vector2 delta = new Vector2(xFromTrain, yFromClick) * Passanger._globalImpulseScale;
 
             currentFallingSpeed += delta;
-            if (currentFallingSpeed.magnitude > Passanger._maxFlightSpeed)
-                currentFallingSpeed = currentFallingSpeed.normalized * Passanger._maxFlightSpeed;
+            currentFallingSpeed = Passanger.ClampFlightVelocity(currentFallingSpeed);
             previousFallingSpeed = currentFallingSpeed;
         }
 
@@ -819,51 +787,26 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             if (collision.transform.TryGetComponent<Passenger>(out Passenger other))
             {
                 // Разбивание пар при ударе
-                if (Passanger.IsInCouple)
-                {
-                    var couple = Passanger.GetComponentInParent<Couple>();
-                    couple?.BreakByHit(other);
-                }
-                if (other.IsInCouple)
-                {
-                    var coupleOther = other.GetComponentInParent<Couple>();
-                    coupleOther?.BreakByHit(Passanger);
-                }
-                bool canMatch = (other.IsFemale != Passanger.IsFemale) && !other.IsInCouple && !Passanger.IsInCouple && other.IsMatchable && Passanger.IsMatchable;
-                if (canMatch)
-                {
-                    Passanger.ForceToMatchingState(other);
-                    other.ForceToMatchingState(Passanger);
+                Passanger.BreakCoupleOnImpact(other);
+                other.BreakCoupleOnImpact(Passanger);
+                if (Passanger.TryMatchWith(other))
                     return;
-                }
 
                 // Иначе — отражаемся друг от друга как от стен (боулинг)
                 Vector2 vA = _flyingVelocity;
-                Vector2 vB = other.GetRigidbody() != null ? other.GetRigidbody().velocity : Vector2.zero;
+                Vector2 vB = other.GetCurrentVelocity();
 
-                Vector2 rA = Vector2.Reflect(vA, n) * Passanger._bounceElasticity;
-                rA *= Passanger._wallBounceBoost;
-                if (rA.magnitude > Passanger._maxFlightSpeed) rA = rA.normalized * Passanger._maxFlightSpeed;
+                Vector2 rA = Passanger.ReflectVelocity(vA, n, Mathf.Max(1f, Passanger._wallBounceBoost));
 
-                if (other.GetRigidbody() != null)
-                {
-                    Vector2 rB = Vector2.Reflect(vB, -n) * other._bounceElasticity;
-                    rB *= other._wallBounceBoost;
-                    if (rB.magnitude > other._maxFlightSpeed) rB = rB.normalized * other._maxFlightSpeed;
-                    other.GetRigidbody().velocity = rB;
-                }
+                other.ApplyReflectedVelocity(vB, -n, Mathf.Max(1f, other._wallBounceBoost));
 
-                Passanger.ChangeState(Passanger.fallingState);
-                ((Falling)Passanger.fallingState).SetInitialFallingSpeed(rA);
+                Passanger.EnterFallingState(rA);
                 return;
             }
 
             // Столкновение со стеной — отражаемся и переходим в падение
-            Vector2 r = Vector2.Reflect(_flyingVelocity, n) * Passanger._bounceElasticity;
-            r *= Passanger._wallBounceBoost;
-            if (r.magnitude > Passanger._maxFlightSpeed) r = r.normalized * Passanger._maxFlightSpeed;
-            Passanger.ChangeState(Passanger.fallingState);
-            ((Falling)Passanger.fallingState).SetInitialFallingSpeed(r);
+            Vector2 r = Passanger.ReflectVelocity(_flyingVelocity, n, Passanger._wallBounceBoost);
+            Passanger.EnterFallingState(r);
             Diagnostics.Log($"[Passenger][flying->falling] {Passanger.name} after wall bounce v={r.magnitude:F2}");
         }
 
@@ -885,6 +828,8 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
                 float speed = Mathf.Max(0f, _flyingVelocity.magnitude - Passanger._flightDeceleration * Time.deltaTime);
                 _flyingVelocity = _flyingVelocity.normalized * speed;
             }
+
+            _flyingVelocity = Passanger.ClampFlightVelocity(_flyingVelocity);
             
             // Применяем движение от ветра
             Passanger._rigidbody.velocity = _flyingVelocity;
@@ -892,8 +837,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
             // Если ветер ослаб или время полета превышено, переходим к падению
             if (_windStrength < MIN_WIND_STRENGTH_FOR_FLYING || _flyingTime > MAX_FLYING_TIME)
             {
-                Passanger.ChangeState(Passanger.fallingState);
-                ((Falling)Passanger.fallingState).SetInitialFallingSpeed(_flyingVelocity);
+                Passanger.EnterFallingState(_flyingVelocity);
                 return;
             }
 
@@ -1206,8 +1150,7 @@ public class Passenger : MonoBehaviour, IFieldEffectTarget
         _rematchEnableTime = Time.time + _rematchCooldown;
 
         // Inform abilities
-        var abilities = GetComponent<PassengerAbilities>();
-        abilities?.InvokePairBroken(null);
+        GetAbilities()?.InvokePairBroken(null);
     }
 
     public string GetCurrentStateName()

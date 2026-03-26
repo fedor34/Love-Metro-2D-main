@@ -2,42 +2,35 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Центральная система управления эффектами поля
-/// Инициализируется автоматически и управляет всеми эффектами
-/// </summary>
 public class FieldEffectSystem : MonoBehaviour
 {
     private static FieldEffectSystem _instance;
     public static FieldEffectSystem Instance => _instance;
 
-    [Header("Система")]
+    [Header("System")]
     [SerializeField] private bool _enableDebugMode = true;
     [SerializeField] private bool _enableGizmos = true;
     [SerializeField] private int _maxEffectsPerTarget = 5;
-    
-    [Header("Производительность")]
+
+    [Header("Performance")]
     [SerializeField] private bool _useFixedUpdate = true;
-    
-    // Хранение эффектов по категориям
+
     private Dictionary<FieldEffectCategory, List<IFieldEffect>> _effectsByCategory;
     private Dictionary<FieldEffectType, List<IFieldEffect>> _effectsByType;
     private Dictionary<IFieldEffectTarget, List<ActiveEffectData>> _activeEffectsPerTarget;
-    
-    // Кэширование для производительности
     private List<IFieldEffectTarget> _allTargets;
     private Dictionary<Vector3, List<IFieldEffect>> _spatialCache;
     private float _cacheUpdateTime;
-    private const float CACHE_UPDATE_INTERVAL = 0.1f;
-    
-    // События системы
+
+    private const float CacheUpdateInterval = 0.1f;
+
     public static event Action<IFieldEffect> OnEffectRegistered;
     public static event Action<IFieldEffect> OnEffectUnregistered;
     public static event Action<IFieldEffectTarget, IFieldEffect> OnEffectAppliedToTarget;
     public static event Action<IFieldEffectTarget, IFieldEffect> OnEffectRemovedFromTarget;
 
     #region Initialization
-    
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -47,7 +40,7 @@ public class FieldEffectSystem : MonoBehaviour
         OnEffectAppliedToTarget = null;
         OnEffectRemovedFromTarget = null;
     }
-    
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void InitializeSystem()
     {
@@ -56,14 +49,14 @@ public class FieldEffectSystem : MonoBehaviour
             CreateSystemInstance();
         }
     }
-    
+
     private static void CreateSystemInstance()
     {
-        GameObject systemObj = new GameObject("[FieldEffectSystem]");
-        _instance = systemObj.AddComponent<FieldEffectSystem>();
-        DontDestroyOnLoad(systemObj);
+        GameObject systemObject = new GameObject("[FieldEffectSystem]");
+        _instance = systemObject.AddComponent<FieldEffectSystem>();
+        DontDestroyOnLoad(systemObject);
     }
-    
+
     private void Awake()
     {
         if (_instance == null)
@@ -71,14 +64,16 @@ public class FieldEffectSystem : MonoBehaviour
             _instance = this;
             DontDestroyOnLoad(gameObject);
             InitializeCollections();
+            return;
         }
-        else if (_instance != this)
+
+        if (_instance != this)
         {
-            Debug.LogWarning($"[FieldEffectSystem] Дублированная система обнаружена, уничтожаю {name}");
+            Debug.LogWarning($"[FieldEffectSystem] Duplicate system detected, destroying {name}");
             Destroy(gameObject);
         }
     }
-    
+
     private void InitializeCollections()
     {
         _effectsByCategory = new Dictionary<FieldEffectCategory, List<IFieldEffect>>();
@@ -86,125 +81,112 @@ public class FieldEffectSystem : MonoBehaviour
         _activeEffectsPerTarget = new Dictionary<IFieldEffectTarget, List<ActiveEffectData>>();
         _allTargets = new List<IFieldEffectTarget>();
         _spatialCache = new Dictionary<Vector3, List<IFieldEffect>>();
-        
-        // Инициализируем категории
+
         foreach (FieldEffectCategory category in Enum.GetValues(typeof(FieldEffectCategory)))
         {
             _effectsByCategory[category] = new List<IFieldEffect>();
         }
-        
+
         foreach (FieldEffectType type in Enum.GetValues(typeof(FieldEffectType)))
         {
             _effectsByType[type] = new List<IFieldEffect>();
         }
     }
-    
+
     #endregion
-    
+
     #region Effect Registration
-    
+
     public void RegisterEffect(IFieldEffect effect)
     {
-        if (effect == null) return;
-        
-        var data = effect.GetEffectData();
-        var category = GetEffectCategory(data.effectType);
-        
-        if (!_effectsByCategory[category].Contains(effect))
+        if (!TryGetEffectMetadata(effect, out FieldEffectData data, out FieldEffectCategory category))
+            return;
+
+        List<IFieldEffect> categoryEffects = _effectsByCategory[category];
+        if (categoryEffects.Contains(effect))
+            return;
+
+        categoryEffects.Add(effect);
+        _effectsByType[data.effectType].Add(effect);
+
+        OnEffectRegistered?.Invoke(effect);
+
+        if (_enableDebugMode)
         {
-            _effectsByCategory[category].Add(effect);
-            _effectsByType[data.effectType].Add(effect);
-            
-            OnEffectRegistered?.Invoke(effect);
-            
-            if (_enableDebugMode)
-            {
-                Debug.Log($"[FieldEffectSystem] Зарегистрирован эффект {data.effectType} категории {category}");
-            }
+            Debug.Log($"[FieldEffectSystem] Registered {data.effectType} in {category}");
         }
     }
-    
+
     public void UnregisterEffect(IFieldEffect effect)
     {
-        if (effect == null) return;
-        
-        var data = effect.GetEffectData();
-        var category = GetEffectCategory(data.effectType);
-        
+        if (!TryGetEffectMetadata(effect, out FieldEffectData data, out FieldEffectCategory category))
+            return;
+
         _effectsByCategory[category].Remove(effect);
         _effectsByType[data.effectType].Remove(effect);
-        
-        // Удаляем эффект со всех целей
         RemoveEffectFromAllTargets(effect);
-        
+
         OnEffectUnregistered?.Invoke(effect);
-        
+
         if (_enableDebugMode)
         {
-            Debug.Log($"[FieldEffectSystem] Удален эффект {data.effectType}");
+            Debug.Log($"[FieldEffectSystem] Unregistered {data.effectType}");
         }
     }
-    
+
     #endregion
-    
+
     #region Target Management
-    
+
     public void RegisterTarget(IFieldEffectTarget target)
     {
-        if (target != null && !_allTargets.Contains(target))
-        {
-            _allTargets.Add(target);
-            _activeEffectsPerTarget[target] = new List<ActiveEffectData>();
-        }
+        if (target == null || _allTargets.Contains(target))
+            return;
+
+        _allTargets.Add(target);
+        GetOrCreateActiveEffects(target);
     }
-    
+
     public void UnregisterTarget(IFieldEffectTarget target)
     {
-        if (target != null)
-        {
-            _allTargets.Remove(target);
-            _activeEffectsPerTarget.Remove(target);
-        }
+        if (target == null)
+            return;
+
+        RemoveAllEffectsFromTarget(target);
+        RemoveTargetReference(target);
     }
-    
+
     #endregion
-    
+
     #region Update System
-    
+
     private void Start()
     {
-        // Находим существующие эффекты и цели на сцене
         DiscoverExistingComponents();
-        
+
         if (_enableDebugMode)
         {
-            Debug.Log($"[FieldEffectSystem] Обнаружено {GetTotalEffectsCount()} эффектов и {_allTargets.Count} целей");
+            Debug.Log($"[FieldEffectSystem] Found {GetTotalEffectsCount()} effects and {_allTargets.Count} targets");
         }
     }
-    
+
     private void DiscoverExistingComponents()
     {
-        // Находим эффекты
-        var effects = FindObjectsOfType<MonoBehaviour>();
-        foreach (var obj in effects)
+        MonoBehaviour[] sceneComponents = FindObjectsOfType<MonoBehaviour>();
+        foreach (MonoBehaviour component in sceneComponents)
         {
-            if (obj is IFieldEffect effect)
+            if (component is IFieldEffect effect)
             {
                 RegisterEffect(effect);
             }
-        }
-        
-        // Находим цели
-        var targets = FindObjectsOfType<MonoBehaviour>();
-        foreach (var obj in targets)
-        {
-            if (obj is IFieldEffectTarget target)
+
+            if (component is IFieldEffectTarget target)
             {
                 RegisterTarget(target);
             }
         }
     }
-    
+
     private void Update()
     {
         if (!_useFixedUpdate)
@@ -212,7 +194,7 @@ public class FieldEffectSystem : MonoBehaviour
             UpdateEffects();
         }
     }
-    
+
     private void FixedUpdate()
     {
         if (_useFixedUpdate)
@@ -220,186 +202,183 @@ public class FieldEffectSystem : MonoBehaviour
             UpdateEffects();
         }
     }
-    
+
     private void UpdateEffects()
     {
         float deltaTime = _useFixedUpdate ? Time.fixedDeltaTime : Time.deltaTime;
-        
-        // Обновляем кэш если нужно
         UpdateSpatialCache();
-        
-        // Простая и безопасная проверка на null
-        if (_allTargets == null) return;
-        
-        // Создаем копию списка для безопасной итерации
-        var targetsCopy = new List<IFieldEffectTarget>(_allTargets);
-        
-        // Обновляем все активные эффекты
-        foreach (var target in targetsCopy)
+
+        if (_allTargets == null)
+            return;
+
+        for (int i = _allTargets.Count - 1; i >= 0; i--)
         {
-            if (target == null) 
+            IFieldEffectTarget target = _allTargets[i];
+            if (target == null)
             {
-                // Удаляем null объект из оригинального списка
-                _allTargets.Remove(target);
+                RemoveTargetReferenceAt(i, target);
                 continue;
             }
-            
+
             try
             {
                 UpdateEffectsForTarget(target, deltaTime);
             }
-            catch (System.Exception e)
+            catch (Exception exception)
             {
-                Debug.LogWarning($"[FieldEffectSystem] Ошибка при обновлении эффекта для цели: {e.Message}");
-                // Удаляем проблемную цель
-                _allTargets.Remove(target);
+                Debug.LogWarning($"[FieldEffectSystem] Failed to update target: {exception.Message}");
+                RemoveTargetReferenceAt(i, target);
             }
         }
     }
 
-    
     private void UpdateEffectsForTarget(IFieldEffectTarget target, float deltaTime)
     {
-        // Защита от null
-        if (target == null || _activeEffectsPerTarget == null) return;
-        
-        Vector3 targetPosition;
-        try
+        if (target == null || _activeEffectsPerTarget == null)
+            return;
+
+        if (!TryGetTargetPosition(target, out Vector3 targetPosition))
         {
-            targetPosition = target.GetPosition();
-        }
-        catch (System.Exception)
-        {
-            // Объект уничтожен, удаляем его из списка
-            _allTargets.Remove(target);
+            RemoveTargetReference(target);
             return;
         }
-        
-        var nearbyEffects = GetEffectsAtPosition(targetPosition);
-        
-        // Проверяем, есть ли target в словаре, если нет - создаем
-        if (!_activeEffectsPerTarget.ContainsKey(target))
+
+        List<IFieldEffect> nearbyEffects = GetEffectsAtPosition(targetPosition);
+        HashSet<IFieldEffect> nearbyEffectSet = new HashSet<IFieldEffect>(nearbyEffects);
+        List<ActiveEffectData> activeEffects = GetOrCreateActiveEffects(target);
+
+        foreach (IFieldEffect effect in nearbyEffects)
         {
-            _activeEffectsPerTarget[target] = new List<ActiveEffectData>();
-        }
-        
-        var activeEffects = _activeEffectsPerTarget[target];
-        
-        // Применяем новые эффекты
-        foreach (var effect in nearbyEffects)
-        {
-            if (CanApplyEffect(target, effect))
+            if (CanApplyEffect(target, activeEffects, effect))
             {
-                ApplyEffectToTarget(target, effect, deltaTime);
+                ApplyEffectToTarget(target, effect, activeEffects, deltaTime);
             }
         }
-        
-        // Удаляем эффекты которые больше не действуют
+
         for (int i = activeEffects.Count - 1; i >= 0; i--)
         {
-            var activeEffect = activeEffects[i];
-            if (!nearbyEffects.Contains(activeEffect.Effect))
+            IFieldEffect effect = activeEffects[i].Effect;
+            if (effect == null)
             {
-                RemoveEffectFromTarget(target, activeEffect.Effect);
+                activeEffects.RemoveAt(i);
+                continue;
+            }
+
+            if (!nearbyEffectSet.Contains(effect))
+            {
+                RemoveEffectFromTarget(target, effect, activeEffects);
             }
         }
     }
-    
+
     #endregion
-    
+
     #region Effect Application
-    
-    private bool CanApplyEffect(IFieldEffectTarget target, IFieldEffect effect)
+
+    private bool CanApplyEffect(IFieldEffectTarget target, List<ActiveEffectData> activeEffects, IFieldEffect effect)
     {
-        var data = effect.GetEffectData();
-        return target.CanBeAffectedBy(data.effectType) && 
-               _activeEffectsPerTarget[target].Count < _maxEffectsPerTarget;
+        if (target == null || effect == null)
+            return false;
+
+        FieldEffectData data = effect.GetEffectData();
+        if (data == null || !target.CanBeAffectedBy(data.effectType))
+            return false;
+
+        return HasActiveEffect(activeEffects, effect) || activeEffects.Count < _maxEffectsPerTarget;
     }
-    
-    private void ApplyEffectToTarget(IFieldEffectTarget target, IFieldEffect effect, float deltaTime)
+
+    private void ApplyEffectToTarget(IFieldEffectTarget target, IFieldEffect effect, List<ActiveEffectData> activeEffects, float deltaTime)
     {
-        var activeEffects = _activeEffectsPerTarget[target];
-        var existingEffect = activeEffects.Find(e => e.Effect == effect);
-        
+        ActiveEffectData existingEffect = activeEffects.Find(activeEffect => activeEffect.Effect == effect);
         if (existingEffect == null)
         {
-            // Новый эффект
-            var newActiveEffect = new ActiveEffectData(effect, Time.time);
-            activeEffects.Add(newActiveEffect);
+            activeEffects.Add(new ActiveEffectData(effect, Time.time));
             target.OnEnterFieldEffect(effect);
             OnEffectAppliedToTarget?.Invoke(target, effect);
         }
-        
-        // Применяем эффект
+
         if (_enableDebugMode && effect.GetEffectData().effectType == FieldEffectType.Wind)
         {
-            Debug.Log($"[FieldEffectSystem] Применяю ветер к {target.GetPosition()}: эффект={effect.GetType().Name}");
+            Debug.Log($"[FieldEffectSystem] Applying wind to {target.GetPosition()} via {effect.GetType().Name}");
         }
+
         effect.ApplyEffect(target, deltaTime);
     }
-    
-    private void RemoveEffectFromTarget(IFieldEffectTarget target, IFieldEffect effect)
+
+    private bool RemoveEffectFromTarget(IFieldEffectTarget target, IFieldEffect effect, List<ActiveEffectData> activeEffects = null)
     {
-        var activeEffects = _activeEffectsPerTarget[target];
-        activeEffects.RemoveAll(e => e.Effect == effect);
-        
+        if (target == null || effect == null)
+            return false;
+
+        activeEffects ??= GetOrCreateActiveEffects(target);
+
+        bool removed = false;
+        for (int i = activeEffects.Count - 1; i >= 0; i--)
+        {
+            if (activeEffects[i].Effect != effect)
+                continue;
+
+            activeEffects.RemoveAt(i);
+            removed = true;
+        }
+
+        if (!removed)
+            return false;
+
         effect.RemoveEffect(target);
         target.OnExitFieldEffect(effect);
         OnEffectRemovedFromTarget?.Invoke(target, effect);
+        return true;
     }
-    
+
     private void RemoveEffectFromAllTargets(IFieldEffect effect)
     {
-        foreach (var target in _allTargets)
+        List<IFieldEffectTarget> targets = new List<IFieldEffectTarget>(_activeEffectsPerTarget.Keys);
+        foreach (IFieldEffectTarget target in targets)
         {
-            if (target != null)
-            {
-                RemoveEffectFromTarget(target, effect);
-            }
+            if (target == null)
+                continue;
+
+            RemoveEffectFromTarget(target, effect);
         }
     }
-    
+
     #endregion
-    
-    #region Spatial Cache & Queries
-    
+
+    #region Spatial Cache And Queries
+
     private void UpdateSpatialCache()
     {
-        if (_spatialCache == null) return; // Защита от null
-        
-        if (Time.time - _cacheUpdateTime > CACHE_UPDATE_INTERVAL)
+        if (_spatialCache == null)
+            return;
+
+        if (Time.time - _cacheUpdateTime > CacheUpdateInterval)
         {
             _spatialCache.Clear();
             _cacheUpdateTime = Time.time;
         }
     }
-    
+
     public List<IFieldEffect> GetEffectsAtPosition(Vector3 position)
     {
-        // Защита от null
         if (_spatialCache == null || _effectsByCategory == null)
-        {
             return new List<IFieldEffect>();
-        }
-        
-        var gridPos = new Vector3(
+
+        Vector3 gridPosition = new Vector3(
             Mathf.Round(position.x),
             Mathf.Round(position.y),
-            Mathf.Round(position.z)
-        );
-        
-        if (_spatialCache.TryGetValue(gridPos, out var cachedEffects))
-        {
+            Mathf.Round(position.z));
+
+        if (_spatialCache.TryGetValue(gridPosition, out List<IFieldEffect> cachedEffects))
             return cachedEffects;
-        }
-        
-        var effects = new List<IFieldEffect>();
-        
-        foreach (var categoryEffects in _effectsByCategory.Values)
+
+        List<IFieldEffect> effects = new List<IFieldEffect>();
+        foreach (List<IFieldEffect> categoryEffects in _effectsByCategory.Values)
         {
-            if (categoryEffects == null) continue; // Защита от null списков
-            
-            foreach (var effect in categoryEffects)
+            if (categoryEffects == null)
+                continue;
+
+            foreach (IFieldEffect effect in categoryEffects)
             {
                 if (effect != null && effect.IsInEffectZone(position))
                 {
@@ -407,29 +386,99 @@ public class FieldEffectSystem : MonoBehaviour
                 }
             }
         }
-        
-        _spatialCache[gridPos] = effects;
+
+        _spatialCache[gridPosition] = effects;
         return effects;
     }
-    
+
     public List<IFieldEffect> GetEffectsByCategory(FieldEffectCategory category)
     {
-        return _effectsByCategory.TryGetValue(category, out var effects) 
-            ? new List<IFieldEffect>(effects) 
+        return _effectsByCategory.TryGetValue(category, out List<IFieldEffect> effects)
+            ? new List<IFieldEffect>(effects)
             : new List<IFieldEffect>();
     }
-    
+
     public List<IFieldEffect> GetEffectsByType(FieldEffectType type)
     {
-        return _effectsByType.TryGetValue(type, out var effects) 
-            ? new List<IFieldEffect>(effects) 
+        return _effectsByType.TryGetValue(type, out List<IFieldEffect> effects)
+            ? new List<IFieldEffect>(effects)
             : new List<IFieldEffect>();
     }
-    
+
     #endregion
-    
+
     #region Utility
-    
+
+    private bool TryGetEffectMetadata(IFieldEffect effect, out FieldEffectData data, out FieldEffectCategory category)
+    {
+        data = effect?.GetEffectData();
+        if (effect == null || data == null)
+        {
+            category = FieldEffectCategory.Other;
+            return false;
+        }
+
+        category = GetEffectCategory(data.effectType);
+        return true;
+    }
+
+    private List<ActiveEffectData> GetOrCreateActiveEffects(IFieldEffectTarget target)
+    {
+        if (!_activeEffectsPerTarget.TryGetValue(target, out List<ActiveEffectData> activeEffects))
+        {
+            activeEffects = new List<ActiveEffectData>();
+            _activeEffectsPerTarget[target] = activeEffects;
+        }
+
+        return activeEffects;
+    }
+
+    private bool HasActiveEffect(List<ActiveEffectData> activeEffects, IFieldEffect effect)
+    {
+        return activeEffects.Exists(activeEffect => activeEffect.Effect == effect);
+    }
+
+    private void RemoveAllEffectsFromTarget(IFieldEffectTarget target)
+    {
+        if (target == null || !_activeEffectsPerTarget.TryGetValue(target, out List<ActiveEffectData> activeEffects))
+            return;
+
+        for (int i = activeEffects.Count - 1; i >= 0; i--)
+        {
+            RemoveEffectFromTarget(target, activeEffects[i].Effect, activeEffects);
+        }
+    }
+
+    private void RemoveTargetReference(IFieldEffectTarget target)
+    {
+        _allTargets?.Remove(target);
+        _activeEffectsPerTarget?.Remove(target);
+    }
+
+    private void RemoveTargetReferenceAt(int index, IFieldEffectTarget target)
+    {
+        if (_allTargets != null && index >= 0 && index < _allTargets.Count)
+        {
+            _allTargets.RemoveAt(index);
+        }
+
+        _activeEffectsPerTarget?.Remove(target);
+    }
+
+    private bool TryGetTargetPosition(IFieldEffectTarget target, out Vector3 targetPosition)
+    {
+        try
+        {
+            targetPosition = target.GetPosition();
+            return true;
+        }
+        catch (Exception)
+        {
+            targetPosition = Vector3.zero;
+            return false;
+        }
+    }
+
     private FieldEffectCategory GetEffectCategory(FieldEffectType type)
     {
         switch (type)
@@ -440,132 +489,131 @@ public class FieldEffectSystem : MonoBehaviour
             case FieldEffectType.Magnetic:
             case FieldEffectType.Vortex:
                 return FieldEffectCategory.Movement;
+
             case FieldEffectType.Slowdown:
             case FieldEffectType.Speedup:
             case FieldEffectType.Friction:
             case FieldEffectType.Bounce:
                 return FieldEffectCategory.Modifier;
+
             case FieldEffectType.Teleport:
             case FieldEffectType.Checkpoint:
             case FieldEffectType.Activator:
                 return FieldEffectCategory.Trigger;
+
             case FieldEffectType.Visual:
                 return FieldEffectCategory.Visual;
+
             case FieldEffectType.Audio:
                 return FieldEffectCategory.Audio;
+
             default:
                 return FieldEffectCategory.Other;
         }
     }
-    
+
     public int GetTotalEffectsCount()
     {
         int count = 0;
-        foreach (var effects in _effectsByCategory.Values)
+        foreach (List<IFieldEffect> effects in _effectsByCategory.Values)
         {
             count += effects.Count;
         }
+
         return count;
     }
-    
+
     public int GetTargetsCount()
     {
         return _allTargets?.Count ?? 0;
     }
-    
+
     public List<IFieldEffect> GetActiveEffects()
     {
-        var allActiveEffects = new List<IFieldEffect>();
-        foreach (var effects in _effectsByCategory.Values)
+        List<IFieldEffect> allActiveEffects = new List<IFieldEffect>();
+        foreach (List<IFieldEffect> effects in _effectsByCategory.Values)
         {
             allActiveEffects.AddRange(effects);
         }
+
         return allActiveEffects;
     }
-    
+
     public void ClearAllEffects()
     {
-        // Создаем копию списка эффектов для безопасного удаления
-        var effectsToRemove = new List<IFieldEffect>();
-        foreach (var effects in _effectsByCategory.Values)
+        List<IFieldEffect> effectsToRemove = new List<IFieldEffect>();
+        foreach (List<IFieldEffect> effects in _effectsByCategory.Values)
         {
             effectsToRemove.AddRange(effects);
         }
-        
-        // Удаляем каждый эффект
-        foreach (var effect in effectsToRemove)
+
+        foreach (IFieldEffect effect in effectsToRemove)
         {
-            if (effect != null)
+            if (effect == null)
+                continue;
+
+            UnregisterEffect(effect);
+
+            if (effect is MonoBehaviour behaviour && behaviour != null)
             {
-                UnregisterEffect(effect);
-                
-                // Если это MonoBehaviour, уничтожаем объект
-                if (effect is MonoBehaviour mb && mb != null)
+                if (Application.isPlaying)
                 {
-                    if (Application.isPlaying)
-                    {
-                        Destroy(mb.gameObject);
-                    }
-                    else
-                    {
-                        DestroyImmediate(mb.gameObject);
-                    }
+                    Destroy(behaviour.gameObject);
+                }
+                else
+                {
+                    DestroyImmediate(behaviour.gameObject);
                 }
             }
         }
-        
-        Debug.Log($"[FieldEffectSystem] Очищены все эффекты ({effectsToRemove.Count} эффектов удалено)");
+
+        Debug.Log($"[FieldEffectSystem] Cleared all effects ({effectsToRemove.Count} removed)");
     }
-    
+
     #endregion
-    
-    #region Debug & Gizmos
-    
+
+    #region Debug
+
     private void OnDrawGizmos()
     {
-        if (!_enableGizmos || _instance != this) return;
-        
-        // Рисуем информацию о системе
+        if (!_enableGizmos || _instance != this)
+            return;
+
         Gizmos.color = Color.white;
-        var cameraPos = Camera.current?.transform.position ?? Vector3.zero;
-        
+        Vector3 cameraPosition = Camera.current?.transform.position ?? Vector3.zero;
+
 #if UNITY_EDITOR
-        UnityEditor.Handles.Label(cameraPos + Vector3.up * 3, 
+        UnityEditor.Handles.Label(
+            cameraPosition + Vector3.up * 3f,
             $"Field Effects: {GetTotalEffectsCount()}\nTargets: {_allTargets?.Count ?? 0}");
 #endif
     }
-    
+
     #endregion
 }
 
-/// <summary>
-/// Категории эффектов для группировки и оптимизации
-/// </summary>
 public enum FieldEffectCategory
 {
-    Movement,   // Эффекты движения (гравитация, ветер, отталкивание)
-    Modifier,   // Модификаторы (ускорение, замедление)
-    Trigger,    // Триггерные эффекты (телепорт, активация)
-    Visual,     // Визуальные эффекты
-    Audio,      // Звуковые эффекты
-    Other       // Прочие эффекты
+    Movement,
+    Modifier,
+    Trigger,
+    Visual,
+    Audio,
+    Other
 }
 
-/// <summary>
-/// Данные активного эффекта на цели
-/// </summary>
-[System.Serializable]
+[Serializable]
 public class ActiveEffectData
 {
     public IFieldEffect Effect;
     public float StartTime;
     public float Duration;
     public int Priority;
-    
+
     public ActiveEffectData(IFieldEffect effect, float startTime, int priority = 0)
     {
         Effect = effect;
         StartTime = startTime;
         Priority = priority;
     }
-} 
+}

@@ -2,30 +2,27 @@ using NUnit.Framework;
 using UnityEngine;
 
 /// <summary>
-/// Unit tests for PassengerAbilities system
-/// Tests ability attachment, invocation, and VIP ability functionality
+/// Unit tests for the passenger ability pipeline.
 /// </summary>
 public class PassengerAbilitiesTests
 {
-    private GameObject passengerObject;
-    private Passenger passenger;
-    private PassengerAbilities abilities;
+    private GameObject _passengerObject;
+    private Passenger _passenger;
+    private PassengerAbilities _abilities;
 
     [SetUp]
     public void Setup()
     {
-        passengerObject = new GameObject("TestPassenger");
-        passenger = passengerObject.AddComponent<Passenger>();
-        abilities = passengerObject.AddComponent<PassengerAbilities>();
+        _passengerObject = new GameObject("TestPassenger");
+        _passenger = _passengerObject.AddComponent<Passenger>();
+        _abilities = _passengerObject.AddComponent<PassengerAbilities>();
     }
 
     [TearDown]
     public void Teardown()
     {
-        if (passengerObject != null)
-        {
-            Object.DestroyImmediate(passengerObject);
-        }
+        if (_passengerObject != null)
+            Object.DestroyImmediate(_passengerObject);
     }
 
     [Test]
@@ -33,152 +30,148 @@ public class PassengerAbilitiesTests
     {
         var vipAbility = ScriptableObject.CreateInstance<VipAbility>();
 
-        abilities.AddAbility(vipAbility);
+        _abilities.AddAbility(vipAbility);
 
-        Assert.IsTrue(abilities.HasAbility<VipAbility>());
-
+        Assert.IsTrue(_abilities.HasAbility<VipAbility>());
         Object.DestroyImmediate(vipAbility);
     }
 
     [Test]
     public void AddAbility_IgnoresNullAbility()
     {
-        abilities.AddAbility(null);
+        _abilities.AddAbility(null);
 
-        // Should not throw exception and list remains valid
-        Assert.Pass();
+        Assert.IsFalse(_abilities.HasAbility<VipAbility>());
     }
 
     [Test]
-    public void HasAbility_ReturnsFalse_WhenAbilityNotPresent()
+    public void InvokeMatched_AddsConfiguredVipBonus_WhenPartnerAlsoHasVip()
     {
-        bool hasVip = abilities.HasAbility<VipAbility>();
+        var selfVip = ScriptableObject.CreateInstance<VipAbility>();
+        selfVip.pairBonus = 150;
+        _abilities.AddAbility(selfVip);
 
-        Assert.IsFalse(hasVip);
+        var partnerObject = new GameObject("VipPartner");
+        var partner = partnerObject.AddComponent<Passenger>();
+        var partnerAbilities = partnerObject.AddComponent<PassengerAbilities>();
+        var partnerVip = ScriptableObject.CreateInstance<VipAbility>();
+        partnerAbilities.AddAbility(partnerVip);
+
+        int points = 100;
+        _abilities.InvokeMatched(partner, ref points);
+
+        Assert.AreEqual(250, points);
+
+        Object.DestroyImmediate(selfVip);
+        Object.DestroyImmediate(partnerVip);
+        Object.DestroyImmediate(partnerObject);
     }
 
     [Test]
-    public void HasAbility_ReturnsTrue_WhenAbilityPresent()
+    public void InvokeMatched_DoesNotChangePoints_WhenPartnerHasNoVip()
     {
-        var vipAbility = ScriptableObject.CreateInstance<VipAbility>();
-        abilities.AddAbility(vipAbility);
-
-        bool hasVip = abilities.HasAbility<VipAbility>();
-
-        Assert.IsTrue(hasVip);
-
-        Object.DestroyImmediate(vipAbility);
-    }
-
-    [Test]
-    public void InvokeMatched_VIPAbility_DoublesPoints()
-    {
-        var vipAbility = ScriptableObject.CreateInstance<VipAbility>();
-        abilities.AddAbility(vipAbility);
-        abilities.AttachAll();
+        var selfVip = ScriptableObject.CreateInstance<VipAbility>();
+        selfVip.pairBonus = 150;
+        _abilities.AddAbility(selfVip);
 
         var partner = CreateMockPassenger();
         int points = 100;
+        _abilities.InvokeMatched(partner, ref points);
 
-        abilities.InvokeMatched(partner, ref points);
+        Assert.AreEqual(100, points);
 
-        Assert.AreEqual(200, points); // VIP doubles points
-
-        Object.DestroyImmediate(vipAbility);
+        Object.DestroyImmediate(selfVip);
         CleanupPassenger(partner);
     }
 
     [Test]
-    public void InvokeMatched_WithoutAbilities_PointsUnchanged()
-    {
-        var partner = CreateMockPassenger();
-        int points = 100;
-
-        abilities.InvokeMatched(partner, ref points);
-
-        Assert.AreEqual(100, points); // No abilities, points stay the same
-
-        CleanupPassenger(partner);
-    }
-
-    [Test]
-    public void InvokeMatched_MultipleAbilities_StackCorrectly()
+    public void InvokeMatched_MultipleVipAbilities_StackTheirBonuses()
     {
         var vipAbility1 = ScriptableObject.CreateInstance<VipAbility>();
         var vipAbility2 = ScriptableObject.CreateInstance<VipAbility>();
-        abilities.AddAbility(vipAbility1);
-        abilities.AddAbility(vipAbility2);
-        abilities.AttachAll();
+        vipAbility1.pairBonus = 100;
+        vipAbility2.pairBonus = 250;
+        _abilities.AddAbility(vipAbility1);
+        _abilities.AddAbility(vipAbility2);
 
-        var partner = CreateMockPassenger();
+        var partnerObject = new GameObject("VipPartner");
+        var partner = partnerObject.AddComponent<Passenger>();
+        var partnerAbilities = partnerObject.AddComponent<PassengerAbilities>();
+        var partnerVip = ScriptableObject.CreateInstance<VipAbility>();
+        partnerAbilities.AddAbility(partnerVip);
+
         int points = 100;
+        _abilities.InvokeMatched(partner, ref points);
 
-        abilities.InvokeMatched(partner, ref points);
-
-        // Two VIP abilities: 100 * 2 * 2 = 400
-        Assert.AreEqual(400, points);
+        Assert.AreEqual(450, points);
 
         Object.DestroyImmediate(vipAbility1);
         Object.DestroyImmediate(vipAbility2);
-        CleanupPassenger(partner);
+        Object.DestroyImmediate(partnerVip);
+        Object.DestroyImmediate(partnerObject);
     }
 
     [Test]
-    public void InvokePairBroken_DoesNotThrow_WithNoAbilities()
+    public void AttachAll_ForwardsOwnerToAbilities()
     {
+        var trackingAbility = ScriptableObject.CreateInstance<TrackingAbility>();
+        _abilities.AddAbility(trackingAbility);
+
+        _abilities.AttachAll();
+
+        Assert.AreEqual(1, trackingAbility.AttachCalls);
+        Assert.AreSame(_passenger, trackingAbility.LastOwner);
+
+        Object.DestroyImmediate(trackingAbility);
+    }
+
+    [Test]
+    public void InvokePairBroken_ForwardsHitterToAbilities()
+    {
+        var trackingAbility = ScriptableObject.CreateInstance<TrackingAbility>();
+        _abilities.AddAbility(trackingAbility);
         var hitter = CreateMockPassenger();
 
-        Assert.DoesNotThrow(() =>
-        {
-            abilities.InvokePairBroken(hitter);
-        });
+        _abilities.InvokePairBroken(hitter);
 
+        Assert.AreEqual(1, trackingAbility.PairBrokenCalls);
+        Assert.AreSame(_passenger, trackingAbility.LastOwner);
+        Assert.AreSame(hitter, trackingAbility.LastHitter);
+
+        Object.DestroyImmediate(trackingAbility);
         CleanupPassenger(hitter);
     }
 
-    [Test]
-    public void AttachAll_CallsOnAttach_ForAllAbilities()
-    {
-        var vipAbility = ScriptableObject.CreateInstance<VipAbility>();
-        abilities.AddAbility(vipAbility);
-
-        Assert.DoesNotThrow(() =>
-        {
-            abilities.AttachAll();
-        });
-
-        Object.DestroyImmediate(vipAbility);
-    }
-
-    [Test]
-    public void AddAbility_AllowsMultipleAbilitiesOfSameType()
-    {
-        var vipAbility1 = ScriptableObject.CreateInstance<VipAbility>();
-        var vipAbility2 = ScriptableObject.CreateInstance<VipAbility>();
-
-        abilities.AddAbility(vipAbility1);
-        abilities.AddAbility(vipAbility2);
-
-        // Both should be added (list allows duplicates)
-        Assert.IsTrue(abilities.HasAbility<VipAbility>());
-
-        Object.DestroyImmediate(vipAbility1);
-        Object.DestroyImmediate(vipAbility2);
-    }
-
-    // Helper methods
-    private Passenger CreateMockPassenger()
+    private static Passenger CreateMockPassenger()
     {
         var go = new GameObject("MockPartner");
-        var p = go.AddComponent<Passenger>();
-        return p;
+        return go.AddComponent<Passenger>();
     }
 
-    private void CleanupPassenger(Passenger p)
+    private static void CleanupPassenger(Passenger passenger)
     {
-        if (p != null && p.gameObject != null)
+        if (passenger != null && passenger.gameObject != null)
+            Object.DestroyImmediate(passenger.gameObject);
+    }
+
+    private class TrackingAbility : PassengerAbility
+    {
+        public int AttachCalls { get; private set; }
+        public int PairBrokenCalls { get; private set; }
+        public Passenger LastOwner { get; private set; }
+        public Passenger LastHitter { get; private set; }
+
+        public override void OnAttach(Passenger self)
         {
-            Object.DestroyImmediate(p.gameObject);
+            AttachCalls++;
+            LastOwner = self;
+        }
+
+        public override void OnPairBroken(Passenger self, Passenger hitter)
+        {
+            PairBrokenCalls++;
+            LastOwner = self;
+            LastHitter = hitter;
         }
     }
 }

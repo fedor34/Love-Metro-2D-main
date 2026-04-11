@@ -1,105 +1,201 @@
-using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine;
 
 public class ParallaxMaterialDriver : MonoBehaviour
 {
-    [Header("Speed coupling")]
-    [SerializeField] private float _maxTrainSpeed = 480f;   // синхронизировано с новым максимумом поезда
-    [SerializeField] private float _offsetScale = 0.8f;     // множитель сдвига на единицу норм. скорости
-    [SerializeField] private float _elapsedTimeScale = 1.0f; // базовая скорость времени для шейдера
-    [SerializeField] private float _speedResponseScale = 0.8f; // ослабление реакции спрайта на скорость поезда (~-20%)
+    private sealed class TargetBinding
+    {
+        public SpriteRenderer Renderer;
+        public Material Material;
+        public ParallaxLayer ParallaxLayer;
+    }
+
+    [Header("Speed Coupling")]
+    [SerializeField] private float _maxTrainSpeed = 480f;
+    [SerializeField] private float _elapsedTimeScale = 1.0f;
+    [SerializeField] private float _speedResponseScale = 0.8f;
+    [SerializeField] private float _targetRefreshRetryInterval = 1.0f;
     [SerializeField] private bool _logOnce = true;
+    [SerializeField] private float _baseSpeedMod = 1.4f;
 
-    [SerializeField] private float _baseSpeedMod = 1.4f;   // базовый множитель скорости в шейдере
+    [Header("Dependencies")]
+    [SerializeField] private TrainManager _train;
 
-    private TrainManager _train;
-    private readonly List<SpriteRenderer> _targets = new List<SpriteRenderer>();
+    private readonly List<TargetBinding> _targets = new List<TargetBinding>();
     private bool _logged;
-    private float _parallaxOffset = 0f;
+    private float _parallaxOffset;
+    private float _nextTargetRefreshTime;
 
     private void Awake()
     {
-        _train = FindObjectOfType<TrainManager>();
-        CacheTargets();
-        DisableParallaxLayerOnTargets();
-    }
-
-    private void CacheTargets()
-    {
-        _targets.Clear();
-        foreach (var r in FindObjectsOfType<SpriteRenderer>(true))
-        {
-            var mat = r.sharedMaterial;
-            string matName = mat != null ? mat.name.ToLower() : string.Empty;
-            string shName = (mat != null && mat.shader != null) ? mat.shader.name.ToLower() : string.Empty;
-            bool looksParallaxByName = matName.Contains("parallax") || shName.Contains("parallax");
-            bool hasProps = false;
-            if (mat != null)
-            {
-                try
-                {
-                    hasProps = mat.HasProperty("_elapsedTime") || mat.HasProperty("elapsedTime") ||
-                               mat.HasProperty("_Speed") || mat.HasProperty("Speed");
-                }
-                catch { }
-            }
-
-            if (looksParallaxByName || hasProps)
-            {
-                _targets.Add(r);
-                r.gameObject.isStatic = false;
-            }
-        }
-        Debug.Log($"[ParallaxMaterialDriver] Found {_targets.Count} parallax materials");
-    }
-
-    private void DisableParallaxLayerOnTargets()
-    {
-        foreach (var r in _targets)
-        {
-            var pl = r.GetComponent<ParallaxLayer>();
-            if (pl != null) pl.enabled = false;
-        }
+        ResolveTrainManager();
+        RefreshTargets();
     }
 
     private void Update()
     {
-        if (_train == null || _targets.Count == 0) return;
-        float s = Mathf.Abs(_train.GetCurrentSpeed());
-        bool held = ClickDirectionManager.IsMouseHeld;
-        float speed01 = held ? Mathf.Clamp01(s / Mathf.Max(0.01f, _maxTrainSpeed)) * _speedResponseScale : 0f;
+        if (!ResolveTrainManager())
+            return;
 
-        // Время должно всегда идти линейно — шейдер уже умножает его на скорость
-        _parallaxOffset += _elapsedTimeScale * Time.deltaTime;
+        if (_targets.Count == 0)
+        {
+            TryRefreshTargets();
+            if (_targets.Count == 0)
+                return;
+        }
 
+        RemoveMissingTargets();
+        if (_targets.Count == 0)
+        {
+            ScheduleNextTargetRefresh();
+            return;
+        }
+
+        float absoluteSpeed = Mathf.Abs(_train.GetCurrentSpeed());
+        float normalizedSpeed = CalculateNormalizedTrainSpeed(
+            absoluteSpeed,
+            _maxTrainSpeed,
+            _speedResponseScale,
+            ClickDirectionManager.IsMouseHeld);
+
+        _parallaxOffset = AdvanceParallaxTime(_parallaxOffset, _elapsedTimeScale, Time.deltaTime);
+        ApplyParallaxProperties(_parallaxOffset, normalizedSpeed, _baseSpeedMod);
+        LogTickOnce(absoluteSpeed, normalizedSpeed);
+    }
+
+    public void RefreshTargets()
+    {
+        _targets.Clear();
+
+        SpriteRenderer[] renderers = FindObjectsOfType<SpriteRenderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            SpriteRenderer renderer = renderers[i];
+            if (!ShouldTrackRenderer(renderer))
+                continue;
+
+            Material runtimeMaterial = renderer.material;
+            if (runtimeMaterial == null)
+                continue;
+
+            _targets.Add(new TargetBinding
+            {
+                Renderer = renderer,
+                Material = runtimeMaterial,
+                ParallaxLayer = renderer.GetComponent<ParallaxLayer>()
+            });
+
+            renderer.gameObject.isStatic = false;
+        }
+
+        DisableParallaxLayers();
+        if (_targets.Count > 0)
+            Diagnostics.Log($"[ParallaxMaterialDriver] Found {_targets.Count} parallax targets.");
+
+        ScheduleNextTargetRefresh();
+    }
+
+    private bool ResolveTrainManager()
+    {
+        if (_train == null)
+            _train = FindObjectOfType<TrainManager>();
+
+        return _train != null;
+    }
+
+    private void RemoveMissingTargets()
+    {
+        _targets.RemoveAll(IsMissingTarget);
+    }
+
+    private void TryRefreshTargets()
+    {
+        if (Time.time < _nextTargetRefreshTime)
+            return;
+
+        RefreshTargets();
+    }
+
+    private void DisableParallaxLayers()
+    {
         for (int i = 0; i < _targets.Count; i++)
         {
-            var mat = _targets[i]?.material;
-            if (mat == null) continue;
-
-            SafeSet(mat, "_elapsedTime", _parallaxOffset);
-            SafeSet(mat, "elapsedTime", _parallaxOffset);
-
-            // Передаём только нормированную скорость
-            SafeSet(mat, "_Speed", speed01);
-            SafeSet(mat, "Speed", speed01);
-
-            // Базовый множитель скорости (не зависит от поезда)
-            SafeSet(mat, "_SpeedModificator", _baseSpeedMod);
-            SafeSet(mat, "SpeedModificator", _baseSpeedMod);
-        }
-
-        if (_logOnce && !_logged)
-        {
-            _logged = true;
-            Debug.Log($"[ParallaxMaterialDriver] tick: speed={s:F2} speed01={speed01:F2} offset(time)={_parallaxOffset:F2} targets={_targets.Count}");
+            ParallaxLayer layer = _targets[i].ParallaxLayer;
+            if (layer != null)
+                layer.enabled = false;
         }
     }
 
-    private void SafeSet(Material m, string name, float value)
+    private void ApplyParallaxProperties(float parallaxTime, float normalizedSpeed, float baseSpeedMod)
     {
-        if (m.HasFloat(name)) m.SetFloat(name, value);
+        for (int i = 0; i < _targets.Count; i++)
+        {
+            Material material = _targets[i].Material;
+            if (material == null)
+                continue;
+
+            SetFloatIfPresent(material, "_elapsedTime", parallaxTime);
+            SetFloatIfPresent(material, "elapsedTime", parallaxTime);
+            SetFloatIfPresent(material, "_Speed", normalizedSpeed);
+            SetFloatIfPresent(material, "Speed", normalizedSpeed);
+            SetFloatIfPresent(material, "_SpeedModificator", baseSpeedMod);
+            SetFloatIfPresent(material, "SpeedModificator", baseSpeedMod);
+        }
     }
 
-    
+    private void LogTickOnce(float absoluteSpeed, float normalizedSpeed)
+    {
+        if (!_logOnce || _logged)
+            return;
+
+        _logged = true;
+        Diagnostics.Log(
+            $"[ParallaxMaterialDriver] speed={absoluteSpeed:F2} normalized={normalizedSpeed:F2} " +
+            $"time={_parallaxOffset:F2} targets={_targets.Count}");
+    }
+
+    private static bool ShouldTrackRenderer(SpriteRenderer renderer)
+    {
+        if (renderer == null)
+            return false;
+
+        return ParallaxRendererClassifier.IsParallaxDrivenMaterial(renderer.sharedMaterial);
+    }
+
+    private static float CalculateNormalizedTrainSpeed(
+        float currentSpeed,
+        float maxTrainSpeed,
+        float speedResponseScale,
+        bool isPointerHeld)
+    {
+        if (!isPointerHeld)
+            return 0f;
+
+        float safeMaxSpeed = Mathf.Max(0.01f, maxTrainSpeed);
+        return Mathf.Clamp01(Mathf.Abs(currentSpeed) / safeMaxSpeed) * Mathf.Max(0f, speedResponseScale);
+    }
+
+    private static float AdvanceParallaxTime(float currentOffset, float elapsedTimeScale, float deltaTime)
+    {
+        return currentOffset + Mathf.Max(0f, elapsedTimeScale) * Mathf.Max(0f, deltaTime);
+    }
+
+    private static void SetFloatIfPresent(Material material, string propertyName, float value)
+    {
+        if (material != null && material.HasFloat(propertyName))
+            material.SetFloat(propertyName, value);
+    }
+
+    private static bool IsMissingTarget(TargetBinding target)
+    {
+        return target == null ||
+               target.Renderer == null ||
+               !target.Renderer ||
+               target.Material == null;
+    }
+
+    private void ScheduleNextTargetRefresh()
+    {
+        _nextTargetRefreshTime = Time.time + Mathf.Max(0.1f, _targetRefreshRetryInterval);
+    }
 }

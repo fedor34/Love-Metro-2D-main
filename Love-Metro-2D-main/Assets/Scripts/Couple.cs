@@ -1,14 +1,13 @@
 using UnityEngine;
 
 /// <summary>
-/// Представляет пару пассажиров в игре, управляет их позиционированием и взаимоотношениями.
-/// Оптимизирован: убраны вызовы FindObjectOfType, добавлено кеширование ScoreCounter.
+/// Represents a passenger couple and manages breakup/despawn behavior.
 /// </summary>
 public class Couple : MonoBehaviour
 {
     [SerializeField] private float _socialDistance;
 
-    [Header("Разбивание пары (кик)")]
+    [Header("Breakup")]
     [SerializeField] private float _breakupBase = 3f;
     [SerializeField] private float _breakupSpeedScale = 0.6f;
     [SerializeField] private float _breakupMax = 12f;
@@ -20,182 +19,172 @@ public class Couple : MonoBehaviour
     private Passenger _passengerOther;
     private ScoreCounter _score;
 
-    // Статический кеш для ScoreCounter (один на сцену)
     private static ScoreCounter _cachedScoreCounter;
 
-    /// <summary>
-    /// Инициализирует пару, позиционируя пассажиров относительно друг друга
-    /// </summary>
+    private readonly struct ImpactInfo
+    {
+        public ImpactInfo(Vector3 position, Vector2 velocity, int penalty)
+        {
+            Position = position;
+            Velocity = velocity;
+            Penalty = penalty;
+        }
+
+        public Vector3 Position { get; }
+        public Vector2 Velocity { get; }
+        public int Penalty { get; }
+    }
+
     public void init(Passenger passengerMain, Passenger passengerOther)
     {
+        Init(passengerMain, passengerOther);
+    }
+
+    public void Init(Passenger passengerMain, Passenger passengerOther)
+    {
+        if (passengerMain == null || passengerOther == null || passengerMain == passengerOther)
+            return;
+
         _passengerMain = passengerMain;
         _passengerOther = passengerOther;
+        transform.position = passengerMain.transform.position;
 
-        Vector3 mainPosition = passengerMain.transform.position;
-        Vector3 otherPosition = passengerOther.transform.position;
+        BindPassengers();
+        ConfigureTrigger();
 
-        // Устанавливаем позицию пары
-        transform.position = mainPosition;
-
-        // Определяем направление для второго пассажира
-        Vector3 otherDirection = mainPosition.x - otherPosition.x <= 0 ? Vector3.right : Vector3.left;
-
-        // Перемещаем второго пассажира
-        passengerOther.Transport(new Vector3(
-            mainPosition.x + otherDirection.x * _socialDistance,
-            mainPosition.y));
-
-        // Устанавливаем направления взгляда
-        passengerMain.PassangerAnimator.ChangeFacingDirection(true);
-        passengerOther.PassangerAnimator.ChangeFacingDirection(false);
-
-        // Делаем пассажиров дочерними объектами
-        passengerMain.transform.parent = transform;
-        passengerOther.transform.parent = transform;
-
-        // Отмечаем, что оба в паре
-        passengerMain.IsInCouple = true;
-        passengerOther.IsInCouple = true;
-
-        // Обновляем статус в реестре
-        if (PassengerRegistry.Instance != null)
-        {
-            PassengerRegistry.Instance.UpdateCoupleStatus(passengerMain);
-            PassengerRegistry.Instance.UpdateCoupleStatus(passengerOther);
-        }
-
-        // Регистрируем пару
         CouplesManager.Instance?.RegisterCouple(this);
-
-        // Настраиваем триггер
-        SetupTrigger();
-
-        // Кешируем ScoreCounter
-        _score = GetCachedScoreCounter();
-    }
-
-    private void SetupTrigger()
-    {
-        var trigger = GetComponent<Collider2D>();
-        if (trigger == null)
-        {
-            var cc = gameObject.AddComponent<CircleCollider2D>();
-            cc.radius = Mathf.Max(0.2f, _socialDistance * 0.75f);
-            cc.isTrigger = true;
-        }
-        else
-        {
-            trigger.isTrigger = true;
-        }
-    }
-
-    /// <summary>
-    /// Возвращает закешированный ScoreCounter или ищет его один раз
-    /// </summary>
-    private static ScoreCounter GetCachedScoreCounter()
-    {
-        if (_cachedScoreCounter == null)
-        {
-            _cachedScoreCounter = Object.FindObjectOfType<ScoreCounter>();
-        }
-        return _cachedScoreCounter;
+        _score = ResolveScoreCounter();
     }
 
     public void DespawnAtStation()
     {
-        if (_passengerMain != null)
-        {
-            _passengerMain.RemoveFromContainerAndDestroy();
-        }
-        if (_passengerOther != null)
-        {
-            _passengerOther.RemoveFromContainerAndDestroy();
-        }
+        CouplesManager.Instance?.UnregisterCouple(this);
+        _passengerMain?.RemoveFromContainerAndDestroy();
+        _passengerOther?.RemoveFromContainerAndDestroy();
         Destroy(gameObject);
-    }
-
-    private void OnTriggerEnter2D(Collider2D other)
-    {
-        if (!enabled || other == null) return;
-
-        var passenger = other.GetComponent<Passenger>();
-        if (passenger == null) return;
-
-        // Игнорируем собственных пассажиров
-        if (passenger == _passengerMain || passenger == _passengerOther) return;
-
-        BreakByHit(passenger);
     }
 
     public void BreakByHit(Passenger hitter)
     {
-        int penalty = _penaltyMin;
-        Vector3 hitPos = transform.position;
-        float speed = 0f;
+        ImpactInfo impact = BuildImpactInfo(hitter, transform.position);
+        if (impact.Velocity.magnitude < _breakMinSpeed)
+            return;
 
-        if (hitter != null)
-        {
-            hitPos = hitter.transform.position;
-            var rb = hitter.GetRigidbody();
-            if (rb != null)
-            {
-                speed = rb.velocity.magnitude;
-                float t = Mathf.Clamp01(speed / 10f);
-                penalty = Mathf.RoundToInt(Mathf.Lerp(_penaltyMin, _penaltyMax, t));
-            }
-        }
-
-        // Не разбиваем при медленном касании
-        if (speed < _breakMinSpeed) return;
-
-        BreakPairInternal(penalty, hitter, hitPos);
+        BreakPairInternal(impact);
     }
 
-    private void BreakPairInternal(int penalty, Passenger hitter, Vector3 hitPos)
-    {
-        CouplesManager.Instance?.UnregisterCouple(this);
-
-        if (_score != null)
-        {
-            _score.ApplyPenalty(penalty, transform.position);
-        }
-
-        Vector2 hitterVel = Vector2.zero;
-        Vector3 hitterPos = hitPos;
-
-        var hitterRb = hitter?.GetRigidbody();
-        if (hitterRb != null)
-        {
-            hitterVel = hitterRb.velocity;
-            hitterPos = hitter.transform.position;
-        }
-
-        float speed = hitterVel.magnitude;
-        float mag = Mathf.Clamp(_breakupBase + speed * _breakupSpeedScale, _breakupBase, _breakupMax);
-
-        ReleasePassenger(_passengerMain, hitterPos, mag, Vector2.left);
-        ReleasePassenger(_passengerOther, hitterPos, mag, Vector2.right);
-
-        Destroy(gameObject);
-    }
-
-    private void ReleasePassenger(Passenger passenger, Vector3 hitterPos, float magnitude, Vector2 fallbackDir)
-    {
-        if (passenger == null) return;
-
-        Vector2 dir = (passenger.transform.position - hitterPos).sqrMagnitude > 0.0001f
-            ? (Vector2)(passenger.transform.position - hitterPos).normalized
-            : fallbackDir;
-
-        passenger.transform.parent = null;
-        passenger.BreakFromCouple(dir * magnitude);
-    }
-
-    /// <summary>
-    /// Очищает статический кеш (вызывать при смене сцены)
-    /// </summary>
     public static void ClearCache()
     {
         _cachedScoreCounter = null;
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (!enabled || other == null)
+            return;
+
+        Passenger passenger = other.GetComponent<Passenger>();
+        if (passenger == null || passenger == _passengerMain || passenger == _passengerOther)
+            return;
+
+        BreakByHit(passenger);
+    }
+
+    private void OnDestroy()
+    {
+        CouplesManager.Instance?.UnregisterCouple(this);
+    }
+
+    private void BindPassengers()
+    {
+        Vector3 mainPosition = _passengerMain.transform.position;
+        Vector3 otherPosition = _passengerOther.transform.position;
+        float spacing = ResolveSpacing(mainPosition, otherPosition);
+        bool mainIsLeft = mainPosition.x <= otherPosition.x;
+
+        Vector3 otherDirection = mainIsLeft ? Vector3.right : Vector3.left;
+        Vector3 alignedOtherPosition = new Vector3(
+            mainPosition.x + otherDirection.x * spacing,
+            mainPosition.y,
+            _passengerOther.transform.position.z);
+
+        _passengerMain.EnterCouple(transform, mainPosition, faceRight: mainIsLeft);
+        _passengerOther.EnterCouple(transform, alignedOtherPosition, faceRight: !mainIsLeft);
+    }
+
+    private void ConfigureTrigger()
+    {
+        Collider2D trigger = GetComponent<Collider2D>();
+        float radius = Mathf.Max(0.2f, ResolveSpacing(_passengerMain.transform.position, _passengerOther.transform.position) * 0.75f);
+
+        if (trigger == null)
+        {
+            CircleCollider2D circle = gameObject.AddComponent<CircleCollider2D>();
+            circle.radius = radius;
+            circle.isTrigger = true;
+            return;
+        }
+
+        trigger.isTrigger = true;
+        if (trigger is CircleCollider2D existingCircle)
+            existingCircle.radius = radius;
+    }
+
+    private static ScoreCounter ResolveScoreCounter()
+    {
+        if (_cachedScoreCounter == null || !_cachedScoreCounter)
+            _cachedScoreCounter = Object.FindObjectOfType<ScoreCounter>();
+
+        return _cachedScoreCounter;
+    }
+
+    private ImpactInfo BuildImpactInfo(Passenger hitter, Vector3 defaultPosition)
+    {
+        if (hitter == null)
+            return new ImpactInfo(defaultPosition, Vector2.zero, _penaltyMin);
+
+        Rigidbody2D rigidbody = hitter.GetRigidbody();
+        Vector2 velocity = rigidbody != null ? rigidbody.velocity : Vector2.zero;
+        float speed = velocity.magnitude;
+        float penaltyLerp = Mathf.Clamp01(speed / 10f);
+        int penalty = Mathf.RoundToInt(Mathf.Lerp(_penaltyMin, _penaltyMax, penaltyLerp));
+        return new ImpactInfo(hitter.transform.position, velocity, penalty);
+    }
+
+    private void BreakPairInternal(ImpactInfo impact)
+    {
+        CouplesManager.Instance?.UnregisterCouple(this);
+        _score ??= ResolveScoreCounter();
+        _score?.ApplyPenalty(impact.Penalty, transform.position);
+
+        float magnitude = Mathf.Clamp(
+            _breakupBase + impact.Velocity.magnitude * _breakupSpeedScale,
+            _breakupBase,
+            _breakupMax);
+
+        ReleasePassenger(_passengerMain, impact.Position, magnitude, Vector2.left);
+        ReleasePassenger(_passengerOther, impact.Position, magnitude, Vector2.right);
+        Destroy(gameObject);
+    }
+
+    private static void ReleasePassenger(Passenger passenger, Vector3 hitterPosition, float magnitude, Vector2 fallbackDirection)
+    {
+        if (passenger == null)
+            return;
+
+        Vector2 direction = (passenger.transform.position - hitterPosition).sqrMagnitude > 0.0001f
+            ? (Vector2)(passenger.transform.position - hitterPosition).normalized
+            : fallbackDirection;
+
+        passenger.ExitCouple(direction * magnitude);
+    }
+
+    private float ResolveSpacing(Vector3 mainPosition, Vector3 otherPosition)
+    {
+        if (_socialDistance > 0f)
+            return _socialDistance;
+
+        float currentSpacing = Mathf.Abs(mainPosition.x - otherPosition.x);
+        return currentSpacing > 0.01f ? currentSpacing : 0.75f;
     }
 }

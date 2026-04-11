@@ -2,209 +2,158 @@ using NUnit.Framework;
 using UnityEngine;
 
 /// <summary>
-/// Integration tests for Couple system
-/// Tests couple creation, positioning, and breaking mechanics
+/// Integration tests for couple creation and breakup behavior.
 /// </summary>
 public class CoupleSystemTests
 {
-    private GameObject coupleManagerObject;
-    private CouplesManager couplesManager;
+    private GameObject _coupleManagerObject;
+    private CouplesManager _couplesManager;
+    private GameObject _registryObject;
+    private PassengerRegistry _registry;
 
     [SetUp]
     public void Setup()
     {
         SetStaticProperty(typeof(CouplesManager), "Instance", null);
-        coupleManagerObject = new GameObject("TestCouplesManager");
-        couplesManager = coupleManagerObject.AddComponent<CouplesManager>();
+        SetStaticProperty(typeof(PassengerRegistry), "Instance", null);
 
-        var awakeMethod = typeof(CouplesManager).GetMethod("Awake",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        awakeMethod?.Invoke(couplesManager, null);
+        _coupleManagerObject = new GameObject("TestCouplesManager");
+        _couplesManager = _coupleManagerObject.AddComponent<CouplesManager>();
+        InvokePrivateMethod(_couplesManager, "Awake");
+
+        _registryObject = new GameObject("TestPassengerRegistry");
+        _registry = _registryObject.AddComponent<PassengerRegistry>();
+        InvokePrivateMethod(_registry, "Awake");
     }
 
     [TearDown]
     public void Teardown()
     {
-        if (coupleManagerObject != null)
-        {
-            Object.DestroyImmediate(coupleManagerObject);
-        }
+        foreach (var couple in Object.FindObjectsOfType<Couple>())
+            Object.DestroyImmediate(couple.gameObject);
+
+        foreach (var passenger in Object.FindObjectsOfType<Passenger>())
+            Object.DestroyImmediate(passenger.gameObject);
+
+        if (_coupleManagerObject != null)
+            Object.DestroyImmediate(_coupleManagerObject);
+
+        if (_registryObject != null)
+            Object.DestroyImmediate(_registryObject);
+
         SetStaticProperty(typeof(CouplesManager), "Instance", null);
+        SetStaticProperty(typeof(PassengerRegistry), "Instance", null);
     }
 
     [Test]
-    public void Singleton_InstanceIsSet_AfterAwake()
+    public void Init_SetsPassengersInCouple_AndRemovesThemFromSingles()
     {
-        Assert.IsNotNull(CouplesManager.Instance);
-        Assert.AreEqual(couplesManager, CouplesManager.Instance);
+        Passenger male = CreateMockPassenger(false, Vector3.zero);
+        Passenger female = CreateMockPassenger(true, new Vector3(2f, 0f, 0f));
+        Couple couple = CreateMockCouple(1.25f);
+
+        _registry.Register(male);
+        _registry.Register(female);
+
+        couple.Init(male, female);
+
+        Assert.IsTrue(male.IsInCouple);
+        Assert.IsTrue(female.IsInCouple);
+        Assert.AreSame(couple.transform, male.transform.parent);
+        Assert.AreSame(couple.transform, female.transform.parent);
+        Assert.AreEqual(0, _registry.Singles.Count);
+        Assert.AreEqual(1, _couplesManager.ActiveCouplesCount);
+        Assert.AreEqual(new Vector3(1.25f, 0f, 0f), female.transform.position);
     }
 
     [Test]
-    public void RegisterCouple_AddsToActiveCouples()
+    public void BreakByHit_ReturnsPassengersToSinglesRegistry_WhenImpactIsStrongEnough()
     {
-        var couple = CreateMockCouple();
+        Passenger male = CreateMockPassenger(false, Vector3.zero);
+        Passenger female = CreateMockPassenger(true, new Vector3(1f, 0f, 0f));
+        Passenger hitter = CreateMockPassenger(false, new Vector3(5f, 0f, 0f));
+        Couple couple = CreateMockCouple(1f);
 
-        couplesManager.RegisterCouple(couple);
+        _registry.Register(male);
+        _registry.Register(female);
+        couple.Init(male, female);
 
-        var activeCouples = GetPrivateField<System.Collections.Generic.List<Couple>>(
-            couplesManager, "_activeCouples");
-        Assert.IsNotNull(activeCouples);
-        Assert.Contains(couple, (System.Collections.ICollection)activeCouples);
+        hitter.GetComponent<Rigidbody2D>().velocity = new Vector2(8f, 0f);
+        couple.BreakByHit(hitter);
 
-        CleanupCouple(couple);
+        Assert.IsFalse(male.IsInCouple);
+        Assert.IsFalse(female.IsInCouple);
+        Assert.IsNull(male.transform.parent);
+        Assert.IsNull(female.transform.parent);
+        Assert.AreEqual(2, _registry.Singles.Count);
+        Assert.AreEqual(1, _registry.MaleSinglesCount);
+        Assert.AreEqual(1, _registry.FemaleSinglesCount);
+        Assert.AreEqual(0, _couplesManager.ActiveCouplesCount);
     }
 
     [Test]
-    public void RegisterCouple_DoesNotAddDuplicate()
+    public void BreakByHit_DoesNothing_WhenImpactIsBelowThreshold()
     {
-        var couple = CreateMockCouple();
+        Passenger male = CreateMockPassenger(false, Vector3.zero);
+        Passenger female = CreateMockPassenger(true, new Vector3(1f, 0f, 0f));
+        Passenger hitter = CreateMockPassenger(false, new Vector3(5f, 0f, 0f));
+        Couple couple = CreateMockCouple(1f);
 
-        couplesManager.RegisterCouple(couple);
-        couplesManager.RegisterCouple(couple);
+        _registry.Register(male);
+        _registry.Register(female);
+        couple.Init(male, female);
 
-        var activeCouples = GetPrivateField<System.Collections.Generic.List<Couple>>(
-            couplesManager, "_activeCouples");
-        int count = 0;
-        foreach (var c in activeCouples)
-        {
-            if (c == couple) count++;
-        }
-        Assert.AreEqual(1, count);
+        hitter.GetComponent<Rigidbody2D>().velocity = new Vector2(1f, 0f);
+        couple.BreakByHit(hitter);
 
-        CleanupCouple(couple);
+        Assert.IsTrue(male.IsInCouple);
+        Assert.IsTrue(female.IsInCouple);
+        Assert.AreSame(couple.transform, male.transform.parent);
+        Assert.AreSame(couple.transform, female.transform.parent);
+        Assert.AreEqual(0, _registry.Singles.Count);
+        Assert.AreEqual(1, _couplesManager.ActiveCouplesCount);
     }
 
-    [Test]
-    public void UnregisterCouple_RemovesFromActiveCouples()
-    {
-        var couple = CreateMockCouple();
-        couplesManager.RegisterCouple(couple);
-
-        couplesManager.UnregisterCouple(couple);
-
-        var activeCouples = GetPrivateField<System.Collections.Generic.List<Couple>>(
-            couplesManager, "_activeCouples");
-        Assert.IsFalse(activeCouples.Contains(couple));
-
-        CleanupCouple(couple);
-    }
-
-    [Test]
-    public void CoupleCreation_SetsIsInCouple_ForBothPassengers()
-    {
-        var male = CreateMockPassenger(false, Vector3.zero);
-        var female = CreateMockPassenger(true, new Vector3(1, 0, 0));
-        var couple = CreateMockCouple();
-
-        var initMethod = typeof(Couple).GetMethod("init",
-            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-
-        if (initMethod != null)
-        {
-            Assert.Pass("Couple init method exists");
-        }
-        else
-        {
-            Assert.Inconclusive("Couple init method not found via reflection");
-        }
-
-        CleanupPassenger(male);
-        CleanupPassenger(female);
-        CleanupCouple(couple);
-    }
-
-    [Test]
-    public void CouplePositioning_PlacesBetweenPassengers()
-    {
-        var male = CreateMockPassenger(false, new Vector3(0, 0, 0));
-        var female = CreateMockPassenger(true, new Vector3(4, 0, 0));
-        var couple = CreateMockCouple();
-
-        couple.transform.position = (male.transform.position + female.transform.position) * 0.5f;
-
-        Vector3 expectedPosition = new Vector3(2, 0, 0);
-        Assert.AreEqual(expectedPosition, couple.transform.position);
-
-        CleanupPassenger(male);
-        CleanupPassenger(female);
-        CleanupCouple(couple);
-    }
-
-    [Test]
-    public void MultipleCouplesTogetherCreation_AllRegistered()
-    {
-        var couple1 = CreateMockCouple();
-        var couple2 = CreateMockCouple();
-        var couple3 = CreateMockCouple();
-
-        couplesManager.RegisterCouple(couple1);
-        couplesManager.RegisterCouple(couple2);
-        couplesManager.RegisterCouple(couple3);
-
-        var activeCouples = GetPrivateField<System.Collections.Generic.List<Couple>>(
-            couplesManager, "_activeCouples");
-        Assert.AreEqual(3, activeCouples.Count);
-
-        CleanupCouple(couple1);
-        CleanupCouple(couple2);
-        CleanupCouple(couple3);
-    }
-
-    private Couple CreateMockCouple()
+    private static Couple CreateMockCouple(float socialDistance)
     {
         var go = new GameObject("MockCouple");
         var couple = go.AddComponent<Couple>();
+        SetPrivateField(couple, "_socialDistance", socialDistance);
         return couple;
     }
 
-    private Passenger CreateMockPassenger(bool isFemale, Vector3 position)
+    private static Passenger CreateMockPassenger(bool isFemale, Vector3 position)
     {
         var go = new GameObject("MockPassenger_" + (isFemale ? "F" : "M"));
         go.transform.position = position;
+        go.AddComponent<BoxCollider2D>();
         var passenger = go.AddComponent<Passenger>();
 
-        var type = typeof(Passenger);
-        var field = type.GetField("IsFemale");
-        var prop = type.GetProperty("IsFemale");
-        if (field != null)
-            field.SetValue(passenger, isFemale);
-        else if (prop != null)
-            prop.SetValue(passenger, isFemale);
-
+        passenger.IsFemale = isFemale;
         return passenger;
     }
 
-    private void CleanupCouple(Couple couple)
+    private static void InvokePrivateMethod(object instance, string methodName)
     {
-        if (couple != null && couple.gameObject != null)
-        {
-            Object.DestroyImmediate(couple.gameObject);
-        }
-    }
-
-    private void CleanupPassenger(Passenger passenger)
-    {
-        if (passenger != null && passenger.gameObject != null)
-        {
-            Object.DestroyImmediate(passenger.gameObject);
-        }
-    }
-
-    private T GetPrivateField<T>(object obj, string fieldName)
-    {
-        var field = obj.GetType().GetField(fieldName,
+        var method = instance.GetType().GetMethod(
+            methodName,
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        if (field != null)
-        {
-            return (T)field.GetValue(obj);
-        }
-        return default(T);
+        method?.Invoke(instance, null);
     }
 
-    private void SetStaticProperty(System.Type type, string propertyName, object value)
+    private static void SetPrivateField(object instance, string fieldName, object value)
     {
-        var prop = type.GetProperty(propertyName,
+        var field = instance.GetType().GetField(
+            fieldName,
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        field?.SetValue(instance, value);
+    }
+
+    private static void SetStaticProperty(System.Type type, string propertyName, object value)
+    {
+        var property = type.GetProperty(
+            propertyName,
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-        prop?.SetValue(null, value);
+        property?.SetValue(null, value);
     }
 }

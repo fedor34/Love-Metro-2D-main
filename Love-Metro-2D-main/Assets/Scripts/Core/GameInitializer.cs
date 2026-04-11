@@ -1,95 +1,142 @@
+using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 
 /// <summary>
-/// Автоматически инициализирует ключевые системы игры при запуске сцены
+/// Ensures core runtime systems exist when a scene starts.
 /// </summary>
 public class GameInitializer : MonoBehaviour
 {
+    private static readonly string[] BackgroundLayerNames =
+    {
+        "6_\u0433\u043e\u0440\u043e\u0434_\u0444\u043e\u043d",
+        "5_\u0433\u043e\u0440\u043e\u0434_\u0434\u0430\u043b\u044c\u043d\u0438\u0439",
+        "4_\u0433\u043e\u0440\u043e\u0434_\u0441\u0440\u0435\u0434\u043d\u0438\u0439",
+        "3_\u0433\u043e\u0440\u043e\u0434_\u0431\u043b\u0438\u0436\u043d\u0438\u0439",
+        "2_\u0433\u043e\u0440\u043e\u0434_\u0434\u0435\u0440\u0435\u0432\u044c\u044f",
+        "1_\u0433\u043e\u0440\u043e\u0434_\u0440\u0435\u043b\u044c\u0441\u044b",
+        "Square"
+    };
+
+    private static readonly float[] BackgroundLayerSpeeds = { 0.3f, 0.5f, 0.8f, 1.0f, 1.2f, 1.5f, 1.0f };
+    private static FieldInfo _backgroundLayersField;
+
     [Header("Auto-Create Settings")]
     [SerializeField] private bool _createClickDirectionManager = true;
     [SerializeField] private bool _createInertiaArrowHUD = true;
-    [SerializeField] private bool _ensureParallaxSystems = false; // выключаем старый автопараллакс
+    [SerializeField] private bool _ensureParallaxSystems = false;
     [SerializeField] private bool _createManualPairingManager = true;
     [SerializeField] private bool _ensureBackgroundScroller = false;
     [SerializeField] private bool _ensureParallaxMaterialDriver = true;
-    [SerializeField] private bool _replaceParallaxMaterialsWithDefault = false; // если true — насильно отключим шейдерный параллакс
-    
-    void Awake()
+    [SerializeField] private bool _replaceParallaxMaterialsWithDefault = false;
+
+    private void Awake()
     {
-        InitializeCore();
+        InitializeCoreSystems();
     }
-    
-    void Start()
+
+    private void Start()
     {
-        InitializeUI();
+        InitializeUiSystems();
     }
-    
-    private void InitializeCore()
+
+    private void InitializeCoreSystems()
     {
-        if (_createClickDirectionManager && FindObjectOfType<ClickDirectionManager>() == null)
+        EnsureComponent<ClickDirectionManager>(_createClickDirectionManager, "ClickDirectionManager", persistent: true);
+        EnsureComponent<ManualPairingManager>(_createManualPairingManager, "ManualPairingManager", persistent: true);
+        EnsureComponent<BackgroundMaterialOverride>(_replaceParallaxMaterialsWithDefault, "BackgroundMaterialOverride");
+        EnsureBackgroundScroller();
+        EnsureComponent<EnsureParallaxLayers>(_ensureParallaxSystems, "EnsureParallaxLayers_Auto");
+        EnsureComponent<ParallaxMaterialDriver>(_ensureParallaxMaterialDriver, "ParallaxMaterialDriver");
+    }
+
+    private void InitializeUiSystems()
+    {
+        EnsureComponent<InertiaArrowHUD>(_createInertiaArrowHUD, "InertiaArrowHUD");
+    }
+
+    private T EnsureComponent<T>(bool shouldCreate, string objectName, bool persistent = false) where T : Component
+    {
+        if (!shouldCreate)
+            return null;
+
+        T existing = FindObjectOfType<T>();
+        if (existing != null)
+            return existing;
+
+        GameObject gameObject = new GameObject(string.IsNullOrWhiteSpace(objectName) ? typeof(T).Name : objectName, typeof(T));
+        if (persistent)
+            DontDestroyOnLoad(gameObject);
+
+        Diagnostics.Log($"[GameInitializer] Created {typeof(T).Name}.");
+        return gameObject.GetComponent<T>();
+    }
+
+    private void EnsureBackgroundScroller()
+    {
+        if (!_ensureBackgroundScroller || FindObjectOfType<SimpleBackgroundScroller>() != null)
+            return;
+
+        GameObject scrollerObject = new GameObject("SimpleBackgroundScroller", typeof(SimpleBackgroundScroller));
+        SimpleBackgroundScroller scroller = scrollerObject.GetComponent<SimpleBackgroundScroller>();
+        int layerCount = ConfigureBackgroundScroller(scroller);
+        Diagnostics.Log($"[GameInitializer] Created SimpleBackgroundScroller with {layerCount} layer(s).");
+    }
+
+    private int ConfigureBackgroundScroller(SimpleBackgroundScroller scroller)
+    {
+        if (scroller == null)
+            return 0;
+
+        FieldInfo layersField = GetBackgroundLayersField();
+        if (layersField == null)
         {
-            GameObject clickManager = new GameObject("ClickDirectionManager", typeof(ClickDirectionManager));
-            DontDestroyOnLoad(clickManager);
-            Debug.Log("[GameInitializer] Created ClickDirectionManager");
+            Diagnostics.Warn("[GameInitializer] SimpleBackgroundScroller._layers field not found.");
+            return 0;
         }
 
-        if (_createManualPairingManager && FindObjectOfType<ManualPairingManager>() == null)
-        {
-            GameObject pairingManager = new GameObject("ManualPairingManager", typeof(ManualPairingManager));
-            DontDestroyOnLoad(pairingManager);
-            Debug.Log("[GameInitializer] Created ManualPairingManager");
-        }
+        List<SimpleBackgroundScroller.Layer> configuredLayers = BuildBackgroundLayers();
+        layersField.SetValue(scroller, configuredLayers.ToArray());
+        return configuredLayers.Count;
+    }
 
-        if (_replaceParallaxMaterialsWithDefault && FindObjectOfType<BackgroundMaterialOverride>() == null)
-        {
-            new GameObject("BackgroundMaterialOverride", typeof(BackgroundMaterialOverride));
-            Debug.Log("[GameInitializer] Created BackgroundMaterialOverride");
-        }
+    private List<SimpleBackgroundScroller.Layer> BuildBackgroundLayers()
+    {
+        var layers = new List<SimpleBackgroundScroller.Layer>(BackgroundLayerNames.Length);
 
-        if (_ensureBackgroundScroller && FindObjectOfType<SimpleBackgroundScroller>() == null)
+        for (int i = 0; i < BackgroundLayerNames.Length; i++)
         {
-            var go = new GameObject("SimpleBackgroundScroller", typeof(SimpleBackgroundScroller));
-            var scroller = go.GetComponent<SimpleBackgroundScroller>();
+            SpriteRenderer renderer = ResolveBackgroundRenderer(BackgroundLayerNames[i]);
+            if (renderer == null)
+                continue;
 
-            var names = new string[] { "6_город_фон", "5_город_дальний", "4_город_средний", "3_город_ближний", "2_город_деревья", "1_город_рельсы", "Square" };
-            var speeds = new float[] { 0.3f, 0.5f, 0.8f, 1.0f, 1.2f, 1.5f, 1.0f };
-            var layers = new System.Collections.Generic.List<SimpleBackgroundScroller.Layer>();
-            for (int i = 0; i < names.Length; i++)
+            layers.Add(new SimpleBackgroundScroller.Layer
             {
-                var obj = GameObject.Find(names[i]);
-                if (obj == null) continue;
-                var sr = obj.GetComponent<SpriteRenderer>();
-                if (sr == null) continue;
-                layers.Add(new SimpleBackgroundScroller.Layer { renderer = sr, speedFactor = i < speeds.Length ? speeds[i] : 1f });
-                obj.isStatic = false;
-            }
-            var so = new SimpleBackgroundScroller.Layer[layers.Count];
-            for (int i = 0; i < layers.Count; i++) so[i] = layers[i];
-            var fld = typeof(SimpleBackgroundScroller).GetField("_layers", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            fld?.SetValue(scroller, so);
+                renderer = renderer,
+                speedFactor = i < BackgroundLayerSpeeds.Length ? BackgroundLayerSpeeds[i] : 1f
+            });
 
-            Debug.Log($"[GameInitializer] Created SimpleBackgroundScroller with {layers.Count} layer(s)");
+            renderer.gameObject.isStatic = false;
         }
 
-        if (_ensureParallaxSystems && FindObjectOfType<EnsureParallaxLayers>() == null)
-        {
-            new GameObject("EnsureParallaxLayers_Auto", typeof(EnsureParallaxLayers));
-            Debug.Log("[GameInitializer] Created EnsureParallaxLayers");
-        }
-
-        if (_ensureParallaxMaterialDriver && FindObjectOfType<ParallaxMaterialDriver>() == null)
-        {
-            new GameObject("ParallaxMaterialDriver", typeof(ParallaxMaterialDriver));
-            Debug.Log("[GameInitializer] Created ParallaxMaterialDriver");
-        }
+        return layers;
     }
-    
-    private void InitializeUI()
+
+    private static SpriteRenderer ResolveBackgroundRenderer(string objectName)
     {
-        if (_createInertiaArrowHUD && FindObjectOfType<InertiaArrowHUD>() == null)
+        GameObject gameObject = GameObject.Find(objectName);
+        return gameObject != null ? gameObject.GetComponent<SpriteRenderer>() : null;
+    }
+
+    private static FieldInfo GetBackgroundLayersField()
+    {
+        if (_backgroundLayersField == null)
         {
-            GameObject arrowHUD = new GameObject("InertiaArrowHUD", typeof(InertiaArrowHUD));
-            Debug.Log("[GameInitializer] Created InertiaArrowHUD");
+            _backgroundLayersField = typeof(SimpleBackgroundScroller).GetField(
+                "_layers",
+                BindingFlags.NonPublic | BindingFlags.Instance);
         }
+
+        return _backgroundLayersField;
     }
 }

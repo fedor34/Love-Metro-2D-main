@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8aa1fcf3f0a46de468aad1268a502491, type: 3}
+  m_Name: PassengerSettings
+  m_EditorClassIdentifier: 
+  globalSpeedMultiplier: 0.7
+  baseSpeed: 2
+  minFallingSpeed: 0.5
+  handrailGrabChance: 0.3
+  handrailMinGrabbingSpeed: 1
+  handrailCooldown: 0.5
+  handrailStandingTimeInterval: {x: 1, y: 3}
+  launchSensitivity: 1
+  minImpulseToLaunch: 3
+  impulseToVelocityScale: 0.45
+  globalImpulseScale: 0.8
+  maxFlightSpeed: 18
+  flightSpeedMultiplier: 0.7
+  flightDeceleration: 0.65
+  maxBounces: 3
+  bounceElasticity: 0.95
+  wallBounceBoost: 1
+  easeOutMinK: 0.985
+  easeOutMaxK: 0.9985
+  aimAssistRadius: 5
+  aimAssistMaxStrength: 1.2
+  turbulenceStrength: 0.8
+  angleSnapDeg: 10
+  magnetRadius: 3.5
+  magnetForce: 5
+  repelRadius: 2
+  repelForce: 4
+  rematchCooldown: 0.35
+  uniformLaunchScale: 1.8
+  uniformLaunchGamma: 0.75
+  flightHorizontalScale: 0.48
+  flightVerticalScale: 2.88
+  flightVerticalGamma: 0.65
+  minWindStrengthForFlying: 8
+  maxFlyingTime: 5
+  defaultLayer: Default

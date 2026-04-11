@@ -8,7 +8,7 @@ using UnityEngine;
 public static class CameraAutoZoom
 {
     // Desired orthographic size. Feel free to tweak if you need a different zoom level.
-    private const float TargetSize = 10f;
+    private const float TargetSize = 6.3124776f;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AdjustCamera()
@@ -18,5 +18,4 @@ public static class CameraAutoZoom
         {
             cam.orthographicSize = TargetSize;
         }
-    }
-}
+ 

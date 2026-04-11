@@ -105,7 +105,9 @@ public partial class Passenger
 
     private void EnterFallingState(Vector2 initialVelocity)
     {
+        EnsureRequiredComponents();
+        EnsureStateMachineInitialized();
         ChangeState(fallingState);
-        ((Falling)fallingState).SetInitialFallingSpeed(initialVelocity);
+        fallingState.SetInitialFallingSpeed(initialVelocity);
     }
 }

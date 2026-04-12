@@ -26,8 +26,8 @@ public class GameInitializer : MonoBehaviour
     [SerializeField] private bool _createInertiaArrowHUD = true;
     [SerializeField] private bool _ensureParallaxSystems = false;
     [SerializeField] private bool _createManualPairingManager = true;
-    [SerializeField] private bool _ensureBackgroundScroller = false;
-    [SerializeField] private bool _ensureParallaxMaterialDriver = true;
+    [SerializeField] private bool _ensureBackgroundScroller = true;
+    [SerializeField] private bool _ensureParallaxMaterialDriver = false;
     [SerializeField] private bool _replaceParallaxMaterialsWithDefault = false;
 
     private void Awake()
@@ -124,8 +124,15 @@ public class GameInitializer : MonoBehaviour
 
     private static SpriteRenderer ResolveBackgroundRenderer(string objectName)
     {
-        GameObject gameObject = GameObject.Find(objectName);
-        return gameObject != null ? gameObject.GetComponent<SpriteRenderer>() : null;
+        // GameObject.Find не находит неактивные объекты (Background выключен в сцене),
+        // поэтому ищем через все SpriteRenderer включая inactive.
+        SpriteRenderer[] all = FindObjectsOfType<SpriteRenderer>(true);
+        for (int i = 0; i < all.Length; i++)
+        {
+            if (all[i].gameObject.name == objectName)
+                return all[i];
+        }
+        return null;
     }
 
     private static FieldInfo GetBackgroundLayersField()

@@ -201,4 +201,10 @@ public class SceneSetupTool : EditorWindow
     {
         foreach (GameObject gameObject in Resources.FindObjectsOfTypeAll<GameObject>())
         {
-            if (gameObject.name =
+            if (gameObject.name == objectName && gameObject.scene.IsValid())
+                return gameObject;
+        }
+
+        return null;
+    }
+}

@@ -155,7 +155,27 @@ public class ScoreCounter : MonoBehaviour
         if (_floatingScorePref == null)
             return null;
 
-        return Instantiate(_floatingScorePref, startPosition, Quaternion.identity, transform.parent);
+        TMP_Text floatingText = Instantiate(_floatingScorePref, startPosition, Quaternion.identity, transform.parent);
+        ConfigureFloatingText(floatingText);
+        return floatingText;
+    }
+
+    private void ConfigureFloatingText(TMP_Text floatingText)
+    {
+        if (floatingText == null)
+            return;
+
+        if (floatingText.font != null && floatingText.font.material != null)
+        {
+            floatingText.fontSharedMaterial = floatingText.font.material;
+        }
+
+        floatingText.raycastTarget = false;
+        floatingText.enableVertexGradient = false;
+        floatingText.enableWordWrapping = false;
+        floatingText.overflowMode = TextOverflowModes.Overflow;
+        floatingText.alignment = TextAlignmentOptions.Center;
+        floatingText.ForceMeshUpdate();
     }
 
     private void FinalizeMatchAward()

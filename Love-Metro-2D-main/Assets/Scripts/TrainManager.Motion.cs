@@ -2,18 +2,6 @@ using UnityEngine;
 
 public partial class TrainManager
 {
-    private void ApplySerializedFallbacks()
-    {
-        if (_maxSpeed < 460f)
-            _maxSpeed = 480f;
-
-        if (_acceleration < 180f)
-            _acceleration = 180f;
-
-        if (_startImpulseSpeedThreshold < 0.5f)
-            _startImpulseSpeedThreshold = 2.0f;
-    }
-
     private void EnsureSpawnerReference()
     {
         if (_spawner == null)

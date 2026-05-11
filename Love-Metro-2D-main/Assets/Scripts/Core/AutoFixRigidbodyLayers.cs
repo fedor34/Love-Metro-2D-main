@@ -19,8 +19,10 @@ public class AutoFixRigidbodyLayers : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DIAGNOSTICS_ENABLED
         EnsureSceneHook();
         RunFix("initial scene load");
+#endif
     }
 
     private static void EnsureSceneHook()

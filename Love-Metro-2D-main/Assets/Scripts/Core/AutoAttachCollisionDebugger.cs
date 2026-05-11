@@ -8,9 +8,11 @@ public class AutoAttachCollisionDebugger : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DIAGNOSTICS_ENABLED
         var go = new GameObject("AutoAttachCollisionDebugger");
         go.AddComponent<AutoAttachCollisionDebugger>();
         DontDestroyOnLoad(go);
+#endif
     }
 
     private void Start()

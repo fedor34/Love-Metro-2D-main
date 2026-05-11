@@ -111,10 +111,13 @@ public partial class Passenger
 
     private void ConfigureRigidbody()
     {
-        _rigidbody.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
-        _rigidbody.interpolation = RigidbodyInterpolation2D.Interpolate;
-        _rigidbody.freezeRotation = true;
-        _rigidbody.gravityScale = 0f;
+        PassengerSettings settings = Settings;
+        _rigidbody.collisionDetectionMode = settings.collisionDetectionMode;
+        _rigidbody.interpolation = settings.interpolation;
+        _rigidbody.freezeRotation = settings.freezeRotation;
+        _rigidbody.gravityScale = settings.gravityScale;
+        _rigidbody.linearDamping = settings.defaultLinearDamping;
+        _rigidbody.angularDamping = settings.defaultAngularDamping;
     }
 
     private void RegisterInRuntimeSystems()
@@ -132,7 +135,7 @@ public partial class Passenger
     private void DetachFromContainer()
     {
         if (container != null)
-            container.RemovePassanger(this);
+            container.RemovePassenger(this);
     }
 
     private void RefreshCoupleRegistryStatus()

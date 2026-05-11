@@ -10,9 +10,11 @@ public class FindAllBoundaries : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DIAGNOSTICS_ENABLED
         var go = new GameObject("FindAllBoundaries");
         go.AddComponent<FindAllBoundaries>();
         DontDestroyOnLoad(go);
+#endif
     }
 
     private void Start()

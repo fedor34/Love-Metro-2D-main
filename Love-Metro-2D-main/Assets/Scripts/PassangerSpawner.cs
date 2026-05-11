@@ -275,8 +275,7 @@ public class PassangerSpawner : MonoBehaviour
 
             Passenger passenger = Instantiate(prefab, position, Quaternion.identity);
             passenger.Initiate(direction, _trainManager, _scoreCounter);
-            passenger.container = _passiveContainer;
-            _passiveContainer.Passangers.Add(passenger);
+            _passiveContainer.AddPassenger(passenger);
 
             ApplyGlobalAbilities(passenger);
             LogPassengerSummary(passenger, "spawned");

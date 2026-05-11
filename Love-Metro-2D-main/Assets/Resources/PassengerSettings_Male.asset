@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8aa1fcf3f0a46de468aad1268a502491, type: 3}
-  m_Name: PassengerSettings
-  m_EditorClassIdentifier: 
+  m_Name: PassengerSettings_Male
+  m_EditorClassIdentifier:
   globalSpeedMultiplier: 0.7
   baseSpeed: 2
-  minFallingSpeed: 0.5
+  minFallingSpeed: 0.1
   additionalCollisionCheckTimePeriod: 2
-  handrailGrabChance: 0.3
-  handrailMinGrabbingSpeed: 1
-  handrailCooldown: 0.5
-  handrailStandingTimeInterval: {x: 1, y: 3}
+  handrailGrabChance: 0.1
+  handrailMinGrabbingSpeed: 0.2
+  handrailCooldown: 5
+  handrailStandingTimeInterval: {x: 3, y: 5}
   launchSensitivity: 1
   minImpulseToLaunch: 3
   impulseToVelocityScale: 0.45

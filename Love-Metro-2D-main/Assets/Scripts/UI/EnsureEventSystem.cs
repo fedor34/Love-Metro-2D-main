@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// <summary>
@@ -11,12 +10,7 @@ public class EnsureEventSystem
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Ensure()
     {
-        // EventSystem
-        if (EventSystem.current == null)
-        {
-            var go = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
-            Object.DontDestroyOnLoad(go);
-        }
+        GameBootstrap.EnsureRuntimeServices();
 
         // Ensure canvases have GraphicRaycaster
         var canvases = Object.FindObjectsOfType<Canvas>();

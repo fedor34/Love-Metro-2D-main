@@ -7,7 +7,7 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
     public static float GlobalSpeedMultiplier = 0.7f;
 
     [Header("Settings (optional)")]
-    [Tooltip("Optional ScriptableObject override. When omitted, inspector values are used.")]
+    [Tooltip("Optional ScriptableObject override. When omitted, Resources/PassengerSettings is used.")]
     [SerializeField] private PassengerSettings _settings;
 
     private delegate void ReleaseHandrail();
@@ -84,54 +84,56 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
     [SerializeField] private float _easeOutMinK = 0.985f;
     [SerializeField] private float _easeOutMaxK = 0.9985f;
 
+    public PassengerSettings Settings => PassengerSettings.Resolve(_settings);
+
     private void ApplySettingsFromAsset()
     {
-        if (_settings == null)
-            return;
+        PassengerSettings settings = Settings;
 
-        GlobalSpeedMultiplier = _settings.globalSpeedMultiplier;
-        _speed = _settings.baseSpeed;
-        _minFallingSpeed = _settings.minFallingSpeed;
+        GlobalSpeedMultiplier = settings.globalSpeedMultiplier;
+        _speed = settings.baseSpeed * settings.globalSpeedMultiplier;
+        _minFallingSpeed = settings.minFallingSpeed;
+        _aditionalCollisionCheckTimePeriod = settings.additionalCollisionCheckTimePeriod;
 
-        _grabingHandrailChance = _settings.handrailGrabChance;
-        _handrailMinGrabbingSpeed = _settings.handrailMinGrabbingSpeed;
-        _handrailCooldown = _settings.handrailCooldown;
-        HandrailStandingTimeInterval = _settings.handrailStandingTimeInterval;
+        _grabingHandrailChance = settings.handrailGrabChance;
+        _handrailMinGrabbingSpeed = settings.handrailMinGrabbingSpeed;
+        _handrailCooldown = settings.handrailCooldown;
+        HandrailStandingTimeInterval = settings.handrailStandingTimeInterval;
 
-        _launchSensitivity = _settings.launchSensitivity;
-        _minImpulseToLaunch = _settings.minImpulseToLaunch;
-        _impulseToVelocityScale = _settings.impulseToVelocityScale;
-        _globalImpulseScale = _settings.globalImpulseScale;
-        _uniformLaunchScale = _settings.uniformLaunchScale;
-        _uniformLaunchGamma = _settings.uniformLaunchGamma;
-        _flightHorizontalScale = _settings.flightHorizontalScale;
-        _flightVerticalScale = _settings.flightVerticalScale;
-        _flightVerticalGamma = _settings.flightVerticalGamma;
-        _minWindStrengthForFlying = _settings.minWindStrengthForFlying;
-        _maxFlyingTime = _settings.maxFlyingTime;
+        _launchSensitivity = settings.launchSensitivity;
+        _minImpulseToLaunch = settings.minImpulseToLaunch;
+        _impulseToVelocityScale = settings.impulseToVelocityScale;
+        _globalImpulseScale = settings.globalImpulseScale;
+        _uniformLaunchScale = settings.uniformLaunchScale;
+        _uniformLaunchGamma = settings.uniformLaunchGamma;
+        _flightHorizontalScale = settings.flightHorizontalScale;
+        _flightVerticalScale = settings.flightVerticalScale;
+        _flightVerticalGamma = settings.flightVerticalGamma;
+        _minWindStrengthForFlying = settings.minWindStrengthForFlying;
+        _maxFlyingTime = settings.maxFlyingTime;
 
-        _maxFlightSpeed = _settings.maxFlightSpeed;
-        _flightSpeedMultiplier = _settings.flightSpeedMultiplier;
-        _flightDeceleration = _settings.flightDeceleration;
-        _maxBounces = _settings.maxBounces;
-        _bounceElasticity = _settings.bounceElasticity;
-        _wallBounceBoost = _settings.wallBounceBoost;
+        _maxFlightSpeed = settings.maxFlightSpeed;
+        _flightSpeedMultiplier = settings.flightSpeedMultiplier;
+        _flightDeceleration = settings.flightDeceleration;
+        _maxBounces = settings.maxBounces;
+        _bounceElasticity = settings.bounceElasticity;
+        _wallBounceBoost = settings.wallBounceBoost;
 
-        _easeOutMinK = _settings.easeOutMinK;
-        _easeOutMaxK = _settings.easeOutMaxK;
+        _easeOutMinK = settings.easeOutMinK;
+        _easeOutMaxK = settings.easeOutMaxK;
 
-        _aimAssistRadius = _settings.aimAssistRadius;
-        _aimAssistMaxStrength = _settings.aimAssistMaxStrength;
-        _turbulenceStrength = _settings.turbulenceStrength;
-        _angleSnapDeg = _settings.angleSnapDeg;
+        _aimAssistRadius = settings.aimAssistRadius;
+        _aimAssistMaxStrength = settings.aimAssistMaxStrength;
+        _turbulenceStrength = settings.turbulenceStrength;
+        _angleSnapDeg = settings.angleSnapDeg;
 
-        _magnetRadius = _settings.magnetRadius;
-        _magnetForce = _settings.magnetForce;
-        _repelRadius = _settings.repelRadius;
-        _repelForce = _settings.repelForce;
+        _magnetRadius = settings.magnetRadius;
+        _magnetForce = settings.magnetForce;
+        _repelRadius = settings.repelRadius;
+        _repelForce = settings.repelForce;
 
-        _rematchCooldown = _settings.rematchCooldown;
-        _defaultLayer = _settings.defaultLayer;
+        _rematchCooldown = settings.rematchCooldown;
+        _defaultLayer = settings.defaultLayer;
     }
 
     public void Initiate(Vector3 initialMovingDirection, TrainManager train, ScoreCounter scoreCounter)
@@ -140,7 +142,6 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
 
         _initialMovingDirection = initialMovingDirection;
         CurrentMovingDirection = _initialMovingDirection.normalized;
-        _speed *= GlobalSpeedMultiplier;
         _scoreCounter = scoreCounter;
 
         EnsureRequiredComponents();
@@ -156,25 +157,6 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
             : "<null>";
         Diagnostics.Log($"[Passenger][init] name={name} female={IsFemale} layer={gameObject.layer} sprite='{spriteName}' ctrl='{controllerName}'");
 
-        if (_launchSensitivity <= 0f) _launchSensitivity = 1.2f;
-        if (_minImpulseToLaunch <= 0f) _minImpulseToLaunch = 0.1f;
-        if (_aimAssistRadius <= 0f) _aimAssistRadius = 5.0f;
-        if (_aimAssistMaxStrength <= 0f) _aimAssistMaxStrength = 1.0f;
-        if (_turbulenceStrength < 0f) _turbulenceStrength = 0.6f;
-        if (_angleSnapDeg <= 0f) _angleSnapDeg = 10f;
-        if (_impulseToVelocityScale <= 0f) _impulseToVelocityScale = 3.2f;
-        if (_maxFlightSpeed <= 0f) _maxFlightSpeed = 56f;
-        if (_flightSpeedMultiplier <= 0f || _flightSpeedMultiplier > 2f) _flightSpeedMultiplier = 0.7f;
-        if (_globalImpulseScale <= 0f || _globalImpulseScale > 2f) _globalImpulseScale = 0.8f;
-        if (_uniformLaunchScale <= 0f) _uniformLaunchScale = 1.8f;
-        if (_uniformLaunchGamma <= 0f) _uniformLaunchGamma = 0.75f;
-        if (_flightHorizontalScale <= 0f) _flightHorizontalScale = 0.48f;
-        if (_flightVerticalScale <= 0f) _flightVerticalScale = 2.88f;
-        if (_flightVerticalGamma <= 0f) _flightVerticalGamma = 0.65f;
-        if (_minWindStrengthForFlying <= 0f) _minWindStrengthForFlying = 8f;
-        if (_maxFlyingTime <= 0f) _maxFlyingTime = 5f;
-        _wallBounceBoost = 1f;
-
         EnsureStateMachineInitialized();
         _currentState = wanderingState;
         _currentState?.Enter();
@@ -186,9 +168,9 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
 
         _isInitiated = true;
         if (LevelGameplaySettings.SlipperyFloorEnabled)
-            _rigidbody.drag = LevelGameplaySettings.SlipperyLinearDrag;
+            _rigidbody.linearDamping = LevelGameplaySettings.SlipperyLinearDrag;
 
-        Diagnostics.Log($"[Passenger][ready] name={name} rb(cdm={_rigidbody.collisionDetectionMode}, interp={_rigidbody.interpolation}, drag={_rigidbody.drag:F2})");
+        Diagnostics.Log($"[Passenger][ready] name={name} rb(cdm={_rigidbody.collisionDetectionMode}, interp={_rigidbody.interpolation}, drag={_rigidbody.linearDamping:F2})");
     }
 
     private void Update()

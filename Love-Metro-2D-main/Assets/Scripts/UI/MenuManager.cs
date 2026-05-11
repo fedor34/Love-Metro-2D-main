@@ -21,15 +21,33 @@ public class MenuManager : MonoBehaviour
     
     [Header("Анимация")]
     [SerializeField] private Animator _menuAnimator;
+
+    public void Configure(
+        Button playButton,
+        Button charactersButton,
+        Button settingsButton,
+        Button exitButton,
+        GameObject mainMenuPanel,
+        GameObject charactersPanel,
+        GameObject settingsPanel,
+        string gameSceneName)
+    {
+        _playButton = playButton;
+        _charactersButton = charactersButton;
+        _settingsButton = settingsButton;
+        _exitButton = exitButton;
+        _mainMenuPanel = mainMenuPanel;
+        _charactersPanel = charactersPanel;
+        _settingsPanel = settingsPanel;
+
+        if (!string.IsNullOrEmpty(gameSceneName))
+            _gameSceneName = gameSceneName;
+    }
     
     private void Start()
     {
         // На всякий случай убедимся, что UI кликается
-        if (UnityEngine.EventSystems.EventSystem.current == null)
-        {
-            var go = new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.EventSystems.StandaloneInputModule));
-            DontDestroyOnLoad(go);
-        }
+        GameBootstrap.EnsureRuntimeServices();
 
         var canvas = GetComponentInParent<Canvas>();
         if (canvas != null && canvas.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
@@ -72,16 +90,28 @@ public class MenuManager : MonoBehaviour
             _exitButton = FindButtonByName("ExitButton");
 
         if (_playButton != null)
+        {
+            _playButton.onClick.RemoveListener(OnPlayButtonClicked);
             _playButton.onClick.AddListener(OnPlayButtonClicked);
+        }
 
         if (_charactersButton != null)
+        {
+            _charactersButton.onClick.RemoveListener(OnCharactersButtonClicked);
             _charactersButton.onClick.AddListener(OnCharactersButtonClicked);
+        }
 
         if (_settingsButton != null)
+        {
+            _settingsButton.onClick.RemoveListener(OnSettingsButtonClicked);
             _settingsButton.onClick.AddListener(OnSettingsButtonClicked);
+        }
 
         if (_exitButton != null)
+        {
+            _exitButton.onClick.RemoveListener(OnExitButtonClicked);
             _exitButton.onClick.AddListener(OnExitButtonClicked);
+        }
     }
 
     private UnityEngine.UI.Button FindButtonByName(string name)
@@ -239,4 +269,4 @@ public class MenuManager : MonoBehaviour
     }
     
     #endregion
-} 
+}

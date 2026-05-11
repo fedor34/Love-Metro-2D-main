@@ -6,7 +6,9 @@
 
 ## Класс Passenger
 
-**Файл:** `Passenger.cs` (~1400 строк)
+**Файлы:** `Passenger.cs`, `Passenger.Lifecycle.cs`, `Passenger.MatchLogic.cs`, `Passenger.FieldEffects.cs`, `Passenger.StateMachine.cs`, `Passenger/States/*.cs`
+
+Состояния вынесены в отдельные файлы, но остаются private nested-классами внутри `partial Passenger`. Это сохраняет текущий serialized API и позволяет уменьшать размер файлов без миграции префабов.
 
 ### Основные компоненты
 

@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// ScriptableObject with the shared passenger tuning values.
+/// ScriptableObject with the shared passenger tuning and physics values.
 /// Create an asset via Assets -> Create -> Love Metro -> Passenger Settings.
 /// </summary>
 [CreateAssetMenu(fileName = "PassengerSettings", menuName = "Love Metro/Passenger Settings")]
@@ -17,6 +17,9 @@ public class PassengerSettings : ScriptableObject
 
     [Tooltip("Minimum flight speed before the passenger returns to wandering.")]
     public float minFallingSpeed = 0.5f;
+
+    [Tooltip("Cooldown before additional collision checks can run again.")]
+    public float additionalCollisionCheckTimePeriod = 2f;
 
     [Header("Handrail")]
     [Tooltip("Chance to grab a handrail.")]
@@ -131,6 +134,31 @@ public class PassengerSettings : ScriptableObject
     [Tooltip("Default layer assigned to the passenger.")]
     public string defaultLayer = "Default";
 
+    [Header("Rigidbody")]
+    [Tooltip("Collision detection mode assigned to passenger rigidbodies.")]
+    public CollisionDetectionMode2D collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+
+    [Tooltip("Interpolation mode assigned to passenger rigidbodies.")]
+    public RigidbodyInterpolation2D interpolation = RigidbodyInterpolation2D.Interpolate;
+
+    [Tooltip("Whether passenger rigidbody rotation is frozen.")]
+    public bool freezeRotation = true;
+
+    [Tooltip("Gravity scale assigned to passenger rigidbodies.")]
+    public float gravityScale = 0f;
+
+    [Tooltip("Linear damping used while the passenger is walking or standing.")]
+    public float defaultLinearDamping = 0.2f;
+
+    [Tooltip("Angular damping used while the passenger is walking or standing.")]
+    public float defaultAngularDamping = 0.2f;
+
+    [Tooltip("Linear damping used while the passenger is airborne.")]
+    public float airborneLinearDamping = 0.02f;
+
+    [Tooltip("Angular damping used while the passenger is airborne.")]
+    public float airborneAngularDamping = 0.02f;
+
     private static PassengerSettings _default;
 
     public static PassengerSettings Default
@@ -149,5 +177,60 @@ public class PassengerSettings : ScriptableObject
 
             return _default;
         }
+    }
+
+    public static PassengerSettings Resolve(PassengerSettings overrideSettings)
+    {
+        return overrideSettings != null ? overrideSettings : Default;
+    }
+
+    private void OnValidate()
+    {
+        globalSpeedMultiplier = Mathf.Clamp(globalSpeedMultiplier, 0.1f, 2f);
+        baseSpeed = Mathf.Max(0f, baseSpeed);
+        minFallingSpeed = Mathf.Max(0f, minFallingSpeed);
+        additionalCollisionCheckTimePeriod = Mathf.Max(0f, additionalCollisionCheckTimePeriod);
+
+        handrailGrabChance = Mathf.Clamp01(handrailGrabChance);
+        handrailMinGrabbingSpeed = Mathf.Max(0f, handrailMinGrabbingSpeed);
+        handrailCooldown = Mathf.Max(0f, handrailCooldown);
+        handrailStandingTimeInterval.x = Mathf.Max(0f, handrailStandingTimeInterval.x);
+        handrailStandingTimeInterval.y = Mathf.Max(handrailStandingTimeInterval.x, handrailStandingTimeInterval.y);
+
+        launchSensitivity = Mathf.Max(0.05f, launchSensitivity);
+        minImpulseToLaunch = Mathf.Max(0f, minImpulseToLaunch);
+        impulseToVelocityScale = Mathf.Max(0.01f, impulseToVelocityScale);
+        globalImpulseScale = Mathf.Clamp(globalImpulseScale, 0.01f, 2f);
+        maxFlightSpeed = Mathf.Max(0.01f, maxFlightSpeed);
+        flightSpeedMultiplier = Mathf.Clamp(flightSpeedMultiplier, 0.01f, 2f);
+        flightDeceleration = Mathf.Max(0f, flightDeceleration);
+        maxBounces = Mathf.Max(1, maxBounces);
+        bounceElasticity = Mathf.Clamp01(bounceElasticity);
+        wallBounceBoost = Mathf.Max(0f, wallBounceBoost);
+
+        easeOutMinK = Mathf.Clamp(easeOutMinK, 0.9f, 1f);
+        easeOutMaxK = Mathf.Clamp(easeOutMaxK, easeOutMinK, 1f);
+        aimAssistRadius = Mathf.Max(0f, aimAssistRadius);
+        aimAssistMaxStrength = Mathf.Max(0f, aimAssistMaxStrength);
+        turbulenceStrength = Mathf.Max(0f, turbulenceStrength);
+        angleSnapDeg = Mathf.Max(0f, angleSnapDeg);
+
+        magnetRadius = Mathf.Max(0f, magnetRadius);
+        magnetForce = Mathf.Max(0f, magnetForce);
+        repelRadius = Mathf.Max(0f, repelRadius);
+        repelForce = Mathf.Max(0f, repelForce);
+        rematchCooldown = Mathf.Max(0f, rematchCooldown);
+        uniformLaunchScale = Mathf.Max(0.01f, uniformLaunchScale);
+        uniformLaunchGamma = Mathf.Max(0.01f, uniformLaunchGamma);
+        flightHorizontalScale = Mathf.Max(0f, flightHorizontalScale);
+        flightVerticalScale = Mathf.Max(0f, flightVerticalScale);
+        flightVerticalGamma = Mathf.Max(0.01f, flightVerticalGamma);
+        minWindStrengthForFlying = Mathf.Max(0f, minWindStrengthForFlying);
+        maxFlyingTime = Mathf.Max(0.01f, maxFlyingTime);
+
+        defaultLinearDamping = Mathf.Max(0f, defaultLinearDamping);
+        defaultAngularDamping = Mathf.Max(0f, defaultAngularDamping);
+        airborneLinearDamping = Mathf.Max(0f, airborneLinearDamping);
+        airborneAngularDamping = Mathf.Max(0f, airborneAngularDamping);
     }
 }

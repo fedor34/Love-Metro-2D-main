@@ -39,13 +39,8 @@ public class MenuInitializer : MonoBehaviour
         if (_instance == null)
             _instance = this;
 
+        GameBootstrap.EnsureRuntimeServices();
         EnsureSceneManager();
-        // Гарантируем наличие EventSystem
-        if (UnityEngine.EventSystems.EventSystem.current == null)
-        {
-            var go = new GameObject("EventSystem", typeof(UnityEngine.EventSystems.EventSystem), typeof(UnityEngine.EventSystems.StandaloneInputModule));
-            DontDestroyOnLoad(go);
-        }
         AutoConfigureMenuManager();
     }
 
@@ -57,16 +52,14 @@ public class MenuInitializer : MonoBehaviour
             // Создаём GameSceneManager
             GameObject sceneManagerObj = new GameObject("GameSceneManager");
             GameSceneManager sceneManager = sceneManagerObj.AddComponent<GameSceneManager>();
-
-            // Настраиваем через рефлексию, так как поля private
-            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-            typeof(GameSceneManager).GetField("_mainMenuScene", flags)?.SetValue(sceneManager, _mainMenuSceneName);
-            typeof(GameSceneManager).GetField("_gameScene", flags)?.SetValue(sceneManager, _gameSceneName);
-            typeof(GameSceneManager).GetField("_useLoadingScreen", flags)?.SetValue(sceneManager, _useLoadingScreen);
+            sceneManager.Configure(_mainMenuSceneName, _gameSceneName, _useLoadingScreen);
 
             DontDestroyOnLoad(sceneManagerObj);
             Debug.Log("MenuInitializer: GameSceneManager создан и настроен");
+            return;
         }
+
+        GameSceneManager.Instance.Configure(_mainMenuSceneName, _gameSceneName, _useLoadingScreen);
     }
 
     private void AutoConfigureMenuManager()
@@ -93,20 +86,15 @@ public class MenuInitializer : MonoBehaviour
         GameObject charactersPanel = GameObject.Find(_charactersPanelName);
         GameObject settingsPanel = GameObject.Find(_settingsPanelName);
 
-        // Настраиваем приватные поля через рефлексию
-        var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
-        System.Type menuType = typeof(MenuManager);
-        menuType.GetField("_playButton", flags)?.SetValue(menuManager, playBtn);
-        menuType.GetField("_charactersButton", flags)?.SetValue(menuManager, charBtn);
-        menuType.GetField("_settingsButton", flags)?.SetValue(menuManager, setBtn);
-        menuType.GetField("_exitButton", flags)?.SetValue(menuManager, exitBtn);
-
-        menuType.GetField("_mainMenuPanel", flags)?.SetValue(menuManager, mainMenuPanel);
-        menuType.GetField("_charactersPanel", flags)?.SetValue(menuManager, charactersPanel);
-        menuType.GetField("_settingsPanel", flags)?.SetValue(menuManager, settingsPanel);
-
-        // Удостоверимся, что Game Scene Name соответствует
-        menuType.GetField("_gameSceneName", flags)?.SetValue(menuManager, _gameSceneName);
+        menuManager.Configure(
+            playBtn,
+            charBtn,
+            setBtn,
+            exitBtn,
+            mainMenuPanel,
+            charactersPanel,
+            settingsPanel,
+            _gameSceneName);
 
         Debug.Log("MenuInitializer: MenuManager автоматически сконфигурирован");
     }
@@ -126,4 +114,4 @@ public class MenuInitializer : MonoBehaviour
         }
         return btn;
     }
-} 
+}

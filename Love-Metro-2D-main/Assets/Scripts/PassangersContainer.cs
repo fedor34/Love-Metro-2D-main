@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,10 +5,38 @@ public class PassangersContainer : MonoBehaviour
 {
     [SerializeField] public List<Passenger> Passangers;
 
+    public IReadOnlyList<Passenger> Passengers => EnsurePassengers();
+    public int Count => EnsurePassengers().Count;
+
+    public void AddPassenger(Passenger passenger)
+    {
+        if (passenger == null)
+            return;
+
+        List<Passenger> passengers = EnsurePassengers();
+        if (!passengers.Contains(passenger))
+        {
+            passengers.Add(passenger);
+            passenger.container = this;
+        }
+    }
+
+    public bool RemovePassenger(Passenger passenger)
+    {
+        if (passenger == null || Passangers == null)
+            return false;
+
+        return Passangers.Remove(passenger);
+    }
+
+    public void ClearPassengers()
+    {
+        EnsurePassengers().Clear();
+    }
+
     public void RemovePassanger(Passenger p)
     {
-        if (p != null && Passangers != null && Passangers.Contains(p))
-            Passangers.Remove(p);
+        RemovePassenger(p);
     }
 
     /// <summary>
@@ -37,5 +64,13 @@ public class PassangersContainer : MonoBehaviour
             Destroy(p.gameObject);
         }
         Passangers.Clear();
+    }
+
+    private List<Passenger> EnsurePassengers()
+    {
+        if (Passangers == null)
+            Passangers = new List<Passenger>();
+
+        return Passangers;
     }
 }

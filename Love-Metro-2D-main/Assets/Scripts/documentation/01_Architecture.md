@@ -58,6 +58,24 @@ Assets/Scripts/
 
 ## Архитектурные паттерны
 
+### Runtime Bootstrap
+
+Точка входа для обязательных runtime-сервисов — `GameBootstrap.EnsureRuntimeServices()`.
+Она создаёт или переиспользует:
+
+- `PassengerRegistry`
+- `CouplesManager`
+- `FieldEffectSystem`
+- `ClickDirectionManager`
+- `ManualPairingManager`
+- `EventSystem`
+
+Остальные bootstrap-компоненты должны делегировать создание этих сервисов в `GameBootstrap`, а не создавать свои дубликаты.
+
+### Compatibility API
+
+Проект пока сохраняет исторические имена `Passanger*`, `spawnPassangers()`, `RemovePassanger()` и публичное поле `Passangers`, чтобы не ломать сцены и prefab-ссылки. Новый код должен использовать `Passenger`, `AddPassenger`, `RemovePassenger`, `ClearPassengers`, `Count` и `Passengers`, но без удаления старого API в этом цикле.
+
 ### 1. Singleton Pattern
 
 Используется для глобально доступных менеджеров:

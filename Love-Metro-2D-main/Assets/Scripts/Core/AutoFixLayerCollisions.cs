@@ -9,6 +9,7 @@ public class AutoFixLayerCollisions : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void FixCollisions()
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DIAGNOSTICS_ENABLED
         int defaultLayer = LayerMask.NameToLayer("Default");
         int wallLayer = LayerMask.NameToLayer("Wall");
         int softWallLayer = LayerMask.NameToLayer("SoftWall");
@@ -73,6 +74,7 @@ public class AutoFixLayerCollisions : MonoBehaviour
         {
             Debug.LogError($"[AutoFixLayerCollisions] ❌ SOME COLLISIONS STILL DISABLED!");
         }
+#endif
     }
 }
 

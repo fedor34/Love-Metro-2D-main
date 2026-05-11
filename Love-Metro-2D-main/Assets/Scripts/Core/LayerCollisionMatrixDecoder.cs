@@ -10,9 +10,11 @@ public class LayerCollisionMatrixDecoder : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DIAGNOSTICS_ENABLED
         var go = new GameObject("LayerCollisionMatrixDecoder");
         go.AddComponent<LayerCollisionMatrixDecoder>();
         DontDestroyOnLoad(go);
+#endif
     }
 
     private void Start()

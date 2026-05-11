@@ -131,7 +131,11 @@ public class BoidsLiteStrategy : IPassengerMovementStrategy
         float yOffset = passenger.transform.position.y;
         Vector2 centering = new Vector2(0, -yOffset * CenteringForce);
 
-        foreach (var other in Object.FindObjectsOfType<Passenger>())
+        IReadOnlyList<Passenger> passengers = PassengerRegistry.Instance != null
+            ? PassengerRegistry.Instance.AllPassengers
+            : Object.FindObjectsOfType<Passenger>();
+
+        foreach (var other in passengers)
         {
             if (other == passenger) continue;
             Vector2 toOther = (Vector2)(other.transform.position - passenger.transform.position);
@@ -148,7 +152,7 @@ public class BoidsLiteStrategy : IPassengerMovementStrategy
             var rb = other.GetRigidbody();
             if (rb != null)
             {
-                alignment += rb.velocity;
+                alignment += rb.linearVelocity;
                 alignmentCount++;
             }
         }

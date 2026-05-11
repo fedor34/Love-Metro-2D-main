@@ -74,7 +74,6 @@ public partial class TrainManager : MonoBehaviour
     {
         SetSpeed(_minSpeed);
         _cameraStartPosition = _camera != null ? _camera.position : Vector3.zero;
-        ApplySerializedFallbacks();
         CacheReferences();
     }
 

@@ -10,6 +10,7 @@ public class BoundaryAutoFix : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void ApplyFix()
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD || DIAGNOSTICS_ENABLED
         int softWall = LayerMask.NameToLayer("SoftWall");
         if (softWall < 0) return;
 
@@ -37,5 +38,6 @@ public class BoundaryAutoFix : MonoBehaviour
             Debug.Log($"[BoundaryAutoFix] Disabled {disabled} PlatformEffector2D on SoftWall objects (code-only fix).");
         else
             Debug.Log("[BoundaryAutoFix] No SoftWall effectors found.");
+#endif
     }
 }

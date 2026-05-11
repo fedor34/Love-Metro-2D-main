@@ -1,5 +1,22 @@
 # Руководство по рефакторингу Love Metro 2D
 
+## Текущий консервативный этап
+
+Этот этап снижает техдолг без переименования `Passanger*` классов и без массовой миграции префабов:
+
+- Runtime-сервисы централизованы через `GameBootstrap.EnsureRuntimeServices()`.
+- `MenuInitializer` больше не настраивает `MenuManager` и `GameSceneManager` через reflection; вместо этого используются явные `Configure(...)` методы.
+- Состояния `Passenger` вынесены в `Assets/Scripts/Passenger/States/`, но остаются private nested-классами внутри `partial Passenger`, поэтому serialized API не меняется.
+- `PassangersContainer` получил новый API `AddPassenger`, `RemovePassenger`, `ClearPassengers`, `Count`, `Passengers`; старые `Passangers` и `RemovePassanger` оставлены для совместимости.
+- Пустые `includeLayers` на пассажирских префабах исправлены в prefab, а аварийные auto-fix скрипты запускаются только в Editor/Development Build.
+- `PassengerSettings` пока не применяется как глобальный default ко всем префабам автоматически; используйте `Love Metro/Reports/Passenger Settings Migration Report` перед ручной миграцией значений.
+
+## Что проверять после изменений
+
+- EditMode tests: весь набор в `Assets/Tests/Editor`.
+- PlayMode smoke: `Assets/Tests/PlayMode/RuntimeSmokeTests.cs`.
+- Static acceptance: отсутствие reflection-конфигурации в runtime UI и пустых physics `includeLayers` на passenger prefab.
+
 ## Что было сделано
 
 ### 1. PassengerRegistry (Core/PassengerRegistry.cs)

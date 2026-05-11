@@ -81,9 +81,9 @@ public class VipBoundaryReturnSystem : MonoBehaviour
         var rb = passenger.GetComponent<Rigidbody2D>();
         if (rb != null)
         {
-            rb.velocity = Vector2.zero;
+            rb.linearVelocity = Vector2.zero;
             rb.angularVelocity = 0f;
-            rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+            rb.collisionDetectionMode = passenger.Settings.collisionDetectionMode;
             rb.includeLayers = Physics2D.AllLayers;
             rb.excludeLayers = 0;
             rb.AddForce(Vector2.up * _returnKickForce, ForceMode2D.Impulse);

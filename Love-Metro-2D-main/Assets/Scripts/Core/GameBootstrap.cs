@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 /// <summary>
 /// Bootstrap скрипт для инициализации необходимых синглтонов при старте игры.
@@ -9,28 +10,67 @@ public class GameBootstrap : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void InitializeSingletons()
     {
-        // Создаём PassengerRegistry если его ещё нет
-        if (PassengerRegistry.Instance == null)
-        {
-            var registryObj = new GameObject("[PassengerRegistry]");
-            registryObj.AddComponent<PassengerRegistry>();
-            DontDestroyOnLoad(registryObj);
-        }
+        EnsureRuntimeServices();
+    }
+
+    public static void EnsureRuntimeServices()
+    {
+        EnsurePersistentSingleton(PassengerRegistry.Instance, "[PassengerRegistry]");
+        EnsurePersistentSingleton(CouplesManager.Instance, "[CouplesManager]");
+        EnsurePersistentSingleton(FieldEffectSystem.Instance, "[FieldEffectSystem]");
+        EnsurePersistentSceneComponent<ClickDirectionManager>("ClickDirectionManager");
+        EnsurePersistentSceneComponent<ManualPairingManager>("ManualPairingManager");
+        EnsureEventSystem();
     }
 
     private void Awake()
     {
-        // Убеждаемся что PassengerRegistry существует
-        EnsurePassengerRegistry();
+        EnsureRuntimeServices();
     }
 
-    private void EnsurePassengerRegistry()
+    private static T EnsurePersistentSingleton<T>(T instance, string objectName) where T : Component
     {
-        if (PassengerRegistry.Instance == null)
+        if (instance != null)
+            return instance;
+
+        T existing = Object.FindObjectOfType<T>();
+        if (existing != null)
         {
-            var registryObj = new GameObject("[PassengerRegistry]");
-            registryObj.AddComponent<PassengerRegistry>();
+            DontDestroyOnLoad(existing.transform.root.gameObject);
+            return existing;
         }
+
+        GameObject serviceObject = new GameObject(objectName);
+        T service = serviceObject.AddComponent<T>();
+        DontDestroyOnLoad(serviceObject);
+        return service;
+    }
+
+    private static T EnsurePersistentSceneComponent<T>(string objectName) where T : Component
+    {
+        T existing = Object.FindObjectOfType<T>();
+        if (existing != null)
+        {
+            DontDestroyOnLoad(existing.transform.root.gameObject);
+            return existing;
+        }
+
+        GameObject serviceObject = new GameObject(objectName);
+        T service = serviceObject.AddComponent<T>();
+        DontDestroyOnLoad(serviceObject);
+        return service;
+    }
+
+    private static void EnsureEventSystem()
+    {
+        if (EventSystem.current != null)
+            return;
+
+        GameObject eventSystem = new GameObject(
+            "EventSystem",
+            typeof(EventSystem),
+            typeof(StandaloneInputModule));
+        DontDestroyOnLoad(eventSystem);
     }
 
     /// <summary>

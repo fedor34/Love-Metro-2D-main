@@ -78,7 +78,7 @@ public class CoupleSystemTests
         _registry.Register(female);
         couple.Init(male, female);
 
-        hitter.GetComponent<Rigidbody2D>().velocity = new Vector2(8f, 0f);
+        hitter.GetComponent<Rigidbody2D>().linearVelocity = new Vector2(8f, 0f);
         couple.BreakByHit(hitter);
 
         Assert.IsFalse(male.IsInCouple);
@@ -103,7 +103,7 @@ public class CoupleSystemTests
         _registry.Register(female);
         couple.Init(male, female);
 
-        hitter.GetComponent<Rigidbody2D>().velocity = new Vector2(1f, 0f);
+        hitter.GetComponent<Rigidbody2D>().linearVelocity = new Vector2(1f, 0f);
         couple.BreakByHit(hitter);
 
         Assert.IsTrue(male.IsInCouple);

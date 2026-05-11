@@ -69,7 +69,7 @@ public class CollisionDebugger : MonoBehaviour
             Debug.LogWarning($"  Contact point: {collision.contacts[0].point}");
             Debug.LogWarning($"  Normal: {collision.contacts[0].normal}");
             Debug.LogWarning($"  VIP position: {transform.position}");
-            Debug.LogWarning($"  VIP velocity: {_rb.velocity}");
+            Debug.LogWarning($"  VIP velocity: {_rb.linearVelocity}");
         }
         else
         {
@@ -126,7 +126,7 @@ public class CollisionDebugger : MonoBehaviour
             Debug.LogError($"[CollisionDebugger] !!! VIP {name} OUT OF BOUNDS !!!");
             Debug.LogError($"  World position: {transform.position}");
             Debug.LogError($"  Screen position: {screenPos}");
-            Debug.LogError($"  Velocity: {_rb.velocity}");
+            Debug.LogError($"  Velocity: {_rb.linearVelocity}");
             Debug.LogError($"  State: {_passenger?.GetCurrentStateName()}");
             Debug.LogError($"  Layer: {LayerMask.LayerToName(gameObject.layer)}");
         }

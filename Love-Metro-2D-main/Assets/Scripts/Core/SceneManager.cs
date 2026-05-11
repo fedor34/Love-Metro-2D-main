@@ -20,6 +20,17 @@ public class GameSceneManager : MonoBehaviour
     public System.Action<string> OnSceneLoadStarted;
     public System.Action<string> OnSceneLoadCompleted;
     public System.Action<float> OnLoadingProgress;
+
+    public void Configure(string mainMenuScene, string gameScene, bool useLoadingScreen)
+    {
+        if (!string.IsNullOrEmpty(mainMenuScene))
+            _mainMenuScene = mainMenuScene;
+
+        if (!string.IsNullOrEmpty(gameScene))
+            _gameScene = gameScene;
+
+        _useLoadingScreen = useLoadingScreen;
+    }
     
     private void Awake()
     {
@@ -123,7 +134,7 @@ public class GameSceneManager : MonoBehaviour
             yield return null;
         }
         
-        OnSceneLoadCompleted?.Invoke(targetScene);
+        NotifySceneLoadCompleted(targetScene);
         Debug.Log($"GameSceneManager: Сцена {targetScene} успешно загружена");
     }
     
@@ -139,7 +150,7 @@ public class GameSceneManager : MonoBehaviour
             yield return null;
         }
         
-        OnSceneLoadCompleted?.Invoke(sceneName);
+        NotifySceneLoadCompleted(sceneName);
         Debug.Log($"GameSceneManager: Сцена {sceneName} успешно загружена");
     }
     
@@ -150,6 +161,12 @@ public class GameSceneManager : MonoBehaviour
     public string GetCurrentSceneName()
     {
         return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+    }
+
+    private void NotifySceneLoadCompleted(string sceneName)
+    {
+        GameBootstrap.OnSceneChange();
+        OnSceneLoadCompleted?.Invoke(sceneName);
     }
     
     public bool IsInMainMenu()
@@ -192,4 +209,4 @@ public class GameSceneManager : MonoBehaviour
     }
     
     #endregion
-} 
+}

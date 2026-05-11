@@ -144,7 +144,7 @@ public class Couple : MonoBehaviour
             return new ImpactInfo(defaultPosition, Vector2.zero, _penaltyMin);
 
         Rigidbody2D rigidbody = hitter.GetRigidbody();
-        Vector2 velocity = rigidbody != null ? rigidbody.velocity : Vector2.zero;
+        Vector2 velocity = rigidbody != null ? rigidbody.linearVelocity : Vector2.zero;
         float speed = velocity.magnitude;
         float penaltyLerp = Mathf.Clamp01(speed / 10f);
         int penalty = Mathf.RoundToInt(Mathf.Lerp(_penaltyMin, _penaltyMax, penaltyLerp));

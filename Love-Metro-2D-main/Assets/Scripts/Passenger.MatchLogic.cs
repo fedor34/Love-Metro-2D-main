@@ -92,7 +92,7 @@ public partial class Passenger
 
     private Vector2 GetCurrentVelocity()
     {
-        return _rigidbody != null ? _rigidbody.velocity : Vector2.zero;
+        return _rigidbody != null ? _rigidbody.linearVelocity : Vector2.zero;
     }
 
     private void ApplyReflectedVelocity(Vector2 velocity, Vector2 normal, float boostMultiplier)
@@ -100,7 +100,7 @@ public partial class Passenger
         if (_rigidbody == null)
             return;
 
-        _rigidbody.velocity = ReflectVelocity(velocity, normal, boostMultiplier);
+        _rigidbody.linearVelocity = ReflectVelocity(velocity, normal, boostMultiplier);
     }
 
     private void EnterFallingState(Vector2 initialVelocity)

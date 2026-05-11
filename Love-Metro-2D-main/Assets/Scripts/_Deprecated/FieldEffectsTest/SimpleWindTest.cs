@@ -80,7 +80,7 @@ public class SimpleWindTest : MonoBehaviour
             var rb = passenger.GetRigidbody();
             if (rb != null)
             {
-                Debug.Log($"[SimpleWindTest] Velocity через 0.1с: {rb.velocity} (magnitude: {rb.velocity.magnitude:F1})");
+                Debug.Log($"[SimpleWindTest] Velocity через 0.1с: {rb.linearVelocity} (magnitude: {rb.linearVelocity.magnitude:F1})");
             }
         }
     }

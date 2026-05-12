@@ -86,7 +86,10 @@ public partial class Passenger
             PassangerAnimator = GetComponent<PassangerAnimator>() ?? gameObject.AddComponent<PassangerAnimator>();
 
         if (_collider != null)
+        {
+            ResetPhysicsCollisionFilters();
             return;
+        }
 
         _collider = GetComponent<Collider2D>();
         if (_collider == null)
@@ -95,6 +98,8 @@ public partial class Passenger
             collider.isTrigger = false;
             _collider = collider;
         }
+
+        ResetPhysicsCollisionFilters();
     }
 
     private static void EnsureSolidColliders(Collider2D[] colliders)
@@ -118,6 +123,23 @@ public partial class Passenger
         _rigidbody.gravityScale = settings.gravityScale;
         _rigidbody.linearDamping = settings.defaultLinearDamping;
         _rigidbody.angularDamping = settings.defaultAngularDamping;
+        ResetPhysicsCollisionFilters();
+    }
+
+    public void ResetPhysicsCollisionFilters()
+    {
+        if (_rigidbody != null)
+        {
+            _rigidbody.includeLayers = Physics2D.AllLayers;
+            _rigidbody.excludeLayers = 0;
+        }
+
+        if (_collider != null)
+        {
+            _collider.isTrigger = false;
+            _collider.includeLayers = Physics2D.AllLayers;
+            _collider.excludeLayers = 0;
+        }
     }
 
     private void RegisterInRuntimeSystems()
@@ -180,6 +202,8 @@ public partial class Passenger
         boxCollider.offset = new Vector2(0f, offsetY);
         boxCollider.isTrigger = false;
         boxCollider.usedByEffector = false;
+        _collider = boxCollider;
+        ResetPhysicsCollisionFilters();
         Diagnostics.Log($"[Passenger][vip-collider] {name}: size={boxCollider.size} offset={boxCollider.offset} spriteSize={spriteSize}");
     }
 }

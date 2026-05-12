@@ -84,18 +84,10 @@ public class VipBoundaryReturnSystem : MonoBehaviour
             rb.linearVelocity = Vector2.zero;
             rb.angularVelocity = 0f;
             rb.collisionDetectionMode = passenger.Settings.collisionDetectionMode;
-            rb.includeLayers = Physics2D.AllLayers;
-            rb.excludeLayers = 0;
             rb.AddForce(Vector2.up * _returnKickForce, ForceMode2D.Impulse);
         }
 
-        var col = passenger.GetComponent<Collider2D>();
-        if (col != null)
-        {
-            col.isTrigger = false;
-            col.includeLayers = Physics2D.AllLayers;
-            col.excludeLayers = 0;
-        }
+        passenger.ResetPhysicsCollisionFilters();
 
         Diagnostics.Warn($"[VipBoundaryReturn] Forced {passenger.name} back inside play area from {currentPos} -> {restoredPos}");
     }

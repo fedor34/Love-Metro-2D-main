@@ -172,30 +172,37 @@ public class RefactoringAcceptanceTests
     }
 
     [Test]
-    public void Passenger_DoesNotDeclareExtractedNestedStates()
+    public void Passenger_DoesNotDeclareNestedStateClasses()
     {
-        string statesRoot = Path.Combine(Application.dataPath, "Scripts", "Passenger", "States");
-        string[] removedStateFiles =
+        string scriptsRoot = Path.Combine(Application.dataPath, "Scripts");
+        var files = new List<string>();
+        files.AddRange(Directory.GetFiles(scriptsRoot, "Passenger*.cs", SearchOption.TopDirectoryOnly));
+
+        string legacyStatesRoot = Path.Combine(scriptsRoot, "Passenger", "States");
+        if (Directory.Exists(legacyStatesRoot))
+            files.AddRange(Directory.GetFiles(legacyStatesRoot, "*.cs", SearchOption.AllDirectories));
+
+        string[] forbiddenStateClassTokens =
         {
-            Path.Combine(statesRoot, "WanderingState.cs"),
-            Path.Combine(statesRoot, "FallingState.cs"),
-            Path.Combine(statesRoot, "FlyingState.cs")
+            "class Wandering",
+            "class Falling",
+            "class Flying",
+            "class Matching",
+            "class StayingOnHandrail",
+            "class BeingAbsorbed",
+            "class PassangerState"
         };
 
-        foreach (string file in removedStateFiles)
+        foreach (string file in files)
         {
-            if (!File.Exists(file))
-                continue;
-
             string source = File.ReadAllText(file);
-            Assert.IsFalse(source.Contains("class Wandering"), $"{file} still declares nested Wandering.");
-            Assert.IsFalse(source.Contains("class Falling"), $"{file} still declares nested Falling.");
-            Assert.IsFalse(source.Contains("class Flying"), $"{file} still declares nested Flying.");
+            foreach (string token in forbiddenStateClassTokens)
+                Assert.IsFalse(source.Contains(token), $"{file} still declares nested passenger state token {token}.");
         }
     }
 
     [Test]
-    public void ExtractedPassengerStates_UseMotionControllerForRigidbodyWrites()
+    public void ExtractedPassengerStates_UseContextAndMotionControllerForPassengerAccess()
     {
         string statesRoot = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "States");
         foreach (string file in Directory.GetFiles(statesRoot, "*PassengerState.cs", SearchOption.TopDirectoryOnly))
@@ -204,7 +211,25 @@ public class RefactoringAcceptanceTests
             Assert.IsFalse(source.Contains("_rigidbody.velocity"), $"{file} writes Rigidbody2D.velocity directly.");
             Assert.IsFalse(source.Contains("_rigidbody.AddForce"), $"{file} calls Rigidbody2D.AddForce directly.");
             Assert.IsFalse(source.Contains("GetRigidbody().velocity"), $"{file} reads Rigidbody2D.velocity directly.");
+            Assert.IsFalse(source.Contains("Passenger._"), $"{file} reaches into Passenger private fields.");
+            Assert.IsFalse(source.Contains("Passanger._"), $"{file} reaches into Passenger private fields.");
+            Assert.IsFalse(source.Contains("_collider"), $"{file} reaches into Passenger collider field.");
+            Assert.IsFalse(source.Contains("releaseHandrail"), $"{file} reaches into Passenger handrail delegate.");
         }
+    }
+
+    [Test]
+    public void PassengerStateFactory_DoesNotUseLegacyStateFallback()
+    {
+        string factoryPath = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "PassengerStateFactory.cs");
+        string contextPath = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "PassengerStateContext.cs");
+
+        string factorySource = File.ReadAllText(factoryPath);
+        string contextSource = File.ReadAllText(contextPath);
+
+        Assert.IsFalse(factorySource.Contains("CreateLegacyState"), "PassengerStateFactory still uses legacy state fallback.");
+        Assert.IsFalse(contextSource.Contains("CreateLegacyState"), "PassengerStateContext still exposes legacy state fallback.");
+        Assert.IsFalse(contextSource.Contains("legacyStateFactory"), "PassengerStateContext still stores legacy state factory.");
     }
 
     [Test]

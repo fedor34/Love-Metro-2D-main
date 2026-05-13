@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,14 +5,9 @@ namespace LoveMetro.Passengers
 {
     public readonly struct PassengerStateContext
     {
-        private readonly Func<PassengerStateId, IPassengerState> _legacyStateFactory;
-
-        public PassengerStateContext(
-            global::Passenger passenger,
-            Func<PassengerStateId, IPassengerState> legacyStateFactory = null)
+        public PassengerStateContext(global::Passenger passenger)
         {
             Passenger = passenger;
-            _legacyStateFactory = legacyStateFactory;
         }
 
         public global::Passenger Passenger { get; }
@@ -76,11 +70,6 @@ namespace LoveMetro.Passengers
         public float EaseOutMinK => Passenger.StateEaseOutMinK;
         public float EaseOutMaxK => Passenger.StateEaseOutMaxK;
 
-        public IPassengerState CreateLegacyState(PassengerStateId id)
-        {
-            return _legacyStateFactory?.Invoke(id);
-        }
-
         public void ChangeState(PassengerStateId id)
         {
             Passenger.StateChangeState(id);
@@ -99,6 +88,11 @@ namespace LoveMetro.Passengers
         public void SetDefaultLayer()
         {
             Passenger.StateSetDefaultLayer();
+        }
+
+        public void SetColliderEnabled(bool enabled)
+        {
+            Passenger.StateSetColliderEnabled(enabled);
         }
 
         public void SetVelocity(Vector2 velocity)
@@ -199,6 +193,16 @@ namespace LoveMetro.Passengers
         public void AttachHandrail(global::HandRailPosition handrail)
         {
             Passenger.StateAttachHandrail(handrail);
+        }
+
+        public void ReleaseHandrail()
+        {
+            Passenger.StateReleaseHandrail();
+        }
+
+        public void RemovePassengerAndDestroy()
+        {
+            Passenger.RemoveFromContainerAndDestroy();
         }
 
         public void LogEvent(string category, string message)

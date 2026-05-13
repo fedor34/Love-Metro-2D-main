@@ -134,7 +134,7 @@ public class RuntimeArchitectureTests
     [Test]
     public void PassengerStateFactory_CreatesEveryStateId()
     {
-        var context = new PassengerStateContext(null, id => new TestPassengerState(id));
+        var context = new PassengerStateContext(null);
         var factory = new PassengerStateFactory(context);
 
         foreach (PassengerStateId id in System.Enum.GetValues(typeof(PassengerStateId)))
@@ -143,6 +143,84 @@ public class RuntimeArchitectureTests
 
             Assert.IsNotNull(state, $"{id} state was not created.");
             Assert.AreEqual(id, state.Id);
+        }
+    }
+
+    [Test]
+    public void MatchingPassengerState_TogglesPhysicsAndMatchability()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+        var state = new LoveMetro.Passengers.States.MatchingPassengerState(new PassengerStateContext(passenger));
+
+        try
+        {
+            Rigidbody2D rigidbody = passenger.GetComponent<Rigidbody2D>();
+            Collider2D collider = passenger.GetComponent<Collider2D>();
+
+            state.Enter();
+
+            Assert.IsFalse(passenger.IsMatchable);
+            Assert.AreEqual(RigidbodyType2D.Static, rigidbody.bodyType);
+            Assert.IsFalse(collider.enabled);
+
+            state.Exit();
+
+            Assert.IsTrue(passenger.IsMatchable);
+            Assert.AreEqual(RigidbodyType2D.Dynamic, rigidbody.bodyType);
+            Assert.IsTrue(collider.enabled);
+        }
+        finally
+        {
+            Object.DestroyImmediate(passenger.gameObject);
+        }
+    }
+
+    [Test]
+    public void StayingOnHandrailPassengerState_ReleasesAttachedHandrail()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+        GameObject handrailObject = new GameObject("Handrail");
+        HandRailPosition handrail = handrailObject.AddComponent<HandRailPosition>();
+        var context = new PassengerStateContext(passenger);
+        var state = new LoveMetro.Passengers.States.StayingOnHandrailPassengerState(context);
+
+        try
+        {
+            state.Enter();
+            context.AttachHandrail(handrail);
+            Assert.IsTrue(handrail.IsOccupied);
+
+            state.Exit();
+
+            Assert.IsFalse(handrail.IsOccupied);
+        }
+        finally
+        {
+            Object.DestroyImmediate(passenger.gameObject);
+            Object.DestroyImmediate(handrailObject);
+        }
+    }
+
+    [Test]
+    public void BeingAbsorbedPassengerState_UsesAbsorptionParametersWithoutDirectRigidbodyAccess()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+        var state = new LoveMetro.Passengers.States.BeingAbsorbedPassengerState(new PassengerStateContext(passenger));
+
+        try
+        {
+            state.SetAbsorptionParameters(Vector3.right * 5f, 10f);
+
+            Assert.DoesNotThrow(() =>
+            {
+                state.Enter();
+                state.UpdateState();
+                state.Exit();
+            });
+        }
+        finally
+        {
+            Object.DestroyImmediate(passenger.gameObject);
         }
     }
 

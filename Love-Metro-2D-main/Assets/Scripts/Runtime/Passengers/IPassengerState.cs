@@ -24,4 +24,9 @@ namespace LoveMetro.Passengers
         void SetFlyingParameters(Vector2 windDirection, float windStrength);
         void UpdateWindEffect(Vector2 windDirection, float windStrength);
     }
+
+    public interface IPassengerAbsorptionState : IPassengerState
+    {
+        void SetAbsorptionParameters(Vector3 center, float force);
+    }
 }

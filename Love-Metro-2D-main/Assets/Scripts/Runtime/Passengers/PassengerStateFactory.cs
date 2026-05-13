@@ -22,10 +22,11 @@ namespace LoveMetro.Passengers
                 case PassengerStateId.Flying:
                     return new States.FlyingPassengerState(_context);
                 case PassengerStateId.Matching:
+                    return new States.MatchingPassengerState(_context);
                 case PassengerStateId.StayingOnHandrail:
+                    return new States.StayingOnHandrailPassengerState(_context);
                 case PassengerStateId.BeingAbsorbed:
-                    return _context.CreateLegacyState(id)
-                        ?? throw new InvalidOperationException($"Legacy passenger state is not configured: {id}");
+                    return new States.BeingAbsorbedPassengerState(_context);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(id), id, null);
             }

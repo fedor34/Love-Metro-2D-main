@@ -42,11 +42,11 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
 
     private LoveMetro.Passengers.PassengerStateFactory _stateFactory;
     private LoveMetro.Passengers.IPassengerState wanderingState;
-    private StayingOnHandrail stayingOnHandrailState;
+    private LoveMetro.Passengers.IPassengerState stayingOnHandrailState;
     private LoveMetro.Passengers.IPassengerFallingState fallingState;
     private LoveMetro.Passengers.IPassengerFlyingState flyingState;
-    private Matching matchingState;
-    private BeingAbsorbed beingAbsorbedState;
+    private LoveMetro.Passengers.IPassengerState matchingState;
+    private LoveMetro.Passengers.IPassengerAbsorptionState beingAbsorbedState;
 
     private bool _isInitiated = false;
 

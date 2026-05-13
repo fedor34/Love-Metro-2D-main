@@ -8,7 +8,7 @@ public partial class Passenger
 
     private void EnsureStateMachineInitialized()
     {
-        PassengerStateContext context = new PassengerStateContext(this, CreateLegacyState);
+        PassengerStateContext context = new PassengerStateContext(this);
         _stateMachine ??= new PassengerStateMachine(context);
         _stateFactory ??= new PassengerStateFactory(context);
 
@@ -18,24 +18,9 @@ public partial class Passenger
         wanderingState = _stateFactory.Create(PassengerStateId.Wandering);
         fallingState = (IPassengerFallingState)_stateFactory.Create(PassengerStateId.Falling);
         flyingState = (IPassengerFlyingState)_stateFactory.Create(PassengerStateId.Flying);
-        stayingOnHandrailState = (StayingOnHandrail)_stateFactory.Create(PassengerStateId.StayingOnHandrail);
-        matchingState = (Matching)_stateFactory.Create(PassengerStateId.Matching);
-        beingAbsorbedState = (BeingAbsorbed)_stateFactory.Create(PassengerStateId.BeingAbsorbed);
-    }
-
-    private IPassengerState CreateLegacyState(PassengerStateId id)
-    {
-        switch (id)
-        {
-            case PassengerStateId.Matching:
-                return new Matching(this);
-            case PassengerStateId.StayingOnHandrail:
-                return new StayingOnHandrail(this);
-            case PassengerStateId.BeingAbsorbed:
-                return new BeingAbsorbed(this);
-            default:
-                return null;
-        }
+        stayingOnHandrailState = _stateFactory.Create(PassengerStateId.StayingOnHandrail);
+        matchingState = _stateFactory.Create(PassengerStateId.Matching);
+        beingAbsorbedState = (IPassengerAbsorptionState)_stateFactory.Create(PassengerStateId.BeingAbsorbed);
     }
 
     private void ChangeState(IPassengerState newState)
@@ -147,6 +132,12 @@ public partial class Passenger
         gameObject.layer = LayerMask.NameToLayer(_defaultLayer);
     }
 
+    internal void StateSetColliderEnabled(bool enabled)
+    {
+        EnsureRequiredComponents();
+        _collider.enabled = enabled;
+    }
+
     internal void StateSetVelocity(Vector2 velocity)
     {
         EnsureMotionController().SetVelocity(velocity);
@@ -235,6 +226,12 @@ public partial class Passenger
         handrail.IsOccupied = true;
         transform.position = handrail.transform.position;
         releaseHandrail += handrail.ReleaseHandrail;
+    }
+
+    internal void StateReleaseHandrail()
+    {
+        releaseHandrail?.Invoke();
+        releaseHandrail = null;
     }
 
     internal void StateLogEvent(string category, string message)

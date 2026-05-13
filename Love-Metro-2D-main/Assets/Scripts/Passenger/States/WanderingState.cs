@@ -16,14 +16,14 @@ public partial class Passenger
 
         public override void Exit()
         {
-            Passanger._rigidbody.linearVelocity = Vector2.zero;
+            Passanger._rigidbody.velocity = Vector2.zero;
             Passanger.PassangerAnimator.ExitWanderingMode();
         }
 
         public override void UpdateState()
         {
             if (!LevelGameplaySettings.SlipperyFloorEnabled)
-                Passanger._rigidbody.linearVelocity = Vector2.zero;
+                Passanger._rigidbody.velocity = Vector2.zero;
 
             Passanger.PassangerAnimator.ChangeFacingDirection(
                 Vector3.Dot(Vector3.Project(Passanger.CurrentMovingDirection, Vector3.right).normalized, Vector3.right) == 1);
@@ -42,7 +42,7 @@ public partial class Passenger
         public override void Enter()
         {
             Passanger._rigidbody.bodyType = RigidbodyType2D.Dynamic;
-            Passanger._rigidbody.linearVelocity = Vector2.zero;
+            Passanger._rigidbody.velocity = Vector2.zero;
             Passanger.PassangerAnimator.EnterWanderingMode();
         }
 
@@ -83,9 +83,10 @@ public partial class Passenger
             if (delta.magnitude < Passanger._minImpulseToLaunch)
                 return;
 
-            Vector2 startVelocity = delta * Passanger._impulseToVelocityScale * (Passanger._flightSpeedMultiplier * Passanger._globalImpulseScale);
-            if (startVelocity.magnitude > Passanger._maxFlightSpeed)
-                startVelocity = startVelocity.normalized * Passanger._maxFlightSpeed;
+            Vector2 startVelocity = Passanger.ScaleLaunchVelocity(
+                delta,
+                Passanger._impulseToVelocityScale,
+                Passanger._flightSpeedMultiplier * Passanger._globalImpulseScale);
 
             Passanger.EnterFallingState(startVelocity);
             Passanger._currentState.OnTrainSpeedChange(delta);

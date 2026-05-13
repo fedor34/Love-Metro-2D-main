@@ -1,10 +1,22 @@
 using System.IO;
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 
 public class RefactoringAcceptanceTests
 {
+    private static readonly string[] ForbiddenRuntimeDiscoveryTokens =
+    {
+        "FindObjectOfType<",
+        "FindObjectsOfType<",
+        "Object.FindObjectOfType<",
+        "Object.FindObjectsOfType<",
+        "GameObject.Find(",
+        "Resources.FindObjectsOfTypeAll(",
+        "BindingFlags"
+    };
+
     [Test]
     public void RuntimeUiCode_DoesNotUseReflectionConfiguration()
     {
@@ -88,6 +100,78 @@ public class RefactoringAcceptanceTests
     }
 
     [Test]
+    public void RuntimeSceneDiscovery_IsLimitedToInstallersDiagnosticsAndDeprecatedCode()
+    {
+        string scriptsRoot = Path.Combine(Application.dataPath, "Scripts");
+        var approved = new HashSet<string>
+        {
+            NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "GameInitializer.cs")),
+            NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "GameBootstrap.cs")),
+            NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "AutoAttachCollisionDebugger.cs")),
+            NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "FindAllBoundaries.cs")),
+            NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "LayerCollisionMatrixDecoder.cs")),
+            NormalizeAssetPath(Path.Combine(scriptsRoot, "UI", "MenuInitializer.cs")),
+            NormalizeAssetPath(Path.Combine(scriptsRoot, "Parallax", "EnsureParallaxLayers.cs")),
+            NormalizeAssetPath(Path.Combine(scriptsRoot, "Parallax", "ParallaxBootstrap.cs")),
+            NormalizeAssetPath(Path.Combine(scriptsRoot, "FieldEffects", "Core", "FieldEffectMenus.cs"))
+        };
+
+        foreach (string file in Directory.GetFiles(scriptsRoot, "*.cs", SearchOption.AllDirectories))
+        {
+            string normalized = NormalizeAssetPath(file);
+            if (normalized.Contains("/_Deprecated/"))
+                continue;
+
+            if (!ContainsForbiddenRuntimeDiscovery(file))
+                continue;
+
+            Assert.IsTrue(approved.Contains(normalized), $"{normalized} uses runtime scene discovery outside an approved installer/diagnostic file.");
+        }
+    }
+
+    [Test]
+    public void GameplayHotPaths_DoNotUseRuntimeSceneDiscovery()
+    {
+        string scriptsRoot = Path.Combine(Application.dataPath, "Scripts");
+        string[] hotPathFiles =
+        {
+            Path.Combine(scriptsRoot, "Couple.cs"),
+            Path.Combine(scriptsRoot, "CouplesManager.cs"),
+            Path.Combine(scriptsRoot, "Passenger.StateMachine.cs"),
+            Path.Combine(scriptsRoot, "Movement", "PassengerMovementStrategies.cs"),
+            Path.Combine(scriptsRoot, "ScoreCounter.cs"),
+            Path.Combine(scriptsRoot, "TrainManager.Motion.cs"),
+            Path.Combine(scriptsRoot, "ParallaxEffect.cs"),
+            Path.Combine(scriptsRoot, "Parallax", "SimpleBackgroundScroller.cs"),
+            Path.Combine(scriptsRoot, "Parallax", "BackgroundGroupScroller.cs"),
+            Path.Combine(scriptsRoot, "Parallax", "ParallaxMaterialDriver.cs"),
+            Path.Combine(scriptsRoot, "Parallax", "BackgroundMaterialOverride.cs"),
+            Path.Combine(scriptsRoot, "FieldEffects", "Core", "FieldEffectSystem.cs"),
+            Path.Combine(scriptsRoot, "Core", "VipBoundaryReturnSystem.cs"),
+            Path.Combine(scriptsRoot, "UI", "SettingsPanel.cs"),
+            Path.Combine(scriptsRoot, "UI", "CharactersPanel.cs"),
+            Path.Combine(scriptsRoot, "UI", "InertiaArrowHUD.cs"),
+            Path.Combine(scriptsRoot, "UI", "EnsureEventSystem.cs")
+        };
+
+        foreach (string file in hotPathFiles)
+            Assert.IsFalse(ContainsForbiddenRuntimeDiscovery(file), $"{NormalizeAssetPath(file)} uses runtime scene discovery in a gameplay/UI hot path.");
+    }
+
+    [Test]
+    public void ScoreCounter_DoesNotOwnFloatingScorePresentationImplementation()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "ScoreCounter.cs");
+        string source = File.ReadAllText(path);
+
+        Assert.IsFalse(source.Contains("IEnumerator"), "ScoreCounter must delegate floating-score coroutines to FloatingScorePresenter.");
+        Assert.IsFalse(source.Contains("CreateFloatingText"), "ScoreCounter must not create floating score text directly.");
+        Assert.IsFalse(source.Contains("WorldToCanvasPoint"), "ScoreCounter must delegate world-to-canvas conversion to ScoreHudView.");
+        Assert.IsFalse(source.Contains("ShowFloatingDelta"), "ScoreCounter must delegate floating penalty presentation.");
+        Assert.IsFalse(source.Contains("ScorePointsFromMatching"), "ScoreCounter must delegate match score presentation.");
+    }
+
+    [Test]
     public void PassengerPrefabs_DoNotUseEmptyPhysicsIncludeLayers()
     {
         string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs/Passangers" });
@@ -129,5 +213,28 @@ public class RefactoringAcceptanceTests
         Assert.IsFalse(
             Physics2D.GetIgnoreLayerCollision(firstLayer, secondLayer),
             $"{firstLayerName} and {secondLayerName} are ignored in Physics2D settings.");
+    }
+
+    private static bool ContainsForbiddenRuntimeDiscovery(string file)
+    {
+        foreach (string line in File.ReadLines(file))
+        {
+            string trimmed = line.TrimStart();
+            if (trimmed.StartsWith("//") || trimmed.StartsWith("///") || trimmed.StartsWith("*"))
+                continue;
+
+            for (int i = 0; i < ForbiddenRuntimeDiscoveryTokens.Length; i++)
+            {
+                if (line.Contains(ForbiddenRuntimeDiscoveryTokens[i]))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string NormalizeAssetPath(string path)
+    {
+        return path.Replace('\\', '/');
     }
 }

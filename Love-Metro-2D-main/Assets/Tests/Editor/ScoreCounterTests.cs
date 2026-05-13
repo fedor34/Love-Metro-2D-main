@@ -14,7 +14,7 @@ public class ScoreCounterTests
     [SetUp]
     public void Setup()
     {
-        _canvasObject = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
+        _canvasObject = new GameObject("ScoreHudCanvas", typeof(RectTransform), typeof(Canvas));
 
         _scoreCounterObject = new GameObject("TestScoreCounter");
         _scoreCounterObject.transform.SetParent(_canvasObject.transform);
@@ -89,10 +89,41 @@ public class ScoreCounterTests
         Assert.AreEqual(125, _scoreCounter.CurrentScore);
     }
 
+    [Test]
+    public void Awake_CreatesHudTextDisplayWhenSceneObjectHasNoTmpText()
+    {
+        var scoreObject = new GameObject("ScoreCounterWithoutText", typeof(RectTransform), typeof(Animator));
+        scoreObject.transform.SetParent(_canvasObject.transform);
+
+        try
+        {
+            var scoreCounter = scoreObject.AddComponent<ScoreCounter>();
+
+            InvokePrivateMethod(scoreCounter, "Awake");
+
+            Transform hudBadge = _canvasObject.transform.Find("ScoreCounterBadge");
+            Transform hudText = hudBadge != null ? hudBadge.Find("ScoreCounterText") : null;
+            Assert.IsNotNull(hudBadge);
+            Assert.IsNotNull(hudText);
+            Assert.IsNotNull(hudText.GetComponent<TextMeshProUGUI>());
+        }
+        finally
+        {
+            Object.DestroyImmediate(scoreObject);
+        }
+    }
+
     private static void SetPrivateField(object obj, string fieldName, object value)
     {
         var field = obj.GetType().GetField(fieldName,
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         field?.SetValue(obj, value);
+    }
+
+    private static void InvokePrivateMethod(object obj, string methodName)
+    {
+        var method = obj.GetType().GetMethod(methodName,
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        method?.Invoke(obj, null);
     }
 }

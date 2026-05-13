@@ -131,9 +131,9 @@ public class BoidsLiteStrategy : IPassengerMovementStrategy
         float yOffset = passenger.transform.position.y;
         Vector2 centering = new Vector2(0, -yOffset * CenteringForce);
 
-        IReadOnlyList<Passenger> passengers = PassengerRegistry.Instance != null
-            ? PassengerRegistry.Instance.AllPassengers
-            : Object.FindObjectsOfType<Passenger>();
+        LoveMetro.Core.IPassengerRegistry registry =
+            LoveMetro.Core.RuntimeServices.Instance.PassengerRegistry ?? PassengerRegistry.Instance;
+        IReadOnlyList<Passenger> passengers = registry?.AllPassengers ?? System.Array.Empty<Passenger>();
 
         foreach (var other in passengers)
         {
@@ -152,7 +152,7 @@ public class BoidsLiteStrategy : IPassengerMovementStrategy
             var rb = other.GetRigidbody();
             if (rb != null)
             {
-                alignment += rb.linearVelocity;
+                alignment += rb.velocity;
                 alignmentCount++;
             }
         }

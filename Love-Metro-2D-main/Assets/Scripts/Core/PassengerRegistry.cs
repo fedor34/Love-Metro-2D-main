@@ -5,7 +5,7 @@ using UnityEngine;
 /// Централизованный реестр всех пассажиров в сцене.
 /// Заменяет дорогие вызовы FindObjectsOfType<Passenger>() на O(1) операции.
 /// </summary>
-public class PassengerRegistry : MonoBehaviour
+public class PassengerRegistry : MonoBehaviour, LoveMetro.Core.IPassengerRegistry
 {
     public static PassengerRegistry Instance { get; private set; }
 
@@ -35,10 +35,13 @@ public class PassengerRegistry : MonoBehaviour
             return;
         }
         Instance = this;
+        LoveMetro.Core.RuntimeServices.Instance.RegisterPassengerRegistry(this);
     }
 
     private void OnDestroy()
     {
+        LoveMetro.Core.RuntimeServices.Instance.UnregisterPassengerRegistry(this);
+
         if (Instance == this)
             Instance = null;
     }

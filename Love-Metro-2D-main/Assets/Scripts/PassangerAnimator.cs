@@ -138,7 +138,7 @@ public class PassangerAnimator : MonoBehaviour
 
     private void UpdateAutomaticWalking()
     {
-        float velocityMagnitude = _rigidbody.linearVelocity.magnitude;
+        float velocityMagnitude = _rigidbody.velocity.magnitude;
         bool aboveThreshold = velocityMagnitude > _movementThreshold;
 
         if (aboveThreshold)
@@ -155,7 +155,7 @@ public class PassangerAnimator : MonoBehaviour
 
     private void UpdateAutomaticAnimationSpeed()
     {
-        float velocityMagnitude = _rigidbody.linearVelocity.magnitude;
+        float velocityMagnitude = _rigidbody.velocity.magnitude;
         float t = Mathf.InverseLerp(_movementThreshold, _movementThreshold * 10f + 0.01f, velocityMagnitude);
         float targetAnimSpeed = Mathf.Lerp(_animSpeedMin, _animSpeedMax, t);
         _animSpeedSmoothed = Mathf.Lerp(_animSpeedSmoothed, targetAnimSpeed, _animSpeedSmoothing * Time.deltaTime);

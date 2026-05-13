@@ -17,9 +17,7 @@ public class Couple : MonoBehaviour
 
     private Passenger _passengerMain;
     private Passenger _passengerOther;
-    private ScoreCounter _score;
-
-    private static ScoreCounter _cachedScoreCounter;
+    private LoveMetro.Scoring.IScoreService _scoreService;
 
     private readonly struct ImpactInfo
     {
@@ -53,7 +51,7 @@ public class Couple : MonoBehaviour
         ConfigureTrigger();
 
         CouplesManager.Instance?.RegisterCouple(this);
-        _score = ResolveScoreCounter();
+        _scoreService = ResolveScoreService();
     }
 
     public void DespawnAtStation()
@@ -75,7 +73,6 @@ public class Couple : MonoBehaviour
 
     public static void ClearCache()
     {
-        _cachedScoreCounter = null;
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -130,12 +127,9 @@ public class Couple : MonoBehaviour
             existingCircle.radius = radius;
     }
 
-    private static ScoreCounter ResolveScoreCounter()
+    private static LoveMetro.Scoring.IScoreService ResolveScoreService()
     {
-        if (_cachedScoreCounter == null || !_cachedScoreCounter)
-            _cachedScoreCounter = Object.FindObjectOfType<ScoreCounter>();
-
-        return _cachedScoreCounter;
+        return LoveMetro.Core.RuntimeServices.Instance.ScoreService;
     }
 
     private ImpactInfo BuildImpactInfo(Passenger hitter, Vector3 defaultPosition)
@@ -144,7 +138,7 @@ public class Couple : MonoBehaviour
             return new ImpactInfo(defaultPosition, Vector2.zero, _penaltyMin);
 
         Rigidbody2D rigidbody = hitter.GetRigidbody();
-        Vector2 velocity = rigidbody != null ? rigidbody.linearVelocity : Vector2.zero;
+        Vector2 velocity = rigidbody != null ? rigidbody.velocity : Vector2.zero;
         float speed = velocity.magnitude;
         float penaltyLerp = Mathf.Clamp01(speed / 10f);
         int penalty = Mathf.RoundToInt(Mathf.Lerp(_penaltyMin, _penaltyMax, penaltyLerp));
@@ -154,8 +148,8 @@ public class Couple : MonoBehaviour
     private void BreakPairInternal(ImpactInfo impact)
     {
         CouplesManager.Instance?.UnregisterCouple(this);
-        _score ??= ResolveScoreCounter();
-        _score?.ApplyPenalty(impact.Penalty, transform.position);
+        _scoreService ??= ResolveScoreService();
+        _scoreService?.ApplyPenalty(impact.Penalty, transform.position);
 
         float magnitude = Mathf.Clamp(
             _breakupBase + impact.Velocity.magnitude * _breakupSpeedScale,

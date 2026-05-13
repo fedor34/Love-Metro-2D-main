@@ -28,6 +28,9 @@ public class CouplesManager : MonoBehaviour
     [SerializeField] private TrainManager _trainManager;
 
     private readonly List<Couple> _activeCouples = new List<Couple>();
+    private LoveMetro.Core.IPassengerRegistry _passengerRegistry;
+    private LoveMetro.Train.ITrainMotionEvents _trainEvents;
+    private LoveMetro.Scoring.IScoreService _scoreService;
     private float _nextCheckTime;
 
     public int ActiveCouplesCount
@@ -52,7 +55,7 @@ public class CouplesManager : MonoBehaviour
 
     private void Start()
     {
-        ResolveTrainManager();
+        ResolveDependencies();
         ScheduleNextCheck(_checkInterval);
     }
 
@@ -97,6 +100,19 @@ public class CouplesManager : MonoBehaviour
         DespawnAllCouplesInternal();
         TriggerStationStop();
         ScheduleNextCheck(_cooldownAfterStop);
+    }
+
+    public void Configure(
+        LoveMetro.Core.IPassengerRegistry registry,
+        LoveMetro.Train.ITrainMotionEvents trainEvents,
+        LoveMetro.Scoring.IScoreService scoreService)
+    {
+        _passengerRegistry = registry;
+        _trainEvents = trainEvents;
+        _scoreService = scoreService;
+
+        if (_trainManager == null && trainEvents is TrainManager trainManager)
+            _trainManager = trainManager;
     }
 
     private void TryHandleAutoStopWhenNoPairsRemain()
@@ -146,43 +162,30 @@ public class CouplesManager : MonoBehaviour
 
     private int GetPossiblePairsCount()
     {
-        PassengerRegistry registry = PassengerRegistry.Instance;
+        ResolveDependencies();
+        LoveMetro.Core.IPassengerRegistry registry = _passengerRegistry;
         if (registry != null)
             return registry.GetPossiblePairsCount();
 
-        return CountPossiblePairsWithoutRegistry();
+        Diagnostics.Warn("[Pair][Station] Passenger registry is not configured; skipping no-pairs auto-stop check.");
+        return int.MaxValue;
     }
 
-    private static int CountPossiblePairsWithoutRegistry()
+    private void ResolveDependencies()
     {
-        Passenger[] passengers = Object.FindObjectsOfType<Passenger>();
-        int maleSingles = 0;
-        int femaleSingles = 0;
+        LoveMetro.Core.RuntimeServices services = LoveMetro.Core.RuntimeServices.Instance;
 
-        for (int i = 0; i < passengers.Length; i++)
-        {
-            Passenger passenger = passengers[i];
-            if (passenger == null || passenger.IsInCouple)
-                continue;
+        _passengerRegistry ??= services.PassengerRegistry ?? PassengerRegistry.Instance;
+        _trainEvents ??= services.TrainMotionEvents;
+        _scoreService ??= services.ScoreService;
 
-            if (passenger.IsFemale)
-                femaleSingles++;
-            else
-                maleSingles++;
-        }
-
-        return Mathf.Min(maleSingles, femaleSingles);
-    }
-
-    private void ResolveTrainManager()
-    {
-        if (_trainManager == null)
-            _trainManager = Object.FindObjectOfType<TrainManager>();
+        if (_trainManager == null && _trainEvents is TrainManager trainManager)
+            _trainManager = trainManager;
     }
 
     private void TriggerStationStop()
     {
-        ResolveTrainManager();
+        ResolveDependencies();
         if (_trainManager == null)
         {
             Diagnostics.Warn("[Pair][Station] TrainManager not found for station stop.");
@@ -211,8 +214,9 @@ public class CouplesManager : MonoBehaviour
     {
         if (reason == StationStopReason.NoPairsPossible)
         {
-            int maleSingles = PassengerRegistry.Instance?.MaleSinglesCount ?? 0;
-            int femaleSingles = PassengerRegistry.Instance?.FemaleSinglesCount ?? 0;
+            ResolveDependencies();
+            int maleSingles = _passengerRegistry?.MaleSinglesCount ?? 0;
+            int femaleSingles = _passengerRegistry?.FemaleSinglesCount ?? 0;
             Diagnostics.Log($"[Pair][Station] reason=no-pairs males={maleSingles} females={femaleSingles}");
             return;
         }

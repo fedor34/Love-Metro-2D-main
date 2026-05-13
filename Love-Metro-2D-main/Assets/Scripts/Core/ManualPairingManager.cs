@@ -94,6 +94,13 @@ public class ManualPairingManager : MonoBehaviour
 
     private bool CanPair(Passenger p1, Passenger p2)
     {
+        LoveMetro.Pairing.IPairingService service = LoveMetro.Core.RuntimeServices.Instance.PairingService;
+        if (service != null)
+        {
+            var result = service.Evaluate(new LoveMetro.Pairing.PairingRequest(p1, p2, _maxPairingDistance, "manual"));
+            return result.Success;
+        }
+
         if (p1 == null || !p1.CanMatchWith(p2))
             return false;
 
@@ -104,6 +111,10 @@ public class ManualPairingManager : MonoBehaviour
     private void PairPassengers(Passenger p1, Passenger p2)
     {
         Debug.Log($"[ManualPairing] Pairing {p1.name} and {p2.name}");
+
+        LoveMetro.Pairing.IPairingService service = LoveMetro.Core.RuntimeServices.Instance.PairingService;
+        if (service != null && service.TryPair(new LoveMetro.Pairing.PairingRequest(p1, p2, _maxPairingDistance, "manual"), out _))
+            return;
 
         p1.ForceToMatchingState(p2);
         p2.ForceToMatchingState(p1);

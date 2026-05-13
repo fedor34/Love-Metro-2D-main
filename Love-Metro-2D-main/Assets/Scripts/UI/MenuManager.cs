@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using TMPro;
 using UnityEngine.UI;
 
 public class MenuManager : MonoBehaviour
@@ -43,6 +42,35 @@ public class MenuManager : MonoBehaviour
         if (!string.IsNullOrEmpty(gameSceneName))
             _gameSceneName = gameSceneName;
     }
+
+    public void Configure(
+        SettingsPanel settingsPanel,
+        CharactersPanel charactersPanel,
+        Button startButton,
+        Button settingsButton,
+        Button exitButton)
+    {
+        if (settingsPanel != null)
+        {
+            settingsPanel.Configure(this);
+            _settingsPanel = settingsPanel.gameObject;
+        }
+
+        if (charactersPanel != null)
+        {
+            charactersPanel.Configure(this);
+            _charactersPanel = charactersPanel.gameObject;
+        }
+
+        if (startButton != null)
+            _playButton = startButton;
+
+        if (settingsButton != null)
+            _settingsButton = settingsButton;
+
+        if (exitButton != null)
+            _exitButton = exitButton;
+    }
     
     private void Start()
     {
@@ -62,13 +90,6 @@ public class MenuManager : MonoBehaviour
     private void InitializeMenu()
     {
         // Автоматически ищем панели при необходимости
-        if (_mainMenuPanel == null)
-            _mainMenuPanel = GameObject.Find("MainMenuPanel");
-        if (_charactersPanel == null)
-            _charactersPanel = GameObject.Find("CharactersPanel");
-        if (_settingsPanel == null)
-            _settingsPanel = GameObject.Find("SettingsPanel");
-
         // Показываем главное меню
         ShowMainMenu();
         
@@ -80,15 +101,6 @@ public class MenuManager : MonoBehaviour
     private void SetupButtonListeners()
     {
         // Если ссылки не назначены в инспекторе, пытаемся найти по имени
-        if (_playButton == null)
-            _playButton = FindButtonByName("PlayButton");
-        if (_charactersButton == null)
-            _charactersButton = FindButtonByName("CharactersButton");
-        if (_settingsButton == null)
-            _settingsButton = FindButtonByName("SettingsButton");
-        if (_exitButton == null)
-            _exitButton = FindButtonByName("ExitButton");
-
         if (_playButton != null)
         {
             _playButton.onClick.RemoveListener(OnPlayButtonClicked);
@@ -114,28 +126,6 @@ public class MenuManager : MonoBehaviour
         }
     }
 
-    private UnityEngine.UI.Button FindButtonByName(string name)
-    {
-        // Сначала ищем по точному имени
-        GameObject go = GameObject.Find(name);
-        if (go != null)
-            return go.GetComponent<UnityEngine.UI.Button>();
-
-        // Если не нашли, пытаемся найти среди всех кнопок по тексту
-        foreach (var btn in Resources.FindObjectsOfTypeAll<UnityEngine.UI.Button>())
-        {
-            var txt = btn.GetComponentInChildren<TMPro.TMP_Text>();
-            if (txt != null && (txt.text.Equals("ИГРАТЬ", System.StringComparison.OrdinalIgnoreCase) && name == "PlayButton" ||
-                                txt.text.Equals("ЧЕЛОВЕЧКИ", System.StringComparison.OrdinalIgnoreCase) && name == "CharactersButton" ||
-                                txt.text.Equals("НАСТРОЙКИ", System.StringComparison.OrdinalIgnoreCase) && name == "SettingsButton" ||
-                                txt.text.Equals("ВЫХОД", System.StringComparison.OrdinalIgnoreCase) && name == "ExitButton"))
-            {
-                return btn;
-            }
-        }
-        return null;
-    }
-    
     #region Button Handlers
     
     public void OnPlayButtonClicked()

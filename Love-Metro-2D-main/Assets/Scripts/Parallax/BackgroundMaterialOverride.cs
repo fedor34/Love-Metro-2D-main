@@ -5,13 +5,20 @@ public class BackgroundMaterialOverride : MonoBehaviour
     [SerializeField] private bool _replaceParallaxMaterials = true;
     [SerializeField] private string _newShaderName = "Sprites/Default";
     [SerializeField] private bool _disableParallaxLayers = true;
+    [SerializeField] private SpriteRenderer[] _renderers;
 
     private void Awake()
     {
-        ApplyOverride();
+        ApplyOverride(_renderers);
     }
 
-    private void ApplyOverride()
+    public void Configure(SpriteRenderer[] renderers)
+    {
+        _renderers = renderers;
+        ApplyOverride(_renderers);
+    }
+
+    private void ApplyOverride(SpriteRenderer[] renderers)
     {
         if (!_replaceParallaxMaterials)
             return;
@@ -20,8 +27,10 @@ public class BackgroundMaterialOverride : MonoBehaviour
         if (shader == null)
             return;
 
+        if (renderers == null)
+            return;
+
         int replaced = 0;
-        SpriteRenderer[] renderers = FindObjectsOfType<SpriteRenderer>(true);
         for (int i = 0; i < renderers.Length; i++)
         {
             if (!ShouldReplaceRenderer(renderers[i]))

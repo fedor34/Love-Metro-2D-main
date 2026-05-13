@@ -31,20 +31,20 @@ public partial class Passenger
                 Vector2 otherVelocity = passenger.GetCurrentVelocity();
 
                 currentFallingSpeed = Passanger.ReflectVelocity(selfVelocity, normal, Mathf.Max(1f, Passanger._wallBounceBoost));
-                Passanger._rigidbody.linearVelocity = currentFallingSpeed;
+                Passanger._rigidbody.velocity = currentFallingSpeed;
                 passenger.ApplyReflectedVelocity(otherVelocity, -normal, Mathf.Max(1f, passenger._wallBounceBoost));
             }
             else
             {
                 currentFallingSpeed = Passanger.ReflectVelocity(currentFallingSpeed, normal, Passanger._wallBounceBoost);
-                Passanger._rigidbody.linearVelocity = currentFallingSpeed;
+                Passanger._rigidbody.velocity = currentFallingSpeed;
                 Diagnostics.Log($"[Passenger][falling][wall] {Passanger.name} bounce v={currentFallingSpeed.magnitude:F2}");
             }
 
             _bounceCount++;
             if (_bounceCount >= Passanger._maxBounces)
             {
-                Passanger._rigidbody.linearVelocity = Vector2.zero;
+                Passanger._rigidbody.velocity = Vector2.zero;
                 Passanger.ChangeState(Passanger.wanderingState);
             }
         }
@@ -52,11 +52,11 @@ public partial class Passenger
         public override void Exit()
         {
             ResetFallingSpeeds();
-            Passanger._rigidbody.linearVelocity = Vector2.zero;
+            Passanger._rigidbody.velocity = Vector2.zero;
             Passanger.PassangerAnimator.ExitAirborneMode();
             Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._defaultLayer);
-            Passanger._rigidbody.linearDamping = Passanger.Settings.defaultLinearDamping;
-            Passanger._rigidbody.angularDamping = Passanger.Settings.defaultAngularDamping;
+            Passanger._rigidbody.drag = Passanger.Settings.defaultLinearDamping;
+            Passanger._rigidbody.angularDrag = Passanger.Settings.defaultAngularDamping;
         }
 
         public override void UpdateState()
@@ -94,7 +94,7 @@ public partial class Passenger
             }
 
             currentFallingSpeed = Passanger.ClampFlightVelocity(currentFallingSpeed);
-            Passanger._rigidbody.linearVelocity = currentFallingSpeed;
+            Passanger._rigidbody.velocity = currentFallingSpeed;
 
             if (currentFallingSpeed.magnitude <= Passanger._minFallingSpeed)
             {
@@ -109,8 +109,8 @@ public partial class Passenger
             Passanger.PassangerAnimator.EnterAirborneMode();
             Passanger.gameObject.layer = LayerMask.NameToLayer(Passanger._defaultLayer);
             _bounceCount = 0;
-            Passanger._rigidbody.linearDamping = Passanger.Settings.airborneLinearDamping;
-            Passanger._rigidbody.angularDamping = Passanger.Settings.airborneAngularDamping;
+            Passanger._rigidbody.drag = Passanger.Settings.airborneLinearDamping;
+            Passanger._rigidbody.angularDrag = Passanger.Settings.airborneAngularDamping;
         }
 
         public override void OnTrainSpeedChange(Vector2 force)

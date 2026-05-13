@@ -50,7 +50,7 @@ public partial class Passenger
             }
 
             _flyingVelocity = Passanger.ClampFlightVelocity(_flyingVelocity);
-            Passanger._rigidbody.linearVelocity = _flyingVelocity;
+            Passanger._rigidbody.velocity = _flyingVelocity;
 
             if (_windStrength < Passanger._minWindStrengthForFlying || _flyingTime > Passanger._maxFlyingTime)
             {

@@ -56,6 +56,7 @@ public partial class ClickDirectionManager
         }
 
         ResetMotionState();
+        PublishIntent();
     }
 
     private void HandlePointerHeld(Vector2 mousePosition)
@@ -72,6 +73,7 @@ public partial class ClickDirectionManager
         }
 
         CurrentPointerWorld = ScreenToWorld(mousePosition);
+        PublishIntent();
     }
 
     private bool TryConsumeManualPairingClick(Vector2 screenPosition)
@@ -88,6 +90,7 @@ public partial class ClickDirectionManager
         HasReleasePoint = false;
         CurrentPointerWorld = ScreenToWorld(screenPosition);
         ResetMotionState();
+        PublishIntent();
         Diagnostics.Log("[ClickDirectionManager] MouseDown consumed by manual pairing.");
         return true;
     }

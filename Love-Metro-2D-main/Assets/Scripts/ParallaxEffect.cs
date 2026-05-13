@@ -38,16 +38,25 @@ public class ParallaxEffect : MonoBehaviour
         ApplySpeedToLayers(speed);
     }
 
+    public void Configure(TrainManager trainManager, ParallaxLayer[] layers)
+    {
+        if (trainManager != null)
+            _trainManager = trainManager;
+
+        if (layers != null && layers.Length > 0)
+            _parallaxLayers = layers;
+    }
+
     private void EnsureLayersInitialized()
     {
-        if (_parallaxLayers == null || _parallaxLayers.Length == 0)
-            _parallaxLayers = FindObjectsOfType<ParallaxLayer>();
+        if (_parallaxLayers == null)
+            _parallaxLayers = System.Array.Empty<ParallaxLayer>();
     }
 
     private void ResolveTrainManager()
     {
-        if (_trainManager == null)
-            _trainManager = FindObjectOfType<TrainManager>();
+        if (_trainManager == null && LoveMetro.Core.RuntimeServices.Instance.TrainMotionEvents is TrainManager trainManager)
+            _trainManager = trainManager;
     }
 
     private bool ShouldReadSpeedFromTrain()

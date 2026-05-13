@@ -45,6 +45,17 @@ public class SimpleBackgroundScroller : MonoBehaviour
     private float _nextTrainResolveTime;
     private Camera _mainCamera;
 
+    public void ConfigureLayers(Layer[] layers)
+    {
+        _layers = layers;
+    }
+
+    public void ConfigureTrain(TrainManager train)
+    {
+        if (train != null)
+            _train = train;
+    }
+
     private void Awake()
     {
         ResolveTrainManager(force: true);
@@ -211,7 +222,9 @@ public class SimpleBackgroundScroller : MonoBehaviour
         if (!force && Time.time < _nextTrainResolveTime)
             return false;
 
-        _train = FindObjectOfType<TrainManager>();
+        if (LoveMetro.Core.RuntimeServices.Instance.TrainMotionEvents is TrainManager trainManager)
+            _train = trainManager;
+
         _nextTrainResolveTime = Time.time + Mathf.Max(0.1f, _trainResolveRetryInterval);
         return _train != null;
     }

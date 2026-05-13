@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class FieldEffectSystem : MonoBehaviour
+public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEffectSystem
 {
     private static FieldEffectSystem _instance;
     public static FieldEffectSystem Instance => _instance;
@@ -53,7 +53,7 @@ public class FieldEffectSystem : MonoBehaviour
     private static void CreateSystemInstance()
     {
         GameObject systemObject = new GameObject("[FieldEffectSystem]");
-        _instance = systemObject.AddComponent<FieldEffectSystem>();
+        systemObject.AddComponent<FieldEffectSystem>();
         DontDestroyOnLoad(systemObject);
     }
 
@@ -64,6 +64,7 @@ public class FieldEffectSystem : MonoBehaviour
             _instance = this;
             DontDestroyOnLoad(gameObject);
             InitializeCollections();
+            LoveMetro.Core.RuntimeServices.Instance.RegisterFieldEffectSystem(this);
             return;
         }
 
@@ -71,6 +72,15 @@ public class FieldEffectSystem : MonoBehaviour
         {
             Debug.LogWarning($"[FieldEffectSystem] Duplicate system detected, destroying {name}");
             Destroy(gameObject);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (_instance == this)
+        {
+            LoveMetro.Core.RuntimeServices.Instance.UnregisterFieldEffectSystem(this);
+            _instance = null;
         }
     }
 
@@ -162,19 +172,22 @@ public class FieldEffectSystem : MonoBehaviour
 
     private void Start()
     {
-        DiscoverExistingComponents();
-
         if (_enableDebugMode)
         {
             Debug.Log($"[FieldEffectSystem] Found {GetTotalEffectsCount()} effects and {_allTargets.Count} targets");
         }
     }
 
-    private void DiscoverExistingComponents()
+    public void RegisterSceneComponents(IEnumerable<MonoBehaviour> sceneComponents)
     {
-        MonoBehaviour[] sceneComponents = FindObjectsOfType<MonoBehaviour>();
+        if (sceneComponents == null)
+            return;
+
         foreach (MonoBehaviour component in sceneComponents)
         {
+            if (component == null)
+                continue;
+
             if (component is IFieldEffect effect)
             {
                 RegisterEffect(effect);

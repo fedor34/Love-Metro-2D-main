@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public partial class TrainManager : MonoBehaviour
+public partial class TrainManager : MonoBehaviour, LoveMetro.Train.ITrainMotionEvents
 {
     public delegate void StartInertia(Vector2 force);
     public StartInertia startInertia;
@@ -10,6 +10,9 @@ public partial class TrainManager : MonoBehaviour
     public delegate void BrakeAction();
     public event BrakeAction OnBrakeStart;
     public event BrakeAction OnBrakeEnd;
+    public event System.Action<Vector2> InertiaImpulseDispatched;
+    public event System.Action BrakeStarted;
+    public event System.Action BrakeEnded;
 
     public static Vector2 LastInertiaImpulse { get; private set; }
 
@@ -65,9 +68,41 @@ public partial class TrainManager : MonoBehaviour
 
     [SerializeField] private float _stopEpsilon = 0.02f;
 
+    public LoveMetro.Train.TrainMotionState CurrentMotionState => new LoveMetro.Train.TrainMotionState(
+        _currentSpeed,
+        _currentAcceleration,
+        _isBraking,
+        _isStopped,
+        LastInertiaImpulse);
+
+    private LoveMetro.Train.TrainMotionController _motionController;
+
+    private void Awake()
+    {
+        _motionController = new LoveMetro.Train.TrainMotionController(_minSpeed, _maxSpeed);
+        LoveMetro.Core.RuntimeServices.Instance.RegisterTrainMotionEvents(this);
+    }
+
+    private void OnDestroy()
+    {
+        LoveMetro.Core.RuntimeServices.Instance.UnregisterTrainMotionEvents(this);
+    }
+
     public float GetCurrentSpeed()
     {
         return _currentSpeed;
+    }
+
+    public void Configure(PassangerSpawner spawner, ParallaxEffect parallax, PassangersContainer container)
+    {
+        if (spawner != null)
+            _spawner = spawner;
+
+        if (parallax != null)
+            _parallaxEffect = parallax;
+
+        if (container != null)
+            _passangers = container;
     }
 
     private void Start()
@@ -93,7 +128,7 @@ public partial class TrainManager : MonoBehaviour
         _previousSpeed = _currentSpeed;
         _turnPhase += Time.deltaTime * _turnSpeed;
 
-        bool isAccelerating = ClickDirectionManager.IsMouseHeld;
+        bool isAccelerating = ResolvePointerIntent().IsHeld;
         UpdateAccelerationHoldTime(isAccelerating);
         HandlePointerInputTransitions();
         UpdateTrainMotion(isAccelerating);
@@ -127,6 +162,7 @@ public partial class TrainManager : MonoBehaviour
         SetSpeed(0f);
         Diagnostics.Log("[Station] stop begin");
         OnBrakeStart?.Invoke();
+        BrakeStarted?.Invoke();
 
         yield return new WaitForSeconds(Mathf.Max(0.05f, pauseSeconds));
 
@@ -143,6 +179,7 @@ public partial class TrainManager : MonoBehaviour
         EnsureSpawnerReference();
         _spawner?.SpawnPassengers();
         OnBrakeEnd?.Invoke();
+        BrakeEnded?.Invoke();
         _isStopped = false;
         stopCoroutineStarted = false;
         Diagnostics.Log("[Station] stop end");

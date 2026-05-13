@@ -36,6 +36,25 @@ public class BackgroundGroupScroller : MonoBehaviour
     private float _nextResolveTime;
     private ResolutionMode _lastLoggedMode = ResolutionMode.Unresolved;
 
+    public void Configure(TrainManager train, Transform group, Transform[] fallbackNodes)
+    {
+        if (train != null)
+            _train = train;
+
+        _group = group;
+        _fallbackNodes = fallbackNodes;
+
+        if (_group != null)
+        {
+            MarkAsDynamic(_group.gameObject);
+            LogResolutionMode(ResolutionMode.Group);
+            return;
+        }
+
+        if (HasFallbackNodes())
+            LogResolutionMode(ResolutionMode.Fallback);
+    }
+
     private void Awake()
     {
         ResolveTargets(force: true);
@@ -71,17 +90,15 @@ public class BackgroundGroupScroller : MonoBehaviour
         if (!force && Time.time < _nextResolveTime)
             return _train != null && (_group != null || HasFallbackNodes());
 
-        if (_train == null)
-            _train = FindObjectOfType<TrainManager>();
+        if (_train == null && LoveMetro.Core.RuntimeServices.Instance.TrainMotionEvents is TrainManager trainManager)
+            _train = trainManager;
 
-        ResolveGroupOrFallbackNodes();
         _nextResolveTime = Time.time + Mathf.Max(0.1f, _resolveRetryInterval);
         return _train != null && (_group != null || HasFallbackNodes());
     }
 
     private void ResolveGroupOrFallbackNodes()
     {
-        _group = ResolveGroup(_groupName);
         if (_group != null)
         {
             MarkAsDynamic(_group.gameObject);
@@ -89,7 +106,6 @@ public class BackgroundGroupScroller : MonoBehaviour
             return;
         }
 
-        _fallbackNodes = ResolveFallbackNodes(_fallbackNodeNames);
         if (HasFallbackNodes())
         {
             LogResolutionMode(ResolutionMode.Fallback);
@@ -98,34 +114,6 @@ public class BackgroundGroupScroller : MonoBehaviour
         {
             _lastLoggedMode = ResolutionMode.Unresolved;
         }
-    }
-
-    private static Transform ResolveGroup(string groupName)
-    {
-        if (string.IsNullOrWhiteSpace(groupName))
-            return null;
-
-        GameObject groupObject = GameObject.Find(groupName);
-        return groupObject != null ? groupObject.transform : null;
-    }
-
-    private static Transform[] ResolveFallbackNodes(string[] nodeNames)
-    {
-        if (nodeNames == null || nodeNames.Length == 0)
-            return null;
-
-        var resolved = new Transform[nodeNames.Length];
-        for (int i = 0; i < nodeNames.Length; i++)
-        {
-            GameObject nodeObject = GameObject.Find(nodeNames[i]);
-            if (nodeObject == null)
-                continue;
-
-            MarkAsDynamic(nodeObject);
-            resolved[i] = nodeObject.transform;
-        }
-
-        return resolved;
     }
 
     private void ApplyDeltaToFallbackNodes(Vector3 delta)

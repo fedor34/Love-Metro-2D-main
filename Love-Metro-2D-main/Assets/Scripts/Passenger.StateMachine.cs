@@ -7,6 +7,9 @@ public partial class Passenger
 
     private void EnsureStateMachineInitialized()
     {
+        _stateMachine ??= new LoveMetro.Passengers.PassengerStateMachine(
+            new LoveMetro.Passengers.PassengerStateContext(this));
+
         if (wanderingState != null)
             return;
 
@@ -20,34 +23,21 @@ public partial class Passenger
 
     private void ChangeState(PassangerState newState)
     {
-        if (_currentState != null)
-        {
-            _currentState.Exit();
-            UnsubscribeCurrentStateFromTrainInertia();
-        }
-
-        _currentState = newState;
-
-        if (_currentState != null)
-        {
-            _currentState.Enter();
-            SubscribeCurrentStateToTrainInertia();
-        }
+        EnsureStateMachineInitialized();
+        _stateMachine.ConfigureTrain(_train);
+        _stateMachine.ChangeState(newState);
+        _currentState = _stateMachine.CurrentState;
     }
 
     private void SubscribeCurrentStateToTrainInertia()
     {
-        if (_train == null || _currentState == null)
-            return;
-
-        _train.startInertia -= _currentState.OnTrainSpeedChange;
-        _train.startInertia += _currentState.OnTrainSpeedChange;
+        _stateMachine?.ConfigureTrain(_train);
     }
 
     private void UnsubscribeCurrentStateFromTrainInertia()
     {
-        if (_train != null && _currentState != null)
-            _train.startInertia -= _currentState.OnTrainSpeedChange;
+        _stateMachine?.Clear();
+        _currentState = null;
     }
 
     private Vector2 GetImpulseTargetWorld(Vector2 position)
@@ -95,44 +85,23 @@ public partial class Passenger
         if (results == null)
             return;
 
-        if (PassengerRegistry.Instance != null)
+        LoveMetro.Core.IPassengerRegistry registry = ResolvePassengerRegistry();
+        if (registry != null)
         {
-            PassengerRegistry.Instance.GetSameGenderInRadius(this, _repelRadius, results);
+            registry.GetSameGenderInRadius(this, _repelRadius, results);
             return;
         }
 
         results.Clear();
-        foreach (Passenger other in Object.FindObjectsOfType<Passenger>())
-        {
-            if (other == this || other == null || other.IsFemale != IsFemale)
-                continue;
-
-            float distance = Vector2.Distance(transform.position, other.transform.position);
-            if (distance <= _repelRadius)
-                results.Add(other);
-        }
     }
 
     private static Passenger FindClosestOpposite(Passenger self, float radius)
     {
-        if (PassengerRegistry.Instance != null)
-            return PassengerRegistry.Instance.FindClosestOpposite(self, radius);
+        return ResolvePassengerRegistry()?.FindClosestOpposite(self, radius);
+    }
 
-        Passenger best = null;
-        float bestDistance = radius;
-        foreach (Passenger passenger in Object.FindObjectsOfType<Passenger>())
-        {
-            if (passenger == self || passenger == null || passenger.IsFemale == self.IsFemale)
-                continue;
-
-            float distance = Vector2.Distance(self.transform.position, passenger.transform.position);
-            if (distance < bestDistance)
-            {
-                bestDistance = distance;
-                best = passenger;
-            }
-        }
-
-        return best;
+    private static LoveMetro.Core.IPassengerRegistry ResolvePassengerRegistry()
+    {
+        return LoveMetro.Core.RuntimeServices.Instance.PassengerRegistry ?? PassengerRegistry.Instance;
     }
 }

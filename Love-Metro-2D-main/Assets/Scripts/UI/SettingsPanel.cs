@@ -26,11 +26,16 @@ public class SettingsPanel : MonoBehaviour
     [SerializeField] private Button _backButton;
     
     // Ссылка на менеджер меню
-    private MenuManager _menuManager;
+    [SerializeField] private MenuManager _menuManager;
     
+    public void Configure(MenuManager menuManager)
+    {
+        if (menuManager != null)
+            _menuManager = menuManager;
+    }
+
     private void Start()
     {
-        _menuManager = FindObjectOfType<MenuManager>();
         InitializeSettings();
         SetupButtonListeners();
         LoadSettings();
@@ -235,4 +240,4 @@ public class SettingsPanel : MonoBehaviour
     }
     
     #endregion
-} 
+}

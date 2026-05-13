@@ -2,22 +2,41 @@ using UnityEngine;
 
 public partial class TrainManager
 {
+    private LoveMetro.Input.PointerIntent ResolvePointerIntent()
+    {
+        LoveMetro.Input.IInputIntentProvider provider = LoveMetro.Core.RuntimeServices.Instance.InputIntentProvider;
+        return provider != null
+            ? provider.CurrentIntent
+            : new LoveMetro.Input.PointerIntent(
+                ClickDirectionManager.CurrentClickDirection,
+                ClickDirectionManager.HasClickDirection,
+                ClickDirectionManager.IsMouseHeld,
+                ClickDirectionManager.HorizontalAxis,
+                ClickDirectionManager.HorizontalVelocity,
+                ClickDirectionManager.VerticalAxis,
+                ClickDirectionManager.VerticalVelocity,
+                ClickDirectionManager.CurrentPointerWorld,
+                ClickDirectionManager.LastReleaseWorld,
+                ClickDirectionManager.HasReleasePoint,
+                ClickDirectionManager.LastReleaseTime);
+    }
+
     private void EnsureSpawnerReference()
     {
         if (_spawner == null)
-            _spawner = FindObjectOfType<PassangerSpawner>();
+            Diagnostics.Warn("[Train] PassangerSpawner is not configured.");
     }
 
     private void EnsureParallaxReference()
     {
         if (_parallaxEffect == null)
-            _parallaxEffect = FindObjectOfType<ParallaxEffect>();
+            Diagnostics.Warn("[Train] ParallaxEffect is not configured.");
     }
 
     private void EnsurePassengersContainerReference()
     {
         if (_passangers == null)
-            _passangers = FindObjectOfType<PassangersContainer>();
+            Diagnostics.Warn("[Train] PassangersContainer is not configured.");
     }
 
     private void UpdateAccelerationHoldTime(bool isAccelerating)
@@ -54,6 +73,7 @@ public partial class TrainManager
 
         SetSpeed(boostSpeed);
         OnBrakeEnd?.Invoke();
+        BrakeEnded?.Invoke();
 
         if (_accelImpulseGiven || !wasAtRest)
             return;
@@ -66,6 +86,7 @@ public partial class TrainManager
     private void HandlePointerRelease()
     {
         OnBrakeStart?.Invoke();
+        BrakeStarted?.Invoke();
         _isBraking = true;
     }
 
@@ -79,22 +100,25 @@ public partial class TrainManager
             : ResolveCoastingDeceleration();
 
         _currentAcceleration = accelerationValue;
-        SetSpeed(_currentSpeed + accelerationValue * Time.deltaTime);
+        SetSpeed(_motionController != null
+            ? _motionController.ApplyAcceleration(_currentSpeed, accelerationValue, Time.deltaTime)
+            : _currentSpeed + accelerationValue * Time.deltaTime);
         ResetStartImpulseWhenNeeded();
     }
 
     private float ResolveHeldAcceleration()
     {
-        float horizontalAxis = ClickDirectionManager.HorizontalAxis;
-        float horizontalVelocity = ClickDirectionManager.HorizontalVelocity;
+        LoveMetro.Input.PointerIntent pointerIntent = ResolvePointerIntent();
+        float horizontalAxis = pointerIntent.HorizontalAxis;
+        float horizontalVelocity = pointerIntent.HorizontalVelocity;
         float accelerationValue = CalculateHeldAcceleration(horizontalAxis, horizontalVelocity);
 
         _isBraking = accelerationValue < 0f;
         if (!_isBraking)
             OnBrakeEnd?.Invoke();
 
-        TryEmitDirectionChangeImpulse(horizontalAxis, horizontalVelocity);
-        TryEmitFlickImpulse(horizontalVelocity);
+        TryEmitDirectionChangeImpulse(horizontalAxis, horizontalVelocity, pointerIntent.VerticalAxis);
+        TryEmitFlickImpulse(horizontalVelocity, pointerIntent.VerticalVelocity);
         _lastAxis = horizontalAxis;
 
         return accelerationValue;
@@ -131,7 +155,7 @@ public partial class TrainManager
         return accelerationValue;
     }
 
-    private void TryEmitDirectionChangeImpulse(float horizontalAxis, float horizontalVelocity)
+    private void TryEmitDirectionChangeImpulse(float horizontalAxis, float horizontalVelocity, float verticalAxis)
     {
         float deadZone = 0.06f;
         bool validPrev = Mathf.Abs(_lastAxis) > deadZone;
@@ -140,20 +164,20 @@ public partial class TrainManager
             return;
 
         float magnitude = CalculateDirectionalImpulseMagnitude(horizontalAxis, horizontalVelocity);
-        Vector2 impulse = BuildDirectionalImpulse(horizontalAxis, ClickDirectionManager.VerticalAxis, magnitude);
+        Vector2 impulse = BuildDirectionalImpulse(horizontalAxis, verticalAxis, magnitude);
         DispatchDirectionalImpulse(
             impulse,
             "DIR-CHANGE impulse",
             $"(x:{_lastAxis:F2}->{horizontalAxis:F2}, |vx|={Mathf.Abs(horizontalVelocity):F2}, mag={magnitude:F1})");
     }
 
-    private void TryEmitFlickImpulse(float horizontalVelocity)
+    private void TryEmitFlickImpulse(float horizontalVelocity, float verticalVelocity)
     {
         if (Mathf.Abs(horizontalVelocity) <= _dirFlickThreshold || !CanEmitDirectionalImpulse())
             return;
 
         float magnitude = CalculateDirectionalImpulseMagnitude(horizontalVelocity, horizontalVelocity);
-        Vector2 impulse = BuildDirectionalImpulse(horizontalVelocity, ClickDirectionManager.VerticalVelocity, magnitude);
+        Vector2 impulse = BuildDirectionalImpulse(horizontalVelocity, verticalVelocity, magnitude);
         DispatchDirectionalImpulse(
             impulse,
             "FLICK impulse",
@@ -188,6 +212,7 @@ public partial class TrainManager
     {
         Vector2 rotatedImpulse = Rotate(impulse, Mathf.Sin(_turnPhase) * _turnAmplitudeDeg);
         startInertia?.Invoke(rotatedImpulse);
+        InertiaImpulseDispatched?.Invoke(rotatedImpulse);
         LastInertiaImpulse = rotatedImpulse;
 
         if (string.IsNullOrEmpty(details))

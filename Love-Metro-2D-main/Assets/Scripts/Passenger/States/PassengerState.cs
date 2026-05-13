@@ -2,7 +2,7 @@ using UnityEngine;
 
 public partial class Passenger
 {
-    private abstract class PassangerState
+    private abstract class PassangerState : LoveMetro.Passengers.IPassengerState
     {
         protected Passenger Passanger;
 

@@ -20,13 +20,18 @@ public class CharactersPanel : MonoBehaviour
     [SerializeField] private CharacterData[] _charactersData;
     
     // Ссылка на менеджер меню
-    private MenuManager _menuManager;
+    [SerializeField] private MenuManager _menuManager;
     private List<CharacterCard> _characterCards = new List<CharacterCard>();
     private int _selectedCharacterIndex = 0;
     
+    public void Configure(MenuManager menuManager)
+    {
+        if (menuManager != null)
+            _menuManager = menuManager;
+    }
+
     private void Start()
     {
-        _menuManager = FindObjectOfType<MenuManager>();
         SetupButtonListeners();
         CreateCharacterCards();
         SelectCharacter(0);
@@ -224,4 +229,4 @@ public class CharacterCard : MonoBehaviour
             _onSelectCallback?.Invoke();
         }
     }
-} 
+}

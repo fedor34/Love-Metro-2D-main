@@ -208,7 +208,6 @@ public abstract class BaseFieldEffect : MonoBehaviour, IFieldEffect
     {
         if (_currentTargets.Remove(target))
         {
-            RemoveEffect(target);
             OnTargetExited?.Invoke(target);
         }
     }
@@ -269,10 +268,11 @@ public abstract class BaseFieldEffect : MonoBehaviour, IFieldEffect
         if (!active)
         {
             // Удаляем эффект со всех текущих целей
-            foreach (var target in _currentTargets)
-            {
-                RemoveEffect(target);
-            }
+            var targets = new List<IFieldEffectTarget>(_currentTargets);
+            foreach (var target in targets)
+                OnTargetExited?.Invoke(target);
+
+            _currentTargets.Clear();
         }
     }
     
@@ -409,4 +409,4 @@ public static class FieldEffectFactory
                 throw new System.NotImplementedException($"Тип эффекта {type} не реализован");
         }
     }
-} 
+}

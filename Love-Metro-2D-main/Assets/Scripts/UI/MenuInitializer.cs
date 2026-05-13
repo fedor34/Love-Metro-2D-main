@@ -65,7 +65,7 @@ public class MenuInitializer : MonoBehaviour
     private void AutoConfigureMenuManager()
     {
         // Пытаемся найти Canvas
-        Canvas canvas = FindObjectOfType<Canvas>();
+        Canvas canvas = FindMenuCanvas();
         GameObject root = canvas != null ? canvas.gameObject : this.gameObject;
 
         // Проверяем / создаём MenuManager
@@ -96,7 +96,31 @@ public class MenuInitializer : MonoBehaviour
             settingsPanel,
             _gameSceneName);
 
+        SettingsPanel settingsPanelComponent = settingsPanel != null ? settingsPanel.GetComponent<SettingsPanel>() : null;
+        CharactersPanel charactersPanelComponent = charactersPanel != null ? charactersPanel.GetComponent<CharactersPanel>() : null;
+        menuManager.Configure(settingsPanelComponent, charactersPanelComponent, playBtn, setBtn, exitBtn);
+
         Debug.Log("MenuInitializer: MenuManager автоматически сконфигурирован");
+    }
+
+    private Canvas FindMenuCanvas()
+    {
+        Canvas[] canvases = FindObjectsOfType<Canvas>();
+        Canvas fallback = null;
+
+        foreach (Canvas canvas in canvases)
+        {
+            if (canvas == null || canvas.name == "ScoreHudCanvas")
+                continue;
+
+            if (canvas.GetComponentInChildren<UnityEngine.UI.Button>() != null)
+                return canvas;
+
+            if (fallback == null)
+                fallback = canvas;
+        }
+
+        return fallback;
     }
 
     private UnityEngine.UI.Button FindButton(string name)

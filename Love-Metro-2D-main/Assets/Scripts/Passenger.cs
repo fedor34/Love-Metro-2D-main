@@ -33,7 +33,9 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
     [SerializeField] private TrainManager _train;
 
     private float _timeWithoutHolding;
-    private PassangerState _currentState;
+    private LoveMetro.Passengers.IPassengerState _currentState;
+    private LoveMetro.Passengers.PassengerStateMachine _stateMachine;
+    private LoveMetro.Passengers.PassengerMotionController _motionController;
     private Rigidbody2D _rigidbody;
     private Collider2D _collider;
     private ScoreCounter _scoreCounter;
@@ -145,6 +147,7 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
         _scoreCounter = scoreCounter;
 
         EnsureRequiredComponents();
+        ConfigureMotionController();
         gameObject.layer = LayerMask.NameToLayer(_defaultLayer);
 
         var spriteRenderer = GetComponent<SpriteRenderer>();
@@ -158,45 +161,43 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
         Diagnostics.Log($"[Passenger][init] name={name} female={IsFemale} layer={gameObject.layer} sprite='{spriteName}' ctrl='{controllerName}'");
 
         EnsureStateMachineInitialized();
-        _currentState = wanderingState;
-        _currentState?.Enter();
-
         _train = train;
-        SubscribeCurrentStateToTrainInertia();
+        _stateMachine.ConfigureTrain(_train);
+        ChangeState(wanderingState);
 
         GetAbilities()?.AttachAll();
 
         _isInitiated = true;
         if (LevelGameplaySettings.SlipperyFloorEnabled)
-            _rigidbody.linearDamping = LevelGameplaySettings.SlipperyLinearDrag;
+            _rigidbody.drag = LevelGameplaySettings.SlipperyLinearDrag;
 
-        Diagnostics.Log($"[Passenger][ready] name={name} rb(cdm={_rigidbody.collisionDetectionMode}, interp={_rigidbody.interpolation}, drag={_rigidbody.linearDamping:F2})");
+        Diagnostics.Log($"[Passenger][ready] name={name} rb(cdm={_rigidbody.collisionDetectionMode}, interp={_rigidbody.interpolation}, drag={_rigidbody.drag:F2})");
     }
 
     private void Update()
     {
-        if (!_isInitiated || _currentState == null)
+        if (!_isInitiated || _stateMachine?.CurrentState == null)
             return;
 
-        _currentState.UpdateState();
+        _stateMachine.UpdateState();
         if (!IsMatchable && Time.time >= _rematchEnableTime)
             IsMatchable = true;
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        if (_currentState == null)
+        if (_stateMachine?.CurrentState == null)
             return;
 
-        _currentState.OnCollision(collision);
+        _stateMachine.OnCollision(collision);
     }
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        if (_currentState == null)
+        if (_stateMachine?.CurrentState == null)
             return;
 
-        _currentState.OnTriggerEnter(collision);
+        _stateMachine.OnTriggerEnter(collision);
     }
 
     public void ForceToMatchingState(Passenger partner)

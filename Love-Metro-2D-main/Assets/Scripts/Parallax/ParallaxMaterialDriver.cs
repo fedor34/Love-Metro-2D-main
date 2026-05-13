@@ -29,7 +29,6 @@ public class ParallaxMaterialDriver : MonoBehaviour
     private void Awake()
     {
         ResolveTrainManager();
-        RefreshTargets();
     }
 
     private void Update()
@@ -63,14 +62,31 @@ public class ParallaxMaterialDriver : MonoBehaviour
         LogTickOnce(absoluteSpeed, normalizedSpeed);
     }
 
+    public void Configure(TrainManager train, IEnumerable<SpriteRenderer> renderers)
+    {
+        if (train != null)
+            _train = train;
+
+        RefreshTargets(renderers);
+    }
+
     public void RefreshTargets()
+    {
+        RefreshTargets(null);
+    }
+
+    public void RefreshTargets(IEnumerable<SpriteRenderer> renderers)
     {
         _targets.Clear();
 
-        SpriteRenderer[] renderers = FindObjectsOfType<SpriteRenderer>(true);
-        for (int i = 0; i < renderers.Length; i++)
+        if (renderers == null)
         {
-            SpriteRenderer renderer = renderers[i];
+            ScheduleNextTargetRefresh();
+            return;
+        }
+
+        foreach (SpriteRenderer renderer in renderers)
+        {
             if (!ShouldTrackRenderer(renderer))
                 continue;
 
@@ -97,8 +113,8 @@ public class ParallaxMaterialDriver : MonoBehaviour
 
     private bool ResolveTrainManager()
     {
-        if (_train == null)
-            _train = FindObjectOfType<TrainManager>();
+        if (_train == null && LoveMetro.Core.RuntimeServices.Instance.TrainMotionEvents is TrainManager trainManager)
+            _train = trainManager;
 
         return _train != null;
     }

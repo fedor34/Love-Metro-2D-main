@@ -14,7 +14,12 @@ public partial class Passenger
 
     public int CalculateMatchPointsWith(Passenger partner, ScoreCounter scoreCounter = null)
     {
-        int points = ResolveScoreCounter(scoreCounter)?.GetBasePointsPerCouple() ?? 0;
+        return CalculateMatchPointsWith(partner, ResolveScoreService(scoreCounter));
+    }
+
+    public int CalculateMatchPointsWith(Passenger partner, LoveMetro.Scoring.IScoreService scoreService)
+    {
+        int points = scoreService?.BasePointsPerCouple ?? 0;
         GetAbilities()?.InvokeMatched(partner, ref points);
         partner?.GetAbilities()?.InvokeMatched(this, ref points);
         return Mathf.Max(0, points);
@@ -25,19 +30,21 @@ public partial class Passenger
         return scoreCounter != null ? scoreCounter : _scoreCounter;
     }
 
-    private void AwardMatchPointsFor(Passenger partner, Vector3 worldPosition)
+    private LoveMetro.Scoring.IScoreService ResolveScoreService(ScoreCounter scoreCounter = null)
     {
-        ScoreCounter scoreCounter = ResolveScoreCounter();
-        if (scoreCounter == null)
-            return;
-
-        scoreCounter.AwardMatchPoints(WorldToScreenPoint(worldPosition), CalculateMatchPointsWith(partner, scoreCounter));
+        ScoreCounter concreteScoreCounter = ResolveScoreCounter(scoreCounter);
+        return concreteScoreCounter != null
+            ? concreteScoreCounter
+            : LoveMetro.Core.RuntimeServices.Instance.ScoreService;
     }
 
-    private static Vector3 WorldToScreenPoint(Vector3 worldPosition)
+    private void AwardMatchPointsFor(Passenger partner, Vector3 worldPosition)
     {
-        Camera mainCamera = Camera.main;
-        return mainCamera != null ? mainCamera.WorldToScreenPoint(worldPosition) : Vector3.zero;
+        LoveMetro.Scoring.IScoreService scoreService = ResolveScoreService();
+        if (scoreService == null)
+            return;
+
+        scoreService.AwardMatchPoints(worldPosition, CalculateMatchPointsWith(partner, scoreService));
     }
 
     private static bool CanMatch(Passenger first, Passenger second)
@@ -59,6 +66,10 @@ public partial class Passenger
 
     private bool TryMatchWith(Passenger other)
     {
+        LoveMetro.Pairing.IPairingService service = LoveMetro.Core.RuntimeServices.Instance.PairingService;
+        if (service != null)
+            return service.TryPair(new LoveMetro.Pairing.PairingRequest(this, other, source: "collision"), out _);
+
         if (!CanMatch(this, other))
             return false;
 
@@ -77,30 +88,27 @@ public partial class Passenger
 
     private Vector2 ClampFlightVelocity(Vector2 velocity)
     {
-        if (velocity.magnitude > _maxFlightSpeed)
-            return velocity.normalized * _maxFlightSpeed;
-
-        return velocity;
+        return EnsureMotionController().ClampFlightVelocity(velocity);
     }
 
     private Vector2 ReflectVelocity(Vector2 velocity, Vector2 normal, float boostMultiplier)
     {
-        Vector2 reflected = Vector2.Reflect(velocity, normal) * _bounceElasticity;
-        reflected *= boostMultiplier;
-        return ClampFlightVelocity(reflected);
+        return EnsureMotionController().ReflectVelocity(velocity, normal, boostMultiplier);
+    }
+
+    private Vector2 ScaleLaunchVelocity(Vector2 velocity, float speedMultiplier, float impulseScale)
+    {
+        return EnsureMotionController().ScaleLaunchVelocity(velocity, speedMultiplier, impulseScale);
     }
 
     private Vector2 GetCurrentVelocity()
     {
-        return _rigidbody != null ? _rigidbody.linearVelocity : Vector2.zero;
+        return EnsureMotionController().CurrentVelocity;
     }
 
     private void ApplyReflectedVelocity(Vector2 velocity, Vector2 normal, float boostMultiplier)
     {
-        if (_rigidbody == null)
-            return;
-
-        _rigidbody.linearVelocity = ReflectVelocity(velocity, normal, boostMultiplier);
+        EnsureMotionController().SetVelocity(ReflectVelocity(velocity, normal, boostMultiplier));
     }
 
     private void EnterFallingState(Vector2 initialVelocity)
@@ -109,5 +117,33 @@ public partial class Passenger
         EnsureStateMachineInitialized();
         ChangeState(fallingState);
         fallingState.SetInitialFallingSpeed(initialVelocity);
+    }
+
+    private LoveMetro.Passengers.PassengerMotionController EnsureMotionController()
+    {
+        if (_motionController == null)
+            ConfigureMotionController();
+
+        return _motionController;
+    }
+
+    private void ConfigureMotionController()
+    {
+        if (_rigidbody == null)
+            _rigidbody = GetComponent<Rigidbody2D>() ?? gameObject.AddComponent<Rigidbody2D>();
+
+        LoveMetro.Passengers.PassengerMotionConfig config = new LoveMetro.Passengers.PassengerMotionConfig(
+            _maxFlightSpeed,
+            _minFallingSpeed,
+            _magnetRadius,
+            _magnetForce,
+            _repelRadius,
+            _repelForce,
+            _rematchCooldown);
+
+        if (_motionController == null)
+            _motionController = new LoveMetro.Passengers.PassengerMotionController(_rigidbody, config, _bounceElasticity);
+        else
+            _motionController.Configure(config, _bounceElasticity);
     }
 }

@@ -106,7 +106,7 @@ public class UltimateDiagnostic : MonoBehaviour
             Debug.Log($"    Position: {vip.transform.position}");
             Debug.Log($"    Layer: {LayerMask.LayerToName(vip.gameObject.layer)} ({vip.gameObject.layer})");
             Debug.Log($"    State: {vip.GetCurrentStateName()}");
-            Debug.Log($"    Velocity: {rb.linearVelocity} (magnitude: {rb.linearVelocity.magnitude:F2})");
+            Debug.Log($"    Velocity: {rb.velocity} (magnitude: {rb.velocity.magnitude:F2})");
             Debug.Log($"    CollisionDetectionMode: {rb.collisionDetectionMode}");
             Debug.Log($"    Interpolation: {rb.interpolation}");
             Debug.Log($"    Collider Type: {col.GetType().Name}");
@@ -118,10 +118,10 @@ public class UltimateDiagnostic : MonoBehaviour
             }
             
             // Проверяем скорость - tunneling?
-            if (rb.linearVelocity.magnitude > 20f)
+            if (rb.velocity.magnitude > 20f)
             {
                 Debug.LogWarning($"    ⚠️ ВЫСОКАЯ СКОРОСТЬ! Может быть tunneling!");
-                Debug.LogWarning($"       → Скорость {rb.linearVelocity.magnitude:F2} > 20");
+                Debug.LogWarning($"       → Скорость {rb.velocity.magnitude:F2} > 20");
                 
                 if (rb.collisionDetectionMode != CollisionDetectionMode2D.Continuous)
                 {
@@ -174,7 +174,7 @@ public class UltimateDiagnostic : MonoBehaviour
             {
                 Debug.LogError($"❌❌❌ VIP {p.name} ВЫЛЕТЕЛ ЗА ГРАНИЦЫ! ❌❌❌");
                 Debug.LogError($"  Position: {pos}");
-                Debug.LogError($"  Velocity: {rb.linearVelocity}");
+                Debug.LogError($"  Velocity: {rb.velocity}");
                 Debug.LogError($"  State: {p.GetCurrentStateName()}");
                 Debug.LogError($"  Layer: {LayerMask.LayerToName(p.gameObject.layer)}");
                 Debug.LogError($"  CollisionDetection: {rb.collisionDetectionMode}");

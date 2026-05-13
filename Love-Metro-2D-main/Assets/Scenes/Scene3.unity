@@ -576,7 +576,7 @@ MonoBehaviour:
   _floatingTextInitialSpeed: 900
   _floatingTextSpawnOffsetY: 100
   _matchesPerBrakeText: {fileID: 0}
-  _trainManager: {fileID: 0}
+  _trainManager: {fileID: 1652136996}
 --- !u!95 &72410762
 Animator:
   serializedVersion: 5
@@ -585,7 +585,7 @@ Animator:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 72410759}
-  m_Enabled: 1
+  m_Enabled: 0
   m_Avatar: {fileID: 0}
   m_Controller: {fileID: 9100000, guid: 6516130663f2e504193c539c499f5683, type: 2}
   m_CullingMode: 0

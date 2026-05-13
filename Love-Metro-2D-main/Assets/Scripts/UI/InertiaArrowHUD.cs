@@ -32,8 +32,7 @@ public class InertiaArrowHUD : MonoBehaviour
     {
         if (arrowTransform != null) return;
 
-        // Find or create Canvas
-        Canvas canvas = FindObjectOfType<Canvas>();
+        Canvas canvas = GetComponentInParent<Canvas>();
         if (canvas == null)
         {
             GameObject canvasGo = new GameObject("InertiaArrowCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));

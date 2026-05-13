@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Reflection;
 using UnityEngine;
 
 /// <summary>
@@ -19,8 +18,6 @@ public class GameInitializer : MonoBehaviour
     };
 
     private static readonly float[] BackgroundLayerSpeeds = { 0.3f, 0.5f, 0.8f, 1.0f, 1.2f, 1.5f, 1.0f };
-    private static FieldInfo _backgroundLayersField;
-
     [Header("Auto-Create Settings")]
     [SerializeField] private bool _createClickDirectionManager = true;
     [SerializeField] private bool _createInertiaArrowHUD = true;
@@ -38,6 +35,7 @@ public class GameInitializer : MonoBehaviour
     private void Start()
     {
         InitializeUiSystems();
+        ConfigureSceneDependencies();
     }
 
     private void InitializeCoreSystems()
@@ -53,6 +51,69 @@ public class GameInitializer : MonoBehaviour
     private void InitializeUiSystems()
     {
         EnsureComponent<InertiaArrowHUD>(_createInertiaArrowHUD, "InertiaArrowHUD");
+    }
+
+    private void ConfigureSceneDependencies()
+    {
+        TrainManager train = FindObjectOfType<TrainManager>();
+        PassangerSpawner spawner = FindObjectOfType<PassangerSpawner>();
+        ParallaxEffect parallax = FindObjectOfType<ParallaxEffect>();
+        PassangersContainer container = FindObjectOfType<PassangersContainer>();
+        SpriteRenderer[] spriteRenderers = FindObjectsOfType<SpriteRenderer>(true);
+
+        train?.Configure(spawner, parallax, container);
+
+        if (parallax != null)
+            parallax.Configure(train, FindObjectsOfType<ParallaxLayer>());
+
+        SimpleBackgroundScroller simpleScroller = FindObjectOfType<SimpleBackgroundScroller>();
+        simpleScroller?.ConfigureTrain(train);
+
+        BackgroundGroupScroller groupScroller = FindObjectOfType<BackgroundGroupScroller>();
+        groupScroller?.Configure(train, ResolveTransformByName("Background"), ResolveBackgroundTransforms(BackgroundLayerNames));
+
+        ParallaxMaterialDriver materialDriver = FindObjectOfType<ParallaxMaterialDriver>();
+        materialDriver?.Configure(train, spriteRenderers);
+
+        BackgroundMaterialOverride materialOverride = FindObjectOfType<BackgroundMaterialOverride>();
+        materialOverride?.Configure(spriteRenderers);
+
+        CouplesManager couplesManager = CouplesManager.Instance ?? FindObjectOfType<CouplesManager>();
+        couplesManager?.Configure(
+            LoveMetro.Core.RuntimeServices.Instance.PassengerRegistry ?? PassengerRegistry.Instance,
+            LoveMetro.Core.RuntimeServices.Instance.TrainMotionEvents,
+            LoveMetro.Core.RuntimeServices.Instance.ScoreService);
+
+        FieldEffectSystem fieldEffectSystem = FieldEffectSystem.Instance ?? FindObjectOfType<FieldEffectSystem>();
+        fieldEffectSystem?.RegisterSceneComponents(FindObjectsOfType<MonoBehaviour>());
+    }
+
+    private static Transform[] ResolveBackgroundTransforms(string[] objectNames)
+    {
+        if (objectNames == null || objectNames.Length == 0)
+            return System.Array.Empty<Transform>();
+
+        Transform[] transforms = new Transform[objectNames.Length];
+        for (int i = 0; i < objectNames.Length; i++)
+            transforms[i] = ResolveTransformByName(objectNames[i]);
+
+        return transforms;
+    }
+
+    private static Transform ResolveTransformByName(string objectName)
+    {
+        if (string.IsNullOrWhiteSpace(objectName))
+            return null;
+
+        Transform[] allTransforms = FindObjectsOfType<Transform>(true);
+        for (int i = 0; i < allTransforms.Length; i++)
+        {
+            Transform candidate = allTransforms[i];
+            if (candidate != null && candidate.name == objectName)
+                return candidate;
+        }
+
+        return null;
     }
 
     private T EnsureComponent<T>(bool shouldCreate, string objectName, bool persistent = false) where T : Component
@@ -88,15 +149,8 @@ public class GameInitializer : MonoBehaviour
         if (scroller == null)
             return 0;
 
-        FieldInfo layersField = GetBackgroundLayersField();
-        if (layersField == null)
-        {
-            Diagnostics.Warn("[GameInitializer] SimpleBackgroundScroller._layers field not found.");
-            return 0;
-        }
-
         List<SimpleBackgroundScroller.Layer> configuredLayers = BuildBackgroundLayers();
-        layersField.SetValue(scroller, configuredLayers.ToArray());
+        scroller.ConfigureLayers(configuredLayers.ToArray());
         return configuredLayers.Count;
     }
 
@@ -135,15 +189,4 @@ public class GameInitializer : MonoBehaviour
         return null;
     }
 
-    private static FieldInfo GetBackgroundLayersField()
-    {
-        if (_backgroundLayersField == null)
-        {
-            _backgroundLayersField = typeof(SimpleBackgroundScroller).GetField(
-                "_layers",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-        }
-
-        return _backgroundLayersField;
-    }
 }

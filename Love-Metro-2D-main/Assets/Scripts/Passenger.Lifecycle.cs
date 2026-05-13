@@ -121,8 +121,8 @@ public partial class Passenger
         _rigidbody.interpolation = settings.interpolation;
         _rigidbody.freezeRotation = settings.freezeRotation;
         _rigidbody.gravityScale = settings.gravityScale;
-        _rigidbody.linearDamping = settings.defaultLinearDamping;
-        _rigidbody.angularDamping = settings.defaultAngularDamping;
+        _rigidbody.drag = settings.defaultLinearDamping;
+        _rigidbody.angularDrag = settings.defaultAngularDamping;
         ResetPhysicsCollisionFilters();
     }
 

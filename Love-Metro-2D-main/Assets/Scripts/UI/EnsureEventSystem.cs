@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.UI;
 
 /// <summary>
 /// Guarantees that an EventSystem and at least one GraphicRaycaster exist at runtime.
@@ -11,16 +10,6 @@ public class EnsureEventSystem
     private static void Ensure()
     {
         GameBootstrap.EnsureRuntimeServices();
-
-        // Ensure canvases have GraphicRaycaster
-        var canvases = Object.FindObjectsOfType<Canvas>();
-        foreach (var c in canvases)
-        {
-            if (c.GetComponent<GraphicRaycaster>() == null)
-            {
-                c.gameObject.AddComponent<GraphicRaycaster>();
-            }
-        }
 
         // Cursor defaults for menu
         Cursor.visible = true;

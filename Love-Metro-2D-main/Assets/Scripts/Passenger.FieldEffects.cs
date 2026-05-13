@@ -116,14 +116,14 @@ public partial class Passenger
         {
             UpdateCurrentMovingDirection(force);
             float forceMultiplier = windStrength < _minWindStrengthForFlying ? 0.5f : 2f;
-            _rigidbody.AddForce(force * forceMultiplier, ForceMode2D.Force);
+            EnsureMotionController().AddForce(force * forceMultiplier, ForceMode2D.Force);
             LogPassengerEvent("wind", $"{name} pushed while wandering force={windStrength:F1} multiplier={forceMultiplier:F1}");
             return true;
         }
 
         if (windStrength > 5f && _currentState is not BeingAbsorbed)
         {
-            _rigidbody.AddForce(force, ForceMode2D.Force);
+            EnsureMotionController().AddForce(force, ForceMode2D.Force);
             LogPassengerEvent("wind", $"{name} forced by wind force={windStrength:F1}");
             return true;
         }
@@ -134,8 +134,7 @@ public partial class Passenger
     private void ApplyDirectedForce(Vector3 force, ForceMode2D forceMode)
     {
         UpdateCurrentMovingDirection(force);
-        if (_rigidbody != null)
-            _rigidbody.AddForce(force, forceMode);
+        EnsureMotionController().AddForce(force, forceMode);
     }
 
     private void UpdateCurrentMovingDirection(Vector3 force)

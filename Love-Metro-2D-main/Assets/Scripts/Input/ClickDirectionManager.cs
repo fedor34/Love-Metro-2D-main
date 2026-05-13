@@ -4,7 +4,7 @@ using UnityEngine;
 /// Captures pointer intent for train movement and passenger launching.
 /// Keeps the legacy static API used by gameplay code while isolating input and visuals.
 /// </summary>
-public partial class ClickDirectionManager : MonoBehaviour
+public partial class ClickDirectionManager : MonoBehaviour, LoveMetro.Input.IInputIntentProvider
 {
     [Header("Click Direction Settings")]
     [SerializeField] private float _maxClickDistance = 5f;
@@ -48,6 +48,15 @@ public partial class ClickDirectionManager : MonoBehaviour
     private bool _inputBlocked;
     private bool _suppressReleaseUntilMouseUp;
 
+    public LoveMetro.Input.PointerIntent CurrentIntent => BuildCurrentIntent();
+
+    public event System.Action<LoveMetro.Input.PointerIntent> IntentChanged;
+
+    private void Awake()
+    {
+        LoveMetro.Core.RuntimeServices.Instance.RegisterInputIntentProvider(this);
+    }
+
     private void Start()
     {
         RefreshScreenMetrics(force: true);
@@ -70,10 +79,12 @@ public partial class ClickDirectionManager : MonoBehaviour
     {
         ResetHoldState();
         HideDirectionLine();
+        PublishIntent();
     }
 
     private void OnDestroy()
     {
+        LoveMetro.Core.RuntimeServices.Instance.UnregisterInputIntentProvider(this);
         ResetStaticState();
         OnDirectionSet = null;
     }
@@ -84,6 +95,7 @@ public partial class ClickDirectionManager : MonoBehaviour
         HasClickDirection = true;
 
         OnDirectionSet?.Invoke(direction);
+        PublishIntent();
         Diagnostics.Log($"[ClickDirectionManager] Direction set to {direction}");
     }
 
@@ -107,6 +119,27 @@ public partial class ClickDirectionManager : MonoBehaviour
         LastReleaseWorld = Vector2.zero;
         HasReleasePoint = false;
         LastReleaseTime = -999f;
+    }
+
+    private LoveMetro.Input.PointerIntent BuildCurrentIntent()
+    {
+        return new LoveMetro.Input.PointerIntent(
+            CurrentClickDirection,
+            HasClickDirection,
+            IsMouseHeld,
+            HorizontalAxis,
+            HorizontalVelocity,
+            VerticalAxis,
+            VerticalVelocity,
+            CurrentPointerWorld,
+            LastReleaseWorld,
+            HasReleasePoint,
+            LastReleaseTime);
+    }
+
+    private void PublishIntent()
+    {
+        IntentChanged?.Invoke(BuildCurrentIntent());
     }
 
     public static Vector2 GetCurrentDirection()

@@ -92,66 +92,62 @@ public partial class Passenger
     void IPassengerStateHost.EnterFallingState(Vector2 initialVelocity) => EnterFallingState(initialVelocity);
     void IPassengerStateHost.SetBodyType(RigidbodyType2D bodyType)
     {
-        EnsureRequiredComponents();
-        _rigidbody.bodyType = bodyType;
+        EnsurePhysicsRuntime().SetBodyType(bodyType);
     }
 
     void IPassengerStateHost.SetDefaultLayer()
     {
-        gameObject.layer = LayerMask.NameToLayer(_defaultLayer);
+        EnsurePhysicsRuntime().SetDefaultLayer(_defaultLayer);
     }
 
     void IPassengerStateHost.SetColliderEnabled(bool enabled)
     {
-        EnsureRequiredComponents();
-        _collider.enabled = enabled;
+        EnsurePhysicsRuntime().SetColliderEnabled(enabled);
     }
 
     void IPassengerStateHost.SetVelocity(Vector2 velocity)
     {
-        EnsureMotionController().SetVelocity(velocity);
+        EnsurePhysicsRuntime().SetVelocity(velocity);
     }
 
     void IPassengerStateHost.AddForce(Vector2 force, ForceMode2D mode)
     {
-        EnsureMotionController().AddForce(force, mode);
+        EnsurePhysicsRuntime().AddForce(force, mode);
     }
 
     Vector2 IPassengerStateHost.GetVelocity()
     {
-        return EnsureMotionController().CurrentVelocity;
+        return EnsurePhysicsRuntime().CurrentVelocity;
     }
 
     Vector2 IPassengerStateHost.GetVelocity(Passenger passenger)
     {
-        return passenger != null ? passenger.EnsureMotionController().CurrentVelocity : Vector2.zero;
+        return passenger != null ? passenger.EnsurePhysicsRuntime().CurrentVelocity : Vector2.zero;
     }
 
     void IPassengerStateHost.SetDamping(float linearDamping, float angularDamping)
     {
-        EnsureRequiredComponents();
-        _rigidbody.drag = linearDamping;
-        _rigidbody.angularDrag = angularDamping;
+        EnsurePhysicsRuntime().SetDamping(linearDamping, angularDamping);
     }
 
     Vector2 IPassengerStateHost.ClampFlightVelocity(Vector2 velocity)
     {
-        return ClampFlightVelocity(velocity);
+        return EnsurePhysicsRuntime().ClampFlightVelocity(velocity);
     }
 
     Vector2 IPassengerStateHost.ReflectVelocity(Vector2 velocity, Vector2 normal, float boostMultiplier)
     {
-        return ReflectVelocity(velocity, normal, boostMultiplier);
+        return EnsurePhysicsRuntime().ReflectVelocity(velocity, normal, boostMultiplier);
     }
 
     Vector2 IPassengerStateHost.ScaleLaunchVelocity(Vector2 velocity, float speedMultiplier, float impulseScale)
     {
-        return ScaleLaunchVelocity(velocity, speedMultiplier, impulseScale);
+        return EnsurePhysicsRuntime().ScaleLaunchVelocity(velocity, speedMultiplier, impulseScale);
     }
 
     void IPassengerStateHost.ApplyReflectedVelocity(Vector2 velocity, Vector2 normal, float boostMultiplier)
     {
-        ApplyReflectedVelocity(velocity, normal, boostMultiplier);
+        EnsurePhysicsRuntime().ApplyReflectedVelocity(velocity, normal, boostMultiplier);
     }
 
     void IPassengerStateHost.ApplyReflectedVelocity(Passenger passenger, Vector2 velocity, Vector2 normal, float boostMultiplier)
@@ -202,8 +198,7 @@ public partial class Passenger
 
     int IPassengerStateHost.GetContacts(ContactPoint2D[] contactPoints)
     {
-        EnsureRequiredComponents();
-        return _rigidbody.GetContacts(contactPoints);
+        return EnsurePhysicsRuntime().GetContacts(contactPoints);
     }
 
     void IPassengerStateHost.AttachHandrail(HandRailPosition handrail)

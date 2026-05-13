@@ -4,14 +4,12 @@ public partial class Passenger
 {
     private void Awake()
     {
-        Collider2D[] allColliders = GetComponentsInChildren<Collider2D>(includeInactive: true);
-        EnsureSolidColliders(allColliders);
+        int colliderCount = EnsurePhysicsRuntime().EnsureSolidChildColliders();
         EnsureRequiredComponents();
         ConfigureRigidbody();
-        Diagnostics.Log($"[Passenger][awake] name={name} cols={allColliders?.Length ?? 0} rb(cdm={_rigidbody.collisionDetectionMode}, interp={_rigidbody.interpolation}) layer={gameObject.layer}");
+        Diagnostics.Log($"[Passenger][awake] name={name} cols={colliderCount} {EnsurePhysicsRuntime().DescribeRigidbody()} layer={gameObject.layer}");
 
-        if (ShouldNormalizeVipCollider())
-            NormalizeVipCollider();
+        EnsurePhysicsRuntime().NormalizeVipColliderIfNeeded();
     }
 
     private void Start()
@@ -36,7 +34,7 @@ public partial class Passenger
     {
         EnsureRequiredComponents();
         Transport(worldPosition);
-        PassangerAnimator.ChangeFacingDirection(faceRight);
+        PassangerAnimator?.ChangeFacingDirection(faceRight);
         transform.SetParent(coupleRoot);
         IsInCouple = true;
         RefreshCoupleRegistryStatus();
@@ -50,15 +48,11 @@ public partial class Passenger
 
     public void BreakFromCouple(Vector2 kickVelocity)
     {
+        EnsureRequiredComponents();
         IsInCouple = false;
-        if (_collider != null)
-            _collider.enabled = true;
-
-        if (_rigidbody != null)
-            _rigidbody.bodyType = RigidbodyType2D.Dynamic;
-
-        if (PassangerAnimator != null)
-            PassangerAnimator.ResetAfterPairBreak();
+        EnsurePhysicsRuntime().SetColliderEnabled(true);
+        EnsurePhysicsRuntime().SetBodyType(RigidbodyType2D.Dynamic);
+        PassangerAnimator?.ResetAfterPairBreak();
 
         Launch(kickVelocity);
         IsMatchable = false;
@@ -79,67 +73,19 @@ public partial class Passenger
 
     private void EnsureRequiredComponents()
     {
-        if (_rigidbody == null)
-            _rigidbody = GetComponent<Rigidbody2D>() ?? gameObject.AddComponent<Rigidbody2D>();
-
-        if (PassangerAnimator == null)
-            PassangerAnimator = GetComponent<PassangerAnimator>() ?? gameObject.AddComponent<PassangerAnimator>();
-
-        if (_collider != null)
-        {
-            ResetPhysicsCollisionFilters();
-            return;
-        }
-
-        _collider = GetComponent<Collider2D>();
-        if (_collider == null)
-        {
-            CircleCollider2D collider = gameObject.AddComponent<CircleCollider2D>();
-            collider.isTrigger = false;
-            _collider = collider;
-        }
-
-        ResetPhysicsCollisionFilters();
-    }
-
-    private static void EnsureSolidColliders(Collider2D[] colliders)
-    {
-        if (colliders == null)
-            return;
-
-        for (int i = 0; i < colliders.Length; i++)
-        {
-            if (colliders[i] != null)
-                colliders[i].isTrigger = false;
-        }
+        EnsurePhysicsRuntime().EnsureRequiredComponents();
+        PassangerAnimator = EnsurePhysicsRuntime().Animator;
     }
 
     private void ConfigureRigidbody()
     {
-        PassengerSettings settings = Settings;
-        _rigidbody.collisionDetectionMode = settings.collisionDetectionMode;
-        _rigidbody.interpolation = settings.interpolation;
-        _rigidbody.freezeRotation = settings.freezeRotation;
-        _rigidbody.gravityScale = settings.gravityScale;
-        _rigidbody.drag = settings.defaultLinearDamping;
-        _rigidbody.angularDrag = settings.defaultAngularDamping;
-        ResetPhysicsCollisionFilters();
+        EnsurePhysicsRuntime().ConfigureRigidbody(Settings);
+        PassangerAnimator = EnsurePhysicsRuntime().Animator;
     }
 
     public void ResetPhysicsCollisionFilters()
     {
-        if (_rigidbody != null)
-        {
-            _rigidbody.includeLayers = Physics2D.AllLayers;
-            _rigidbody.excludeLayers = 0;
-        }
-
-        if (_collider != null)
-        {
-            _collider.isTrigger = false;
-            _collider.includeLayers = Physics2D.AllLayers;
-            _collider.excludeLayers = 0;
-        }
+        EnsurePhysicsRuntime().ResetCollisionFilters();
     }
 
     private void RegisterInRuntimeSystems()
@@ -165,45 +111,11 @@ public partial class Passenger
         PassengerRegistry.Instance?.UpdateCoupleStatus(this);
     }
 
-    private bool ShouldNormalizeVipCollider()
+    private LoveMetro.Passengers.PassengerPhysicsRuntime EnsurePhysicsRuntime()
     {
-        if (name.IndexOf("VIP", System.StringComparison.OrdinalIgnoreCase) >= 0)
-            return true;
+        if (_physicsRuntime == null)
+            _physicsRuntime = new LoveMetro.Passengers.PassengerPhysicsRuntime(this);
 
-        Animator animator = GetComponent<Animator>();
-        string controllerName = animator != null && animator.runtimeAnimatorController != null
-            ? animator.runtimeAnimatorController.name
-            : string.Empty;
-        return !string.IsNullOrEmpty(controllerName)
-            && controllerName.IndexOf("VIP", System.StringComparison.OrdinalIgnoreCase) >= 0;
-    }
-
-    private void NormalizeVipCollider()
-    {
-        SpriteRenderer spriteRenderer = GetComponent<SpriteRenderer>();
-        Sprite sprite = spriteRenderer != null ? spriteRenderer.sprite : null;
-        BoxCollider2D boxCollider = GetComponent<BoxCollider2D>();
-        if (boxCollider == null)
-            boxCollider = gameObject.AddComponent<BoxCollider2D>();
-
-        if (sprite == null)
-        {
-            Diagnostics.Warn($"[Passenger][vip-collider] {name}: no sprite - skip");
-            return;
-        }
-
-        Vector2 spriteSize = sprite.bounds.size;
-        float width = Mathf.Clamp(spriteSize.x * 0.92f, 0.6f, spriteSize.x * 1.05f);
-        float height = Mathf.Clamp(spriteSize.y * 0.13f, 0.35f, spriteSize.y * 0.6f);
-        float footMargin = Mathf.Clamp(spriteSize.y * 0.02f, 0.02f, 0.2f);
-        float offsetY = (-spriteSize.y * 0.5f) + (height * 0.5f) + footMargin;
-
-        boxCollider.size = new Vector2(width, height);
-        boxCollider.offset = new Vector2(0f, offsetY);
-        boxCollider.isTrigger = false;
-        boxCollider.usedByEffector = false;
-        _collider = boxCollider;
-        ResetPhysicsCollisionFilters();
-        Diagnostics.Log($"[Passenger][vip-collider] {name}: size={boxCollider.size} offset={boxCollider.offset} spriteSize={spriteSize}");
+        return _physicsRuntime;
     }
 }

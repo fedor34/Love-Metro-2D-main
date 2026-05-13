@@ -34,9 +34,7 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
 
     private float _timeWithoutHolding;
     private LoveMetro.Passengers.PassengerStateRuntime _stateRuntime;
-    private LoveMetro.Passengers.PassengerMotionController _motionController;
-    private Rigidbody2D _rigidbody;
-    private Collider2D _collider;
+    private LoveMetro.Passengers.PassengerPhysicsRuntime _physicsRuntime;
     private ScoreCounter _scoreCounter;
 
     private bool _isInitiated = false;
@@ -140,7 +138,7 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
 
         EnsureRequiredComponents();
         ConfigureMotionController();
-        gameObject.layer = LayerMask.NameToLayer(_defaultLayer);
+        EnsurePhysicsRuntime().SetDefaultLayer(_defaultLayer);
 
         var spriteRenderer = GetComponent<SpriteRenderer>();
         var animator = GetComponent<Animator>();
@@ -161,9 +159,9 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
 
         _isInitiated = true;
         if (LevelGameplaySettings.SlipperyFloorEnabled)
-            _rigidbody.drag = LevelGameplaySettings.SlipperyLinearDrag;
+            EnsurePhysicsRuntime().SetLinearDamping(LevelGameplaySettings.SlipperyLinearDrag);
 
-        Diagnostics.Log($"[Passenger][ready] name={name} rb(cdm={_rigidbody.collisionDetectionMode}, interp={_rigidbody.interpolation}, drag={_rigidbody.drag:F2})");
+        Diagnostics.Log($"[Passenger][ready] name={name} {EnsurePhysicsRuntime().DescribeRigidbody()}");
     }
 
     private void Update()

@@ -298,6 +298,83 @@ public class RuntimeArchitectureTests
     }
 
     [Test]
+    public void PassengerPhysicsRuntime_CreatesRequiredComponentsAndSyncsAnimator()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+        var runtime = new PassengerPhysicsRuntime(passenger);
+
+        try
+        {
+            runtime.EnsureRequiredComponents();
+            passenger.PassangerAnimator = runtime.Animator;
+
+            Assert.IsNotNull(runtime.Rigidbody);
+            Assert.IsNotNull(runtime.Collider);
+            Assert.IsNotNull(runtime.Animator);
+            Assert.AreSame(runtime.Animator, passenger.PassangerAnimator);
+        }
+        finally
+        {
+            Object.DestroyImmediate(passenger.gameObject);
+        }
+    }
+
+    [Test]
+    public void PassengerPhysicsRuntime_ResetsCollisionFilters()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+        var runtime = new PassengerPhysicsRuntime(passenger);
+
+        try
+        {
+            runtime.EnsureRequiredComponents();
+            runtime.Rigidbody.includeLayers = 0;
+            runtime.Rigidbody.excludeLayers = 1;
+            runtime.Collider.includeLayers = 0;
+            runtime.Collider.excludeLayers = 1;
+
+            runtime.ResetCollisionFilters();
+
+            Assert.AreEqual(Physics2D.AllLayers, runtime.Rigidbody.includeLayers.value);
+            Assert.AreEqual(0, runtime.Rigidbody.excludeLayers.value);
+            Assert.AreEqual(Physics2D.AllLayers, runtime.Collider.includeLayers.value);
+            Assert.AreEqual(0, runtime.Collider.excludeLayers.value);
+            Assert.IsFalse(runtime.Collider.isTrigger);
+        }
+        finally
+        {
+            Object.DestroyImmediate(passenger.gameObject);
+        }
+    }
+
+    [Test]
+    public void PassengerPhysicsRuntime_PreservesMotionOperations()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+        var runtime = new PassengerPhysicsRuntime(passenger);
+        PassengerMotionConfig config = new PassengerMotionConfig(5f, 0.1f, 3f, 1f, 2f, 1f, 0.3f);
+
+        try
+        {
+            runtime.ConfigureMotion(config, bounceElasticity: 0.5f);
+            Vector2 clamped = runtime.ClampFlightVelocity(new Vector2(10f, 0f));
+            Vector2 reflected = runtime.ReflectVelocity(Vector2.right, Vector2.left, boostMultiplier: 2f);
+            Vector2 launched = runtime.ScaleLaunchVelocity(Vector2.right, speedMultiplier: 2f, impulseScale: 3f);
+            runtime.SetVelocity(Vector2.up * 2f);
+
+            Assert.AreEqual(5f, clamped.magnitude, 0.001f);
+            Assert.AreEqual(Vector2.left, reflected);
+            Assert.AreEqual(5f, launched.magnitude, 0.001f);
+            Assert.AreEqual(Vector2.up * 2f, runtime.CurrentVelocity);
+            Assert.DoesNotThrow(() => runtime.AddForce(Vector2.right, ForceMode2D.Impulse));
+        }
+        finally
+        {
+            Object.DestroyImmediate(passenger.gameObject);
+        }
+    }
+
+    [Test]
     public void GameInitializer_DoesNotUseRuntimeReflectionConfiguration()
     {
         string path = Path.Combine(Application.dataPath, "Scripts", "Core", "GameInitializer.cs");

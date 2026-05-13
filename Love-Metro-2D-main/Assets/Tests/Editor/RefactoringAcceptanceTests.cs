@@ -229,6 +229,45 @@ public class RefactoringAcceptanceTests
     }
 
     [Test]
+    public void Passenger_DoesNotOwnPhysicsRuntimeDetails()
+    {
+        string scriptsRoot = Path.Combine(Application.dataPath, "Scripts");
+        string[] files = Directory.GetFiles(scriptsRoot, "Passenger*.cs", SearchOption.TopDirectoryOnly);
+        string[] forbiddenTokens =
+        {
+            "private Rigidbody2D _rigidbody",
+            "private Collider2D _collider",
+            "PassengerMotionController _motionController"
+        };
+
+        foreach (string file in files)
+        {
+            string source = File.ReadAllText(file);
+            foreach (string token in forbiddenTokens)
+                Assert.IsFalse(source.Contains(token), $"{file} still owns physics runtime detail {token}.");
+        }
+    }
+
+    [Test]
+    public void PassengerStateMachine_DoesNotAccessPhysicsComponentsDirectly()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "Passenger.StateMachine.cs");
+        string source = File.ReadAllText(path);
+        string[] forbiddenTokens =
+        {
+            "_rigidbody",
+            "_collider",
+            ".bodyType",
+            ".drag",
+            ".angularDrag",
+            "_rigidbody.GetContacts"
+        };
+
+        foreach (string token in forbiddenTokens)
+            Assert.IsFalse(source.Contains(token), $"Passenger.StateMachine.cs still accesses physics directly via {token}.");
+    }
+
+    [Test]
     public void PassengerStateContext_DoesNotExposePassengerOrStatePassThroughs()
     {
         string contextPath = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "PassengerStateContext.cs");

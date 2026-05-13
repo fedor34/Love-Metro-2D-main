@@ -88,50 +88,45 @@ public partial class Passenger
 
     private Vector2 ClampFlightVelocity(Vector2 velocity)
     {
-        return EnsureMotionController().ClampFlightVelocity(velocity);
+        return EnsurePhysicsRuntime().ClampFlightVelocity(velocity);
     }
 
     private Vector2 ReflectVelocity(Vector2 velocity, Vector2 normal, float boostMultiplier)
     {
-        return EnsureMotionController().ReflectVelocity(velocity, normal, boostMultiplier);
+        return EnsurePhysicsRuntime().ReflectVelocity(velocity, normal, boostMultiplier);
     }
 
     private Vector2 ScaleLaunchVelocity(Vector2 velocity, float speedMultiplier, float impulseScale)
     {
-        return EnsureMotionController().ScaleLaunchVelocity(velocity, speedMultiplier, impulseScale);
+        return EnsurePhysicsRuntime().ScaleLaunchVelocity(velocity, speedMultiplier, impulseScale);
     }
 
     private Vector2 GetCurrentVelocity()
     {
-        return EnsureMotionController().CurrentVelocity;
+        return EnsurePhysicsRuntime().CurrentVelocity;
     }
 
     private void ApplyReflectedVelocity(Vector2 velocity, Vector2 normal, float boostMultiplier)
     {
-        EnsureMotionController().SetVelocity(ReflectVelocity(velocity, normal, boostMultiplier));
+        EnsurePhysicsRuntime().ApplyReflectedVelocity(velocity, normal, boostMultiplier);
     }
 
     private void EnterFallingState(Vector2 initialVelocity)
     {
         EnsureRequiredComponents();
+        ConfigureMotionController();
         EnsureStateRuntimeInitialized();
         _stateRuntime.EnterFalling(initialVelocity);
     }
 
-    private LoveMetro.Passengers.PassengerMotionController EnsureMotionController()
-    {
-        if (_motionController == null)
-            ConfigureMotionController();
-
-        return _motionController;
-    }
-
     private void ConfigureMotionController()
     {
-        if (_rigidbody == null)
-            _rigidbody = GetComponent<Rigidbody2D>() ?? gameObject.AddComponent<Rigidbody2D>();
+        EnsurePhysicsRuntime().ConfigureMotion(CreateMotionConfig(), _bounceElasticity);
+    }
 
-        LoveMetro.Passengers.PassengerMotionConfig config = new LoveMetro.Passengers.PassengerMotionConfig(
+    private LoveMetro.Passengers.PassengerMotionConfig CreateMotionConfig()
+    {
+        return new LoveMetro.Passengers.PassengerMotionConfig(
             _maxFlightSpeed,
             _minFallingSpeed,
             _magnetRadius,
@@ -139,10 +134,5 @@ public partial class Passenger
             _repelRadius,
             _repelForce,
             _rematchCooldown);
-
-        if (_motionController == null)
-            _motionController = new LoveMetro.Passengers.PassengerMotionController(_rigidbody, config, _bounceElasticity);
-        else
-            _motionController.Configure(config, _bounceElasticity);
     }
 }

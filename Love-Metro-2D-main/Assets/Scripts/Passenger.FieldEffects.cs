@@ -52,7 +52,7 @@ public partial class Passenger
 
     public Rigidbody2D GetRigidbody()
     {
-        return _rigidbody;
+        return EnsurePhysicsRuntime().Rigidbody;
     }
 
     public bool CanBeAffectedBy(FieldEffectType effectType)
@@ -118,14 +118,14 @@ public partial class Passenger
         {
             UpdateCurrentMovingDirection(force);
             float forceMultiplier = windStrength < _minWindStrengthForFlying ? 0.5f : 2f;
-            EnsureMotionController().AddForce(force * forceMultiplier, ForceMode2D.Force);
+            EnsurePhysicsRuntime().AddForce(force * forceMultiplier, ForceMode2D.Force);
             LogPassengerEvent("wind", $"{name} pushed while wandering force={windStrength:F1} multiplier={forceMultiplier:F1}");
             return true;
         }
 
         if (windStrength > 5f && !IsCurrentState(PassengerStateId.BeingAbsorbed))
         {
-            EnsureMotionController().AddForce(force, ForceMode2D.Force);
+            EnsurePhysicsRuntime().AddForce(force, ForceMode2D.Force);
             LogPassengerEvent("wind", $"{name} forced by wind force={windStrength:F1}");
             return true;
         }
@@ -136,7 +136,7 @@ public partial class Passenger
     private void ApplyDirectedForce(Vector3 force, ForceMode2D forceMode)
     {
         UpdateCurrentMovingDirection(force);
-        EnsureMotionController().AddForce(force, forceMode);
+        EnsurePhysicsRuntime().AddForce(force, forceMode);
     }
 
     private void UpdateCurrentMovingDirection(Vector3 force)

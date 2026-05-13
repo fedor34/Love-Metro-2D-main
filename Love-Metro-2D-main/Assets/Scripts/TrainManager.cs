@@ -66,8 +66,6 @@ public partial class TrainManager : MonoBehaviour, LoveMetro.Train.ITrainMotionE
     private float _lastAxis;
     private float _lastDirImpulseTime = -999f;
 
-    [SerializeField] private float _stopEpsilon = 0.02f;
-
     public LoveMetro.Train.TrainMotionState CurrentMotionState => new LoveMetro.Train.TrainMotionState(
         _currentSpeed,
         _currentAcceleration,

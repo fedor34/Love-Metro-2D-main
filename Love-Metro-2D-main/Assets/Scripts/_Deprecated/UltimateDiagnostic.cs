@@ -6,9 +6,14 @@ using System.Collections.Generic;
 /// </summary>
 public class UltimateDiagnostic : MonoBehaviour
 {
+    private static bool AutoRunDeprecatedDiagnostics => false;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()
     {
+        if (!AutoRunDeprecatedDiagnostics)
+            return;
+
         var go = new GameObject("UltimateDiagnostic");
         go.AddComponent<UltimateDiagnostic>();
         DontDestroyOnLoad(go);

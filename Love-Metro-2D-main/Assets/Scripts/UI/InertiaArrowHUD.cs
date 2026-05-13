@@ -21,6 +21,7 @@ public class InertiaArrowHUD : MonoBehaviour
     [SerializeField] private bool showOnlyOnBrake = false; // show only left-directed impulses
     [SerializeField] private float showThreshold = 0.05f;  // hide if below
 
+    private static Sprite _generatedArrowSprite;
     private Vector2 _displayed;
 
     private void OnEnable()
@@ -54,7 +55,7 @@ public class InertiaArrowHUD : MonoBehaviour
 
         // Assign default UI sprite
         var img = arrowGo.GetComponent<Image>();
-        var builtin = Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd");
+        var builtin = GetGeneratedArrowSprite();
         if (builtin == null)
         {
             // На некоторых билдах UISprite.psd отсутствует — создаём простой белый спрайт без спама ошибок
@@ -64,6 +65,20 @@ public class InertiaArrowHUD : MonoBehaviour
         img.sprite = builtin;
         img.color = color;
         img.raycastTarget = false;
+    }
+
+    private static Sprite GetGeneratedArrowSprite()
+    {
+        if (_generatedArrowSprite != null)
+            return _generatedArrowSprite;
+
+        Texture2D texture = Texture2D.whiteTexture;
+        _generatedArrowSprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, texture.width, texture.height),
+            new Vector2(0.5f, 0.5f));
+        _generatedArrowSprite.name = "GeneratedInertiaArrowSprite";
+        return _generatedArrowSprite;
     }
 
     private void Update()

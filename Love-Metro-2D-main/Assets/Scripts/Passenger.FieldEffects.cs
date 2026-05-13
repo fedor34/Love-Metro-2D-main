@@ -1,4 +1,5 @@
 using UnityEngine;
+using LoveMetro.Passengers;
 
 public partial class Passenger
 {
@@ -8,24 +9,24 @@ public partial class Passenger
             return;
 
         if (effectType == FieldEffectType.Wind && force.magnitude > 0.1f)
-            LogPassengerEvent("wind", $"{name} force={force.magnitude:F1} state={_currentState?.GetType().Name} inCouple={IsInCouple} initiated={_isInitiated}");
+            LogPassengerEvent("wind", $"{name} force={force.magnitude:F1} state={GetCurrentStateName()} inCouple={IsInCouple} initiated={_isInitiated}");
 
         if (effectType == FieldEffectType.Wind && TryHandleWindForce(force))
             return;
 
-        if (_currentState is Falling)
+        if (IsCurrentState(PassengerStateId.Falling))
         {
             ApplyDirectedForce(force, ForceMode2D.Force);
             return;
         }
 
-        if (_currentState is Wandering)
+        if (IsCurrentState(PassengerStateId.Wandering))
         {
             ApplyDirectedForce(force, ForceMode2D.Force);
             return;
         }
 
-        if (_currentState is Flying && flyingState != null)
+        if (IsCurrentState(PassengerStateId.Flying) && flyingState != null)
             flyingState.UpdateWindEffect(force, force.magnitude);
     }
 
@@ -34,13 +35,13 @@ public partial class Passenger
         if (!_isInitiated)
             return;
 
-        if (_currentState is Falling)
+        if (IsCurrentState(PassengerStateId.Falling))
         {
             ApplyDirectedForce(force, forceMode);
             return;
         }
 
-        if (_currentState is Wandering)
+        if (IsCurrentState(PassengerStateId.Wandering))
             UpdateCurrentMovingDirection(force);
     }
 
@@ -56,7 +57,7 @@ public partial class Passenger
 
     public bool CanBeAffectedBy(FieldEffectType effectType)
     {
-        if (!_isInitiated || IsInCouple || _currentState is BeingAbsorbed)
+        if (!_isInitiated || IsInCouple || IsCurrentState(PassengerStateId.BeingAbsorbed))
             return false;
 
         switch (effectType)
@@ -66,11 +67,13 @@ public partial class Passenger
             case FieldEffectType.Wind:
             case FieldEffectType.Vortex:
             case FieldEffectType.Magnetic:
-                return _currentState is Wandering || _currentState is Falling || _currentState is Flying;
+                return IsCurrentState(PassengerStateId.Wandering)
+                    || IsCurrentState(PassengerStateId.Falling)
+                    || IsCurrentState(PassengerStateId.Flying);
             case FieldEffectType.Slowdown:
             case FieldEffectType.Speedup:
             case FieldEffectType.Friction:
-                return _currentState is Wandering;
+                return IsCurrentState(PassengerStateId.Wandering);
             default:
                 return true;
         }
@@ -95,8 +98,8 @@ public partial class Passenger
         float windStrength = force.magnitude;
 
         if (windStrength >= _minWindStrengthForFlying
-            && _currentState is not Flying
-            && _currentState is not BeingAbsorbed
+            && !IsCurrentState(PassengerStateId.Flying)
+            && !IsCurrentState(PassengerStateId.BeingAbsorbed)
             && !IsInCouple)
         {
             EnsureStateMachineInitialized();
@@ -106,13 +109,13 @@ public partial class Passenger
             return true;
         }
 
-        if (_currentState is Flying && flyingState != null)
+        if (IsCurrentState(PassengerStateId.Flying) && flyingState != null)
         {
             flyingState.UpdateWindEffect(force, windStrength);
             return true;
         }
 
-        if (_currentState is Wandering)
+        if (IsCurrentState(PassengerStateId.Wandering))
         {
             UpdateCurrentMovingDirection(force);
             float forceMultiplier = windStrength < _minWindStrengthForFlying ? 0.5f : 2f;
@@ -121,7 +124,7 @@ public partial class Passenger
             return true;
         }
 
-        if (windStrength > 5f && _currentState is not BeingAbsorbed)
+        if (windStrength > 5f && !IsCurrentState(PassengerStateId.BeingAbsorbed))
         {
             EnsureMotionController().AddForce(force, ForceMode2D.Force);
             LogPassengerEvent("wind", $"{name} forced by wind force={windStrength:F1}");
@@ -152,7 +155,7 @@ public partial class Passenger
             return;
         }
 
-        if (effectData.strength <= _handrailMinGrabbingSpeed || _currentState is StayingOnHandrail)
+        if (effectData.strength <= _handrailMinGrabbingSpeed || IsCurrentState(PassengerStateId.StayingOnHandrail))
             return;
 
         EnsureStateMachineInitialized();

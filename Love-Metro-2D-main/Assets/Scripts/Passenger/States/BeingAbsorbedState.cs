@@ -11,6 +11,8 @@ public partial class Passenger
 
         public BeingAbsorbed(Passenger passenger) : base(passenger) { }
 
+        public override LoveMetro.Passengers.PassengerStateId Id => LoveMetro.Passengers.PassengerStateId.BeingAbsorbed;
+
         public void SetAbsorptionParameters(Vector3 center, float force)
         {
             _absorptionCenter = center;

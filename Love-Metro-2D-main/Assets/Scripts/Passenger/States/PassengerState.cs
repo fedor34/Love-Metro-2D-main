@@ -11,6 +11,8 @@ public partial class Passenger
             Passanger = pasanger;
         }
 
+        public abstract LoveMetro.Passengers.PassengerStateId Id { get; }
+
         public abstract void UpdateState();
         public abstract void Exit();
         public abstract void Enter();

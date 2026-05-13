@@ -13,7 +13,8 @@ namespace LoveMetro.Passengers
 
         public PassengerStateContext Context { get; }
         public IPassengerState CurrentState { get; private set; }
-        public string CurrentStateName => CurrentState != null ? CurrentState.GetType().Name : "None";
+        public PassengerStateId? CurrentStateId => CurrentState?.Id;
+        public string CurrentStateName => CurrentState != null ? CurrentState.Id.ToString() : "None";
 
         public void ConfigureTrain(global::TrainManager train)
         {

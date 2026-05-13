@@ -132,6 +132,21 @@ public class RuntimeArchitectureTests
     }
 
     [Test]
+    public void PassengerStateFactory_CreatesEveryStateId()
+    {
+        var context = new PassengerStateContext(null, id => new TestPassengerState(id));
+        var factory = new PassengerStateFactory(context);
+
+        foreach (PassengerStateId id in System.Enum.GetValues(typeof(PassengerStateId)))
+        {
+            IPassengerState state = factory.Create(id);
+
+            Assert.IsNotNull(state, $"{id} state was not created.");
+            Assert.AreEqual(id, state.Id);
+        }
+    }
+
+    [Test]
     public void PassengerMotionController_ClampsAndReflectsVelocity()
     {
         GameObject gameObject = new GameObject("MotionPassenger");
@@ -144,10 +159,13 @@ public class RuntimeArchitectureTests
             Vector2 clamped = controller.ClampFlightVelocity(new Vector2(10f, 0f));
             Vector2 reflected = controller.ReflectVelocity(Vector2.right, Vector2.left, boostMultiplier: 2f);
             Vector2 launched = controller.ScaleLaunchVelocity(Vector2.right, speedMultiplier: 2f, impulseScale: 3f);
+            controller.SetVelocity(Vector2.up * 2f);
 
             Assert.AreEqual(5f, clamped.magnitude, 0.001f);
             Assert.AreEqual(Vector2.left, reflected);
             Assert.AreEqual(5f, launched.magnitude, 0.001f);
+            Assert.AreEqual(Vector2.up * 2f, controller.CurrentVelocity);
+            Assert.DoesNotThrow(() => controller.AddForce(Vector2.right, ForceMode2D.Impulse));
         }
         finally
         {
@@ -189,6 +207,13 @@ public class RuntimeArchitectureTests
 
     private sealed class TestPassengerState : IPassengerState
     {
+        public TestPassengerState(PassengerStateId id = PassengerStateId.Wandering)
+        {
+            Id = id;
+        }
+
+        public PassengerStateId Id { get; }
+
         public int EnterCount { get; private set; }
         public int ExitCount { get; private set; }
         public int TrainImpulseCount { get; private set; }

@@ -172,6 +172,42 @@ public class RefactoringAcceptanceTests
     }
 
     [Test]
+    public void Passenger_DoesNotDeclareExtractedNestedStates()
+    {
+        string statesRoot = Path.Combine(Application.dataPath, "Scripts", "Passenger", "States");
+        string[] removedStateFiles =
+        {
+            Path.Combine(statesRoot, "WanderingState.cs"),
+            Path.Combine(statesRoot, "FallingState.cs"),
+            Path.Combine(statesRoot, "FlyingState.cs")
+        };
+
+        foreach (string file in removedStateFiles)
+        {
+            if (!File.Exists(file))
+                continue;
+
+            string source = File.ReadAllText(file);
+            Assert.IsFalse(source.Contains("class Wandering"), $"{file} still declares nested Wandering.");
+            Assert.IsFalse(source.Contains("class Falling"), $"{file} still declares nested Falling.");
+            Assert.IsFalse(source.Contains("class Flying"), $"{file} still declares nested Flying.");
+        }
+    }
+
+    [Test]
+    public void ExtractedPassengerStates_UseMotionControllerForRigidbodyWrites()
+    {
+        string statesRoot = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "States");
+        foreach (string file in Directory.GetFiles(statesRoot, "*PassengerState.cs", SearchOption.TopDirectoryOnly))
+        {
+            string source = File.ReadAllText(file);
+            Assert.IsFalse(source.Contains("_rigidbody.velocity"), $"{file} writes Rigidbody2D.velocity directly.");
+            Assert.IsFalse(source.Contains("_rigidbody.AddForce"), $"{file} calls Rigidbody2D.AddForce directly.");
+            Assert.IsFalse(source.Contains("GetRigidbody().velocity"), $"{file} reads Rigidbody2D.velocity directly.");
+        }
+    }
+
+    [Test]
     public void PassengerPrefabs_DoNotUseEmptyPhysicsIncludeLayers()
     {
         string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs/Passangers" });

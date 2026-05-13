@@ -6,6 +6,8 @@ public partial class Passenger
     {
         public Matching(Passenger pasanger) : base(pasanger) { }
 
+        public override LoveMetro.Passengers.PassengerStateId Id => LoveMetro.Passengers.PassengerStateId.Matching;
+
         public override void OnCollision(Collision2D collision) { }
 
         public override void Exit()

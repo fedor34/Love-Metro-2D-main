@@ -40,10 +40,11 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
     private Collider2D _collider;
     private ScoreCounter _scoreCounter;
 
-    private Wandering wanderingState;
+    private LoveMetro.Passengers.PassengerStateFactory _stateFactory;
+    private LoveMetro.Passengers.IPassengerState wanderingState;
     private StayingOnHandrail stayingOnHandrailState;
-    private Falling fallingState;
-    private Flying flyingState;
+    private LoveMetro.Passengers.IPassengerFallingState fallingState;
+    private LoveMetro.Passengers.IPassengerFlyingState flyingState;
     private Matching matchingState;
     private BeingAbsorbed beingAbsorbedState;
 
@@ -233,7 +234,7 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
 
     public void ForceToAbsorptionState(Vector3 absorptionCenter, float absorptionForce)
     {
-        if (IsInCouple || _currentState is BeingAbsorbed)
+        if (IsInCouple || IsCurrentState(LoveMetro.Passengers.PassengerStateId.BeingAbsorbed))
             return;
 
         EnsureRequiredComponents();

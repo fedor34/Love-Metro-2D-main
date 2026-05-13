@@ -9,6 +9,8 @@ public partial class Passenger
 
         public StayingOnHandrail(Passenger pasanger) : base(pasanger) { }
 
+        public override LoveMetro.Passengers.PassengerStateId Id => LoveMetro.Passengers.PassengerStateId.StayingOnHandrail;
+
         public override void OnCollision(Collision2D collision) { }
 
         public override void Exit()

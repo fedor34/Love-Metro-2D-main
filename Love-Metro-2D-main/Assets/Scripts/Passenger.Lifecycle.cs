@@ -69,7 +69,7 @@ public partial class Passenger
 
     public string GetCurrentStateName()
     {
-        return _currentState != null ? _currentState.GetType().Name : "None";
+        return _currentState != null ? _currentState.Id.ToString() : "None";
     }
 
     private void LogPassengerEvent(string category, string message)

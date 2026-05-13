@@ -56,35 +56,7 @@ namespace LoveMetro.Passengers
             set => Host.TimeWithoutHolding = value;
         }
 
-        public float AdditionalCollisionCheckTimePeriod => Host.AdditionalCollisionCheckTimePeriod;
-        public float GrabbingHandrailChance => Host.GrabbingHandrailChance;
-        public float HandrailCooldown => Host.HandrailCooldown;
-        public Vector2 HandrailStandingTimeInterval => Host.HandrailStandingTimeInterval;
-        public float LaunchSensitivity => Host.LaunchSensitivity;
-        public float MinImpulseToLaunch => Host.MinImpulseToLaunch;
-        public float AimAssistRadius => Host.AimAssistRadius;
-        public float AimAssistMaxStrength => Host.AimAssistMaxStrength;
-        public float TurbulenceStrength => Host.TurbulenceStrength;
-        public float ImpulseToVelocityScale => Host.ImpulseToVelocityScale;
-        public float MaxFlightSpeed => Host.MaxFlightSpeed;
-        public float FlightSpeedMultiplier => Host.FlightSpeedMultiplier;
-        public float GlobalImpulseScale => Host.GlobalImpulseScale;
-        public float UniformLaunchScale => Host.UniformLaunchScale;
-        public float UniformLaunchGamma => Host.UniformLaunchGamma;
-        public float FlightHorizontalScale => Host.FlightHorizontalScale;
-        public float FlightVerticalScale => Host.FlightVerticalScale;
-        public float FlightVerticalGamma => Host.FlightVerticalGamma;
-        public float MinWindStrengthForFlying => Host.MinWindStrengthForFlying;
-        public float MaxFlyingTime => Host.MaxFlyingTime;
-        public float MagnetRadius => Host.MagnetRadius;
-        public float MagnetForce => Host.MagnetForce;
-        public float RepelRadius => Host.RepelRadius;
-        public float RepelForce => Host.RepelForce;
-        public float FlightDeceleration => Host.FlightDeceleration;
-        public float WallBounceBoost => Host.WallBounceBoost;
-        public int MaxBounces => Host.MaxBounces;
-        public float EaseOutMinK => Host.EaseOutMinK;
-        public float EaseOutMaxK => Host.EaseOutMaxK;
+        public PassengerStateTuning Tuning => Host.Tuning;
 
         public void ChangeState(PassengerStateId id)
         {

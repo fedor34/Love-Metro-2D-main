@@ -13,36 +13,7 @@ namespace LoveMetro.Passengers
         bool IsMatchable { get; set; }
         Vector2 CurrentMovingDirection { get; set; }
         float TimeWithoutHolding { get; set; }
-
-        float AdditionalCollisionCheckTimePeriod { get; }
-        float GrabbingHandrailChance { get; }
-        float HandrailCooldown { get; }
-        Vector2 HandrailStandingTimeInterval { get; }
-        float LaunchSensitivity { get; }
-        float MinImpulseToLaunch { get; }
-        float AimAssistRadius { get; }
-        float AimAssistMaxStrength { get; }
-        float TurbulenceStrength { get; }
-        float ImpulseToVelocityScale { get; }
-        float MaxFlightSpeed { get; }
-        float FlightSpeedMultiplier { get; }
-        float GlobalImpulseScale { get; }
-        float UniformLaunchScale { get; }
-        float UniformLaunchGamma { get; }
-        float FlightHorizontalScale { get; }
-        float FlightVerticalScale { get; }
-        float FlightVerticalGamma { get; }
-        float MinWindStrengthForFlying { get; }
-        float MaxFlyingTime { get; }
-        float MagnetRadius { get; }
-        float MagnetForce { get; }
-        float RepelRadius { get; }
-        float RepelForce { get; }
-        float FlightDeceleration { get; }
-        float WallBounceBoost { get; }
-        int MaxBounces { get; }
-        float EaseOutMinK { get; }
-        float EaseOutMaxK { get; }
+        PassengerStateTuning Tuning { get; }
 
         void ChangeState(PassengerStateId id);
         void EnterFallingState(Vector2 initialVelocity);

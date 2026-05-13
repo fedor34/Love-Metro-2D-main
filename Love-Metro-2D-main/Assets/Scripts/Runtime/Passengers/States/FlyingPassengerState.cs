@@ -26,13 +26,13 @@ namespace LoveMetro.Passengers.States
                 if (_context.TryResolvePassengerImpact(other))
                     return;
 
-                Vector2 reflectedVelocity = _context.ReflectVelocity(_flyingVelocity, normal, Mathf.Max(1f, _context.WallBounceBoost));
+                Vector2 reflectedVelocity = _context.ReflectVelocity(_flyingVelocity, normal, Mathf.Max(1f, _context.Tuning.WallBounceBoost));
                 _context.ApplyReflectedVelocity(other, _context.GetVelocity(other), -normal, Mathf.Max(1f, _context.GetWallBounceBoost(other)));
                 _context.EnterFallingState(reflectedVelocity);
                 return;
             }
 
-            Vector2 reflected = _context.ReflectVelocity(_flyingVelocity, normal, _context.WallBounceBoost);
+            Vector2 reflected = _context.ReflectVelocity(_flyingVelocity, normal, _context.Tuning.WallBounceBoost);
             _context.EnterFallingState(reflected);
             Diagnostics.Log($"[Passenger][flying->falling] {_context.Name} after wall bounce v={reflected.magnitude:F2}");
         }
@@ -49,16 +49,16 @@ namespace LoveMetro.Passengers.States
         {
             _flyingTime += Time.deltaTime;
 
-            if (_flyingVelocity.sqrMagnitude > 0.0001f && _context.FlightDeceleration > 0f)
+            if (_flyingVelocity.sqrMagnitude > 0.0001f && _context.Tuning.FlightDeceleration > 0f)
             {
-                float speed = Mathf.Max(0f, _flyingVelocity.magnitude - _context.FlightDeceleration * Time.deltaTime);
+                float speed = Mathf.Max(0f, _flyingVelocity.magnitude - _context.Tuning.FlightDeceleration * Time.deltaTime);
                 _flyingVelocity = _flyingVelocity.normalized * speed;
             }
 
             _flyingVelocity = _context.ClampFlightVelocity(_flyingVelocity);
             _context.SetVelocity(_flyingVelocity);
 
-            if (_windStrength < _context.MinWindStrengthForFlying || _flyingTime > _context.MaxFlyingTime)
+            if (_windStrength < _context.Tuning.MinWindStrengthForFlying || _flyingTime > _context.Tuning.MaxFlyingTime)
             {
                 _context.EnterFallingState(_flyingVelocity);
                 return;
@@ -85,13 +85,13 @@ namespace LoveMetro.Passengers.States
 
         public void SetFlyingParameters(Vector2 windVelocity, float windStrength)
         {
-            _flyingVelocity = windVelocity * (_context.FlightSpeedMultiplier * _context.GlobalImpulseScale);
+            _flyingVelocity = windVelocity * (_context.Tuning.FlightSpeedMultiplier * _context.Tuning.GlobalImpulseScale);
             _windStrength = windStrength;
         }
 
         public void UpdateWindEffect(Vector2 windVelocity, float windStrength)
         {
-            _flyingVelocity = windVelocity * (_context.FlightSpeedMultiplier * _context.GlobalImpulseScale);
+            _flyingVelocity = windVelocity * (_context.Tuning.FlightSpeedMultiplier * _context.Tuning.GlobalImpulseScale);
             _windStrength = windStrength;
         }
     }

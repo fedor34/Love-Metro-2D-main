@@ -20,7 +20,7 @@ namespace LoveMetro.Passengers.States
 
         public void SetInitialFallingSpeed(Vector2 initialSpeed)
         {
-            _currentFallingSpeed = initialSpeed * (_context.FlightSpeedMultiplier * _context.GlobalImpulseScale);
+            _currentFallingSpeed = initialSpeed * (_context.Tuning.FlightSpeedMultiplier * _context.Tuning.GlobalImpulseScale);
         }
 
         public void OnCollision(Collision2D collision)
@@ -36,19 +36,19 @@ namespace LoveMetro.Passengers.States
                 Vector2 selfVelocity = _currentFallingSpeed;
                 Vector2 otherVelocity = _context.GetVelocity(passenger);
 
-                _currentFallingSpeed = _context.ReflectVelocity(selfVelocity, normal, Mathf.Max(1f, _context.WallBounceBoost));
+                _currentFallingSpeed = _context.ReflectVelocity(selfVelocity, normal, Mathf.Max(1f, _context.Tuning.WallBounceBoost));
                 _context.SetVelocity(_currentFallingSpeed);
                 _context.ApplyReflectedVelocity(passenger, otherVelocity, -normal, Mathf.Max(1f, _context.GetWallBounceBoost(passenger)));
             }
             else
             {
-                _currentFallingSpeed = _context.ReflectVelocity(_currentFallingSpeed, normal, _context.WallBounceBoost);
+                _currentFallingSpeed = _context.ReflectVelocity(_currentFallingSpeed, normal, _context.Tuning.WallBounceBoost);
                 _context.SetVelocity(_currentFallingSpeed);
                 Diagnostics.Log($"[Passenger][falling][wall] {_context.Name} bounce v={_currentFallingSpeed.magnitude:F2}");
             }
 
             _bounceCount++;
-            if (_bounceCount >= _context.MaxBounces)
+            if (_bounceCount >= _context.Tuning.MaxBounces)
             {
                 _context.SetVelocity(Vector2.zero);
                 _context.ChangeState(PassengerStateId.Wandering);
@@ -67,16 +67,16 @@ namespace LoveMetro.Passengers.States
         public void UpdateState()
         {
             float speed = _currentFallingSpeed.magnitude;
-            float t01 = Mathf.InverseLerp(0f, _context.MaxFlightSpeed, speed);
-            float k = Mathf.Lerp(_context.EaseOutMinK, _context.EaseOutMaxK, t01);
+            float t01 = Mathf.InverseLerp(0f, _context.Tuning.MaxFlightSpeed, speed);
+            float k = Mathf.Lerp(_context.Tuning.EaseOutMinK, _context.Tuning.EaseOutMaxK, t01);
             _currentFallingSpeed *= Mathf.Pow(k, 60f * Time.deltaTime);
 
-            global::Passenger target = _context.FindClosestOpposite(_context.MagnetRadius);
+            global::Passenger target = _context.FindClosestOpposite(_context.Tuning.MagnetRadius);
             if (target != null)
             {
                 Vector2 toTarget = (Vector2)(target.transform.position - _context.Position);
-                float weight = Mathf.InverseLerp(_context.MagnetRadius, 0f, toTarget.magnitude);
-                Vector2 acceleration = toTarget.normalized * (_context.MagnetForce * weight) * Time.deltaTime;
+                float weight = Mathf.InverseLerp(_context.Tuning.MagnetRadius, 0f, toTarget.magnitude);
+                Vector2 acceleration = toTarget.normalized * (_context.Tuning.MagnetForce * weight) * Time.deltaTime;
                 Vector2 forward = _currentFallingSpeed.sqrMagnitude > 0.0001f ? _currentFallingSpeed.normalized : Vector2.right;
                 float along = Vector2.Dot(acceleration, forward);
                 _currentFallingSpeed += forward * along;
@@ -91,11 +91,11 @@ namespace LoveMetro.Passengers.States
 
                 Vector2 toOther = (Vector2)(other.transform.position - _context.Position);
                 float distance = toOther.magnitude;
-                if (distance < 0.001f || distance > _context.RepelRadius)
+                if (distance < 0.001f || distance > _context.Tuning.RepelRadius)
                     continue;
 
-                float weight = Mathf.InverseLerp(_context.RepelRadius, 0f, distance);
-                _currentFallingSpeed -= toOther.normalized * (_context.RepelForce * weight) * Time.deltaTime;
+                float weight = Mathf.InverseLerp(_context.Tuning.RepelRadius, 0f, distance);
+                _currentFallingSpeed -= toOther.normalized * (_context.Tuning.RepelForce * weight) * Time.deltaTime;
             }
 
             _currentFallingSpeed = _context.ClampFlightVelocity(_currentFallingSpeed);
@@ -116,27 +116,27 @@ namespace LoveMetro.Passengers.States
 
         public void OnTrainSpeedChange(Vector2 force)
         {
-            float sensitivity = Mathf.Max(0.05f, _context.LaunchSensitivity);
+            float sensitivity = Mathf.Max(0.05f, _context.Tuning.LaunchSensitivity);
             Vector2 position = _context.Position;
             Vector2 targetWorld = _context.GetImpulseTargetWorld(position);
 
             float baseMagnitude = Mathf.Max(force.magnitude, 6f) * sensitivity;
-            float xFromTrain = force.x * sensitivity * _context.FlightHorizontalScale * 1.1f;
+            float xFromTrain = force.x * sensitivity * _context.Tuning.FlightHorizontalScale * 1.1f;
             float deltaYNorm = _context.GetNormalizedTargetDelta(position, targetWorld, vertical: true);
-            float yWeight = Mathf.Pow(Mathf.Abs(deltaYNorm), _context.FlightVerticalGamma);
-            float yFromClick = Mathf.Sign(deltaYNorm) * baseMagnitude * _context.FlightVerticalScale * yWeight;
+            float yWeight = Mathf.Pow(Mathf.Abs(deltaYNorm), _context.Tuning.FlightVerticalGamma);
+            float yFromClick = Mathf.Sign(deltaYNorm) * baseMagnitude * _context.Tuning.FlightVerticalScale * yWeight;
 
-            yFromClick += (Random.value - 0.5f) * 0.25f * _context.TurbulenceStrength;
+            yFromClick += (Random.value - 0.5f) * 0.25f * _context.Tuning.TurbulenceStrength;
 
-            global::Passenger aimTarget = _context.FindClosestOpposite(_context.AimAssistRadius);
+            global::Passenger aimTarget = _context.FindClosestOpposite(_context.Tuning.AimAssistRadius);
             if (aimTarget != null)
             {
                 Vector2 toAim = (Vector2)(aimTarget.transform.position - _context.Position);
-                float weight = Mathf.Clamp01(Mathf.Abs(toAim.y) / _context.AimAssistRadius);
-                yFromClick += Mathf.Sign(toAim.y) * Mathf.Min(_context.AimAssistMaxStrength, toAim.magnitude * 0.2f) * weight;
+                float weight = Mathf.Clamp01(Mathf.Abs(toAim.y) / _context.Tuning.AimAssistRadius);
+                yFromClick += Mathf.Sign(toAim.y) * Mathf.Min(_context.Tuning.AimAssistMaxStrength, toAim.magnitude * 0.2f) * weight;
             }
 
-            Vector2 delta = new Vector2(xFromTrain, yFromClick) * _context.GlobalImpulseScale;
+            Vector2 delta = new Vector2(xFromTrain, yFromClick) * _context.Tuning.GlobalImpulseScale;
             _currentFallingSpeed += delta;
             _currentFallingSpeed = _context.ClampFlightVelocity(_currentFallingSpeed);
         }

@@ -375,6 +375,29 @@ public class RuntimeArchitectureTests
     }
 
     [Test]
+    public void PassengerStateTuning_UsesPassengerRuntimeValues()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+
+        try
+        {
+            PassengerStateTuning tuning = ((IPassengerStateHost)passenger).Tuning;
+
+            Assert.AreEqual(1.0f, tuning.LaunchSensitivity);
+            Assert.AreEqual(18f, tuning.MaxFlightSpeed);
+            Assert.AreEqual(0.7f, tuning.FlightSpeedMultiplier);
+            Assert.AreEqual(1.0f, tuning.WallBounceBoost);
+            Assert.AreEqual(3, tuning.MaxBounces);
+            Assert.AreEqual(8f, tuning.MinWindStrengthForFlying);
+            Assert.AreEqual(new Vector2(0f, 0f), tuning.HandrailStandingTimeInterval);
+        }
+        finally
+        {
+            Object.DestroyImmediate(passenger.gameObject);
+        }
+    }
+
+    [Test]
     public void GameInitializer_DoesNotUseRuntimeReflectionConfiguration()
     {
         string path = Path.Combine(Application.dataPath, "Scripts", "Core", "GameInitializer.cs");

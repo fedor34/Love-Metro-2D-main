@@ -37,7 +37,7 @@ namespace LoveMetro.Passengers.States
 
             _context.TimeWithoutHolding += Time.deltaTime;
             _expiredCollisionCheckTime += Time.deltaTime;
-            if (_expiredCollisionCheckTime <= _context.AdditionalCollisionCheckTimePeriod)
+            if (_expiredCollisionCheckTime <= _context.Tuning.AdditionalCollisionCheckTimePeriod)
                 return;
 
             _expiredCollisionCheckTime = 0f;
@@ -55,7 +55,7 @@ namespace LoveMetro.Passengers.States
 
         public void OnTrainSpeedChange(Vector2 force)
         {
-            float sensitivity = _context.LaunchSensitivity;
+            float sensitivity = _context.Tuning.LaunchSensitivity;
             Vector2 position = _context.Position;
             Vector2 targetWorld = _context.GetImpulseTargetWorld(position);
 
@@ -63,37 +63,37 @@ namespace LoveMetro.Passengers.States
             float deltaXNorm = _context.GetNormalizedTargetDelta(position, targetWorld, vertical: false);
             float deltaYNorm = _context.GetNormalizedTargetDelta(position, targetWorld, vertical: true);
 
-            float xWeight = Mathf.Pow(Mathf.Abs(deltaXNorm), _context.UniformLaunchGamma);
-            float yWeight = Mathf.Pow(Mathf.Abs(deltaYNorm), _context.UniformLaunchGamma);
+            float xWeight = Mathf.Pow(Mathf.Abs(deltaXNorm), _context.Tuning.UniformLaunchGamma);
+            float yWeight = Mathf.Pow(Mathf.Abs(deltaYNorm), _context.Tuning.UniformLaunchGamma);
 
-            float xFromClick = Mathf.Sign(deltaXNorm) * baseMagnitude * (_context.UniformLaunchScale * 1.2f) * xWeight;
-            float yFromClick = Mathf.Sign(deltaYNorm) * baseMagnitude * (_context.UniformLaunchScale * 0.8f) * yWeight;
+            float xFromClick = Mathf.Sign(deltaXNorm) * baseMagnitude * (_context.Tuning.UniformLaunchScale * 1.2f) * xWeight;
+            float yFromClick = Mathf.Sign(deltaYNorm) * baseMagnitude * (_context.Tuning.UniformLaunchScale * 0.8f) * yWeight;
 
-            xFromClick += (Random.value - 0.5f) * 0.1f * _context.TurbulenceStrength;
-            yFromClick += (Random.value - 0.5f) * 0.1f * _context.TurbulenceStrength;
+            xFromClick += (Random.value - 0.5f) * 0.1f * _context.Tuning.TurbulenceStrength;
+            yFromClick += (Random.value - 0.5f) * 0.1f * _context.Tuning.TurbulenceStrength;
 
-            global::Passenger target = _context.FindClosestOpposite(_context.AimAssistRadius);
+            global::Passenger target = _context.FindClosestOpposite(_context.Tuning.AimAssistRadius);
             if (target != null)
             {
                 Vector2 toTarget = (Vector2)(target.transform.position - _context.Position);
-                float distanceNormalized = toTarget.magnitude / _context.AimAssistRadius;
+                float distanceNormalized = toTarget.magnitude / _context.Tuning.AimAssistRadius;
                 if (distanceNormalized < 1f)
                 {
                     Vector2 direction = toTarget.normalized;
-                    float assistStrength = _context.AimAssistMaxStrength * (1f - distanceNormalized);
+                    float assistStrength = _context.Tuning.AimAssistMaxStrength * (1f - distanceNormalized);
                     xFromClick += direction.x * assistStrength;
                     yFromClick += direction.y * assistStrength;
                 }
             }
 
-            Vector2 delta = new Vector2(xFromClick, yFromClick) * (_context.FlightSpeedMultiplier * _context.GlobalImpulseScale);
-            if (delta.magnitude < _context.MinImpulseToLaunch)
+            Vector2 delta = new Vector2(xFromClick, yFromClick) * (_context.Tuning.FlightSpeedMultiplier * _context.Tuning.GlobalImpulseScale);
+            if (delta.magnitude < _context.Tuning.MinImpulseToLaunch)
                 return;
 
             Vector2 startVelocity = _context.ScaleLaunchVelocity(
                 delta,
-                _context.ImpulseToVelocityScale,
-                _context.FlightSpeedMultiplier * _context.GlobalImpulseScale);
+                _context.Tuning.ImpulseToVelocityScale,
+                _context.Tuning.FlightSpeedMultiplier * _context.Tuning.GlobalImpulseScale);
 
             _context.EnterFallingState(startVelocity);
             _context.ForwardTrainSpeedChangeToCurrentState(delta);
@@ -105,9 +105,9 @@ namespace LoveMetro.Passengers.States
             if (!collision.TryGetComponent(out HandRailPosition handrail))
                 return;
 
-            if (_context.TimeWithoutHolding <= _context.HandrailCooldown
+            if (_context.TimeWithoutHolding <= _context.Tuning.HandrailCooldown
                 || handrail.IsOccupied
-                || Random.Range(0f, 1f) > _context.GrabbingHandrailChance)
+                || Random.Range(0f, 1f) > _context.Tuning.GrabbingHandrailChance)
             {
                 return;
             }

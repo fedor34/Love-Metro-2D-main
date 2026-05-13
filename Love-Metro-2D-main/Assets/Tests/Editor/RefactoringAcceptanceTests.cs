@@ -295,6 +295,52 @@ public class RefactoringAcceptanceTests
     }
 
     [Test]
+    public void PassengerStateHost_UsesSingleTuningDto()
+    {
+        string hostPath = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "IPassengerStateHost.cs");
+        string source = File.ReadAllText(hostPath);
+
+        Assert.IsTrue(source.Contains("PassengerStateTuning Tuning { get; }"), "IPassengerStateHost should expose tuning through one DTO.");
+
+        string[] forbiddenAccessors =
+        {
+            "float AdditionalCollisionCheckTimePeriod { get; }",
+            "float GrabbingHandrailChance { get; }",
+            "float LaunchSensitivity { get; }",
+            "float FlightSpeedMultiplier { get; }",
+            "float WallBounceBoost { get; }",
+            "int MaxBounces { get; }",
+            "Vector2 HandrailStandingTimeInterval { get; }"
+        };
+
+        foreach (string token in forbiddenAccessors)
+            Assert.IsFalse(source.Contains(token), $"IPassengerStateHost still exposes individual tuning accessor {token}.");
+    }
+
+    [Test]
+    public void PassengerStateContext_UsesSingleTuningDto()
+    {
+        string contextPath = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "PassengerStateContext.cs");
+        string source = File.ReadAllText(contextPath);
+
+        Assert.IsTrue(source.Contains("public PassengerStateTuning Tuning => Host.Tuning;"), "PassengerStateContext should expose tuning through one DTO.");
+
+        string[] forbiddenAccessors =
+        {
+            "public float AdditionalCollisionCheckTimePeriod",
+            "public float GrabbingHandrailChance",
+            "public float LaunchSensitivity",
+            "public float FlightSpeedMultiplier",
+            "public float WallBounceBoost",
+            "public int MaxBounces",
+            "public Vector2 HandrailStandingTimeInterval"
+        };
+
+        foreach (string token in forbiddenAccessors)
+            Assert.IsFalse(source.Contains(token), $"PassengerStateContext still exposes individual tuning accessor {token}.");
+    }
+
+    [Test]
     public void ExtractedPassengerStates_UseContextAndMotionControllerForPassengerAccess()
     {
         string statesRoot = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "States");

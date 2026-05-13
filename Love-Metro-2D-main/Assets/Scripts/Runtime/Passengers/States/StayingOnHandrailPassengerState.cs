@@ -49,8 +49,8 @@ namespace LoveMetro.Passengers.States
         {
             _expiredTime = 0f;
             _stayingTime = Random.Range(
-                _context.HandrailStandingTimeInterval.x,
-                _context.HandrailStandingTimeInterval.y);
+                _context.Tuning.HandrailStandingTimeInterval.x,
+                _context.Tuning.HandrailStandingTimeInterval.y);
         }
     }
 }

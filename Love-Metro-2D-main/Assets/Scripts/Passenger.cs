@@ -35,7 +35,9 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
     private float _timeWithoutHolding;
     private LoveMetro.Passengers.PassengerStateRuntime _stateRuntime;
     private LoveMetro.Passengers.PassengerPhysicsRuntime _physicsRuntime;
+    private LoveMetro.Passengers.PassengerStateTuning _stateTuning;
     private ScoreCounter _scoreCounter;
+    private bool _stateTuningInitialized;
 
     private bool _isInitiated = false;
 
@@ -126,6 +128,8 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
 
         _rematchCooldown = settings.rematchCooldown;
         _defaultLayer = settings.defaultLayer;
+
+        RebuildStateTuning();
     }
 
     public void Initiate(Vector3 initialMovingDirection, TrainManager train, ScoreCounter scoreCounter)
@@ -229,6 +233,49 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
         EnsureRequiredComponents();
         EnsureStateRuntimeInitialized();
         _stateRuntime.EnterAbsorption(absorptionCenter, absorptionForce);
+    }
+
+    private LoveMetro.Passengers.PassengerStateTuning EnsureStateTuning()
+    {
+        if (!_stateTuningInitialized)
+            RebuildStateTuning();
+
+        return _stateTuning;
+    }
+
+    private void RebuildStateTuning()
+    {
+        _stateTuning = new LoveMetro.Passengers.PassengerStateTuning(
+            _aditionalCollisionCheckTimePeriod,
+            _grabingHandrailChance,
+            _handrailCooldown,
+            HandrailStandingTimeInterval,
+            _launchSensitivity,
+            _minImpulseToLaunch,
+            _aimAssistRadius,
+            _aimAssistMaxStrength,
+            _turbulenceStrength,
+            _impulseToVelocityScale,
+            _maxFlightSpeed,
+            _flightSpeedMultiplier,
+            _globalImpulseScale,
+            _uniformLaunchScale,
+            _uniformLaunchGamma,
+            _flightHorizontalScale,
+            _flightVerticalScale,
+            _flightVerticalGamma,
+            _minWindStrengthForFlying,
+            _maxFlyingTime,
+            _magnetRadius,
+            _magnetForce,
+            _repelRadius,
+            _repelForce,
+            _flightDeceleration,
+            _wallBounceBoost,
+            _maxBounces,
+            _easeOutMinK,
+            _easeOutMaxK);
+        _stateTuningInitialized = true;
     }
 }
 

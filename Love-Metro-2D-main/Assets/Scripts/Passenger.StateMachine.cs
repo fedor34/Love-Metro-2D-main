@@ -8,6 +8,8 @@ public partial class Passenger
 
     private void EnsureStateRuntimeInitialized()
     {
+        EnsureStateTuning();
+
         if (_stateRuntime == null)
             _stateRuntime = new PassengerStateRuntime(this);
 
@@ -58,35 +60,7 @@ public partial class Passenger
         set => _timeWithoutHolding = value;
     }
 
-    float IPassengerStateHost.AdditionalCollisionCheckTimePeriod => _aditionalCollisionCheckTimePeriod;
-    float IPassengerStateHost.GrabbingHandrailChance => _grabingHandrailChance;
-    float IPassengerStateHost.HandrailCooldown => _handrailCooldown;
-    Vector2 IPassengerStateHost.HandrailStandingTimeInterval => HandrailStandingTimeInterval;
-    float IPassengerStateHost.LaunchSensitivity => _launchSensitivity;
-    float IPassengerStateHost.MinImpulseToLaunch => _minImpulseToLaunch;
-    float IPassengerStateHost.AimAssistRadius => _aimAssistRadius;
-    float IPassengerStateHost.AimAssistMaxStrength => _aimAssistMaxStrength;
-    float IPassengerStateHost.TurbulenceStrength => _turbulenceStrength;
-    float IPassengerStateHost.ImpulseToVelocityScale => _impulseToVelocityScale;
-    float IPassengerStateHost.MaxFlightSpeed => _maxFlightSpeed;
-    float IPassengerStateHost.FlightSpeedMultiplier => _flightSpeedMultiplier;
-    float IPassengerStateHost.GlobalImpulseScale => _globalImpulseScale;
-    float IPassengerStateHost.UniformLaunchScale => _uniformLaunchScale;
-    float IPassengerStateHost.UniformLaunchGamma => _uniformLaunchGamma;
-    float IPassengerStateHost.FlightHorizontalScale => _flightHorizontalScale;
-    float IPassengerStateHost.FlightVerticalScale => _flightVerticalScale;
-    float IPassengerStateHost.FlightVerticalGamma => _flightVerticalGamma;
-    float IPassengerStateHost.MinWindStrengthForFlying => _minWindStrengthForFlying;
-    float IPassengerStateHost.MaxFlyingTime => _maxFlyingTime;
-    float IPassengerStateHost.MagnetRadius => _magnetRadius;
-    float IPassengerStateHost.MagnetForce => _magnetForce;
-    float IPassengerStateHost.RepelRadius => _repelRadius;
-    float IPassengerStateHost.RepelForce => _repelForce;
-    float IPassengerStateHost.FlightDeceleration => _flightDeceleration;
-    float IPassengerStateHost.WallBounceBoost => _wallBounceBoost;
-    int IPassengerStateHost.MaxBounces => _maxBounces;
-    float IPassengerStateHost.EaseOutMinK => _easeOutMinK;
-    float IPassengerStateHost.EaseOutMaxK => _easeOutMaxK;
+    PassengerStateTuning IPassengerStateHost.Tuning => EnsureStateTuning();
 
     void IPassengerStateHost.ChangeState(PassengerStateId id) => ChangeState(id);
     void IPassengerStateHost.EnterFallingState(Vector2 initialVelocity) => EnterFallingState(initialVelocity);
@@ -158,7 +132,9 @@ public partial class Passenger
 
     float IPassengerStateHost.GetWallBounceBoost(Passenger passenger)
     {
-        return passenger != null ? passenger._wallBounceBoost : _wallBounceBoost;
+        return passenger != null
+            ? passenger.EnsureStateTuning().WallBounceBoost
+            : EnsureStateTuning().WallBounceBoost;
     }
 
     void IPassengerStateHost.ForwardTrainSpeedChangeToCurrentState(Vector2 force)

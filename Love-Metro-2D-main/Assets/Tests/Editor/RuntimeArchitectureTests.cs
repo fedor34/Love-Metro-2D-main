@@ -147,6 +147,52 @@ public class RuntimeArchitectureTests
     }
 
     [Test]
+    public void PassengerStateRuntime_CreatesEveryStateIdAndChangesCurrentState()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+        var runtime = new PassengerStateRuntime(passenger);
+
+        try
+        {
+            foreach (PassengerStateId id in System.Enum.GetValues(typeof(PassengerStateId)))
+            {
+                runtime.ChangeState(id);
+                Assert.AreEqual(id, runtime.CurrentStateId, $"{id} state was not activated.");
+            }
+        }
+        finally
+        {
+            runtime.Clear();
+            Object.DestroyImmediate(passenger.gameObject);
+        }
+    }
+
+    [Test]
+    public void PassengerStateRuntime_ParameterizedTransitionsSetCurrentState()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+        var runtime = new PassengerStateRuntime(passenger);
+
+        try
+        {
+            runtime.EnterFalling(Vector2.right);
+            Assert.AreEqual(PassengerStateId.Falling, runtime.CurrentStateId);
+
+            runtime.EnterFlying(Vector2.up, 10f);
+            runtime.UpdateFlyingWind(Vector2.left, 9f);
+            Assert.AreEqual(PassengerStateId.Flying, runtime.CurrentStateId);
+
+            runtime.EnterAbsorption(Vector3.right, 3f);
+            Assert.AreEqual(PassengerStateId.BeingAbsorbed, runtime.CurrentStateId);
+        }
+        finally
+        {
+            runtime.Clear();
+            Object.DestroyImmediate(passenger.gameObject);
+        }
+    }
+
+    [Test]
     public void MatchingPassengerState_TogglesPhysicsAndMatchability()
     {
         Passenger passenger = CreatePassenger(false, Vector3.zero);

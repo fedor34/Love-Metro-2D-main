@@ -202,6 +202,60 @@ public class RefactoringAcceptanceTests
     }
 
     [Test]
+    public void Passenger_DoesNotOwnStateInstancesOrFactory()
+    {
+        string scriptsRoot = Path.Combine(Application.dataPath, "Scripts");
+        string[] files = Directory.GetFiles(scriptsRoot, "Passenger*.cs", SearchOption.TopDirectoryOnly);
+        string[] forbiddenTokens =
+        {
+            "IPassengerState _currentState",
+            "PassengerStateMachine _stateMachine",
+            "PassengerStateFactory _stateFactory",
+            "new PassengerStateFactory",
+            "wanderingState",
+            "fallingState",
+            "flyingState",
+            "matchingState",
+            "stayingOnHandrailState",
+            "beingAbsorbedState"
+        };
+
+        foreach (string file in files)
+        {
+            string source = File.ReadAllText(file);
+            foreach (string token in forbiddenTokens)
+                Assert.IsFalse(source.Contains(token), $"{file} still owns passenger state runtime detail {token}.");
+        }
+    }
+
+    [Test]
+    public void PassengerStateContext_DoesNotExposePassengerOrStatePassThroughs()
+    {
+        string contextPath = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "PassengerStateContext.cs");
+        string source = File.ReadAllText(contextPath);
+        string[] forbiddenTokens =
+        {
+            "global::Passenger Passenger",
+            "Passenger.State",
+            "StateAnimator",
+            "StateCurrentMovingDirection",
+            "StateTimeWithoutHolding",
+            "StateSet",
+            "StateGet",
+            "StateEnter",
+            "StateApply",
+            "StateForward",
+            "StateFind",
+            "StateCollect",
+            "StateRelease",
+            "StateLog"
+        };
+
+        foreach (string token in forbiddenTokens)
+            Assert.IsFalse(source.Contains(token), $"PassengerStateContext still exposes passenger state pass-through token {token}.");
+    }
+
+    [Test]
     public void ExtractedPassengerStates_UseContextAndMotionControllerForPassengerAccess()
     {
         string statesRoot = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "States");

@@ -26,8 +26,8 @@ public partial class Passenger
             return;
         }
 
-        if (IsCurrentState(PassengerStateId.Flying) && flyingState != null)
-            flyingState.UpdateWindEffect(force, force.magnitude);
+        if (IsCurrentState(PassengerStateId.Flying))
+            _stateRuntime?.UpdateFlyingWind(force, force.magnitude);
     }
 
     public void ApplyFieldForce(Vector3 force, ForceMode2D forceMode)
@@ -102,16 +102,15 @@ public partial class Passenger
             && !IsCurrentState(PassengerStateId.BeingAbsorbed)
             && !IsInCouple)
         {
-            EnsureStateMachineInitialized();
-            ChangeState(flyingState);
-            flyingState.SetFlyingParameters(force, windStrength);
+            EnsureStateRuntimeInitialized();
+            _stateRuntime.EnterFlying(force, windStrength);
             LogPassengerEvent("wind", $"{name} entered flying with force={windStrength:F1}");
             return true;
         }
 
-        if (IsCurrentState(PassengerStateId.Flying) && flyingState != null)
+        if (IsCurrentState(PassengerStateId.Flying))
         {
-            flyingState.UpdateWindEffect(force, windStrength);
+            _stateRuntime?.UpdateFlyingWind(force, windStrength);
             return true;
         }
 
@@ -158,7 +157,7 @@ public partial class Passenger
         if (effectData.strength <= _handrailMinGrabbingSpeed || IsCurrentState(PassengerStateId.StayingOnHandrail))
             return;
 
-        EnsureStateMachineInitialized();
-        ChangeState(fallingState);
+        EnsureStateRuntimeInitialized();
+        _stateRuntime.ChangeState(PassengerStateId.Falling);
     }
 }

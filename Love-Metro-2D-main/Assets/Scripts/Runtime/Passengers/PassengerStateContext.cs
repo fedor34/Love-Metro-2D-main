@@ -6,208 +6,224 @@ namespace LoveMetro.Passengers
     public readonly struct PassengerStateContext
     {
         public PassengerStateContext(global::Passenger passenger)
+            : this((IPassengerStateHost)passenger)
         {
-            Passenger = passenger;
         }
 
-        public global::Passenger Passenger { get; }
-        public string Name => Passenger != null ? Passenger.name : string.Empty;
-        public Transform Transform => Passenger.transform;
+        internal PassengerStateContext(IPassengerStateHost host)
+        {
+            _host = host;
+        }
+
+        private readonly IPassengerStateHost _host;
+
+        private IPassengerStateHost Host
+        {
+            get
+            {
+                if (_host == null)
+                    throw new System.InvalidOperationException("Passenger state context is not bound to a host.");
+
+                return _host;
+            }
+        }
+
+        public string Name => _host != null ? _host.Name : string.Empty;
         public Vector3 Position
         {
-            get => Passenger.transform.position;
-            set => Passenger.transform.position = value;
+            get => Host.Position;
+            set => Host.Position = value;
         }
 
-        public PassengerSettings Settings => Passenger.Settings;
-        public PassangerAnimator Animator => Passenger.StateAnimator;
-        public bool IsInCouple => Passenger.IsInCouple;
+        public PassengerSettings Settings => Host.Settings;
+        public PassangerAnimator Animator => Host.Animator;
+        public bool IsInCouple => Host.IsInCouple;
         public bool IsMatchable
         {
-            get => Passenger.IsMatchable;
-            set => Passenger.IsMatchable = value;
+            get => Host.IsMatchable;
+            set => Host.IsMatchable = value;
         }
 
         public Vector2 CurrentMovingDirection
         {
-            get => Passenger.StateCurrentMovingDirection;
-            set => Passenger.StateCurrentMovingDirection = value;
+            get => Host.CurrentMovingDirection;
+            set => Host.CurrentMovingDirection = value;
         }
 
         public float TimeWithoutHolding
         {
-            get => Passenger.StateTimeWithoutHolding;
-            set => Passenger.StateTimeWithoutHolding = value;
+            get => Host.TimeWithoutHolding;
+            set => Host.TimeWithoutHolding = value;
         }
 
-        public float AdditionalCollisionCheckTimePeriod => Passenger.StateAdditionalCollisionCheckTimePeriod;
-        public float GrabbingHandrailChance => Passenger.StateGrabbingHandrailChance;
-        public float HandrailCooldown => Passenger.StateHandrailCooldown;
-        public Vector2 HandrailStandingTimeInterval => Passenger.StateHandrailStandingTimeInterval;
-        public float LaunchSensitivity => Passenger.StateLaunchSensitivity;
-        public float MinImpulseToLaunch => Passenger.StateMinImpulseToLaunch;
-        public float AimAssistRadius => Passenger.StateAimAssistRadius;
-        public float AimAssistMaxStrength => Passenger.StateAimAssistMaxStrength;
-        public float TurbulenceStrength => Passenger.StateTurbulenceStrength;
-        public float ImpulseToVelocityScale => Passenger.StateImpulseToVelocityScale;
-        public float MaxFlightSpeed => Passenger.StateMaxFlightSpeed;
-        public float FlightSpeedMultiplier => Passenger.StateFlightSpeedMultiplier;
-        public float GlobalImpulseScale => Passenger.StateGlobalImpulseScale;
-        public float UniformLaunchScale => Passenger.StateUniformLaunchScale;
-        public float UniformLaunchGamma => Passenger.StateUniformLaunchGamma;
-        public float FlightHorizontalScale => Passenger.StateFlightHorizontalScale;
-        public float FlightVerticalScale => Passenger.StateFlightVerticalScale;
-        public float FlightVerticalGamma => Passenger.StateFlightVerticalGamma;
-        public float MinWindStrengthForFlying => Passenger.StateMinWindStrengthForFlying;
-        public float MaxFlyingTime => Passenger.StateMaxFlyingTime;
-        public float MagnetRadius => Passenger.StateMagnetRadius;
-        public float MagnetForce => Passenger.StateMagnetForce;
-        public float RepelRadius => Passenger.StateRepelRadius;
-        public float RepelForce => Passenger.StateRepelForce;
-        public float FlightDeceleration => Passenger.StateFlightDeceleration;
-        public float WallBounceBoost => Passenger.StateWallBounceBoost;
-        public int MaxBounces => Passenger.StateMaxBounces;
-        public float EaseOutMinK => Passenger.StateEaseOutMinK;
-        public float EaseOutMaxK => Passenger.StateEaseOutMaxK;
+        public float AdditionalCollisionCheckTimePeriod => Host.AdditionalCollisionCheckTimePeriod;
+        public float GrabbingHandrailChance => Host.GrabbingHandrailChance;
+        public float HandrailCooldown => Host.HandrailCooldown;
+        public Vector2 HandrailStandingTimeInterval => Host.HandrailStandingTimeInterval;
+        public float LaunchSensitivity => Host.LaunchSensitivity;
+        public float MinImpulseToLaunch => Host.MinImpulseToLaunch;
+        public float AimAssistRadius => Host.AimAssistRadius;
+        public float AimAssistMaxStrength => Host.AimAssistMaxStrength;
+        public float TurbulenceStrength => Host.TurbulenceStrength;
+        public float ImpulseToVelocityScale => Host.ImpulseToVelocityScale;
+        public float MaxFlightSpeed => Host.MaxFlightSpeed;
+        public float FlightSpeedMultiplier => Host.FlightSpeedMultiplier;
+        public float GlobalImpulseScale => Host.GlobalImpulseScale;
+        public float UniformLaunchScale => Host.UniformLaunchScale;
+        public float UniformLaunchGamma => Host.UniformLaunchGamma;
+        public float FlightHorizontalScale => Host.FlightHorizontalScale;
+        public float FlightVerticalScale => Host.FlightVerticalScale;
+        public float FlightVerticalGamma => Host.FlightVerticalGamma;
+        public float MinWindStrengthForFlying => Host.MinWindStrengthForFlying;
+        public float MaxFlyingTime => Host.MaxFlyingTime;
+        public float MagnetRadius => Host.MagnetRadius;
+        public float MagnetForce => Host.MagnetForce;
+        public float RepelRadius => Host.RepelRadius;
+        public float RepelForce => Host.RepelForce;
+        public float FlightDeceleration => Host.FlightDeceleration;
+        public float WallBounceBoost => Host.WallBounceBoost;
+        public int MaxBounces => Host.MaxBounces;
+        public float EaseOutMinK => Host.EaseOutMinK;
+        public float EaseOutMaxK => Host.EaseOutMaxK;
 
         public void ChangeState(PassengerStateId id)
         {
-            Passenger.StateChangeState(id);
+            Host.ChangeState(id);
         }
 
         public void EnterFallingState(Vector2 initialVelocity)
         {
-            Passenger.StateEnterFallingState(initialVelocity);
+            Host.EnterFallingState(initialVelocity);
         }
 
         public void SetBodyType(RigidbodyType2D bodyType)
         {
-            Passenger.StateSetBodyType(bodyType);
+            Host.SetBodyType(bodyType);
         }
 
         public void SetDefaultLayer()
         {
-            Passenger.StateSetDefaultLayer();
+            Host.SetDefaultLayer();
         }
 
         public void SetColliderEnabled(bool enabled)
         {
-            Passenger.StateSetColliderEnabled(enabled);
+            Host.SetColliderEnabled(enabled);
         }
 
         public void SetVelocity(Vector2 velocity)
         {
-            Passenger.StateSetVelocity(velocity);
+            Host.SetVelocity(velocity);
         }
 
         public void AddForce(Vector2 force, ForceMode2D mode)
         {
-            Passenger.StateAddForce(force, mode);
+            Host.AddForce(force, mode);
         }
 
         public Vector2 GetVelocity()
         {
-            return Passenger.StateCurrentVelocity;
+            return Host.GetVelocity();
         }
 
         public void SetDamping(float linearDamping, float angularDamping)
         {
-            Passenger.StateSetDamping(linearDamping, angularDamping);
+            Host.SetDamping(linearDamping, angularDamping);
         }
 
         public Vector2 ClampFlightVelocity(Vector2 velocity)
         {
-            return Passenger.StateClampFlightVelocity(velocity);
+            return Host.ClampFlightVelocity(velocity);
         }
 
         public Vector2 ReflectVelocity(Vector2 velocity, Vector2 normal, float boostMultiplier)
         {
-            return Passenger.StateReflectVelocity(velocity, normal, boostMultiplier);
+            return Host.ReflectVelocity(velocity, normal, boostMultiplier);
         }
 
         public Vector2 ScaleLaunchVelocity(Vector2 velocity, float speedMultiplier, float impulseScale)
         {
-            return Passenger.StateScaleLaunchVelocity(velocity, speedMultiplier, impulseScale);
+            return Host.ScaleLaunchVelocity(velocity, speedMultiplier, impulseScale);
         }
 
         public void ApplyReflectedVelocity(Vector2 velocity, Vector2 normal, float boostMultiplier)
         {
-            Passenger.StateApplyReflectedVelocity(velocity, normal, boostMultiplier);
+            Host.ApplyReflectedVelocity(velocity, normal, boostMultiplier);
         }
 
         public void ApplyReflectedVelocity(global::Passenger passenger, Vector2 velocity, Vector2 normal, float boostMultiplier)
         {
-            passenger.StateApplyReflectedVelocity(velocity, normal, boostMultiplier);
+            Host.ApplyReflectedVelocity(passenger, velocity, normal, boostMultiplier);
         }
 
         public Vector2 GetVelocity(global::Passenger passenger)
         {
-            return passenger.StateCurrentVelocity;
+            return Host.GetVelocity(passenger);
         }
 
         public float GetWallBounceBoost(global::Passenger passenger)
         {
-            return passenger.StateWallBounceBoost;
+            return Host.GetWallBounceBoost(passenger);
         }
 
         public void ForwardTrainSpeedChangeToCurrentState(Vector2 force)
         {
-            Passenger.StateForwardTrainSpeedChangeToCurrentState(force);
+            Host.ForwardTrainSpeedChangeToCurrentState(force);
         }
 
         public Vector2 GetImpulseTargetWorld(Vector2 position)
         {
-            return Passenger.StateGetImpulseTargetWorld(position);
+            return Host.GetImpulseTargetWorld(position);
         }
 
         public float GetNormalizedTargetDelta(Vector2 position, Vector2 targetWorld, bool vertical)
         {
-            return Passenger.StateGetNormalizedTargetDelta(position, targetWorld, vertical);
+            return Host.GetNormalizedTargetDelta(position, targetWorld, vertical);
         }
 
         public Vector2 GetCollisionNormal(Collision2D collision, Vector2 fallback)
         {
-            return Passenger.StateGetCollisionNormal(collision, fallback);
+            return Host.GetCollisionNormal(collision, fallback);
         }
 
         public bool TryResolvePassengerImpact(global::Passenger other)
         {
-            return Passenger.StateTryResolvePassengerImpact(other);
+            return Host.TryResolvePassengerImpact(other);
         }
 
         public global::Passenger FindClosestOpposite(float radius)
         {
-            return Passenger.StateFindClosestOpposite(radius);
+            return Host.FindClosestOpposite(radius);
         }
 
         public void CollectSameGenderPassengers(List<global::Passenger> results)
         {
-            Passenger.StateCollectSameGenderPassengers(results);
+            Host.CollectSameGenderPassengers(results);
         }
 
         public int GetContacts(ContactPoint2D[] contactPoints)
         {
-            return Passenger.StateGetContacts(contactPoints);
+            return Host.GetContacts(contactPoints);
         }
 
         public void AttachHandrail(global::HandRailPosition handrail)
         {
-            Passenger.StateAttachHandrail(handrail);
+            Host.AttachHandrail(handrail);
         }
 
         public void ReleaseHandrail()
         {
-            Passenger.StateReleaseHandrail();
+            Host.ReleaseHandrail();
         }
 
         public void RemovePassengerAndDestroy()
         {
-            Passenger.RemoveFromContainerAndDestroy();
+            Host.RemovePassengerAndDestroy();
         }
 
         public void LogEvent(string category, string message)
         {
-            Passenger.StateLogEvent(category, message);
+            Host.LogEvent(category, message);
         }
     }
 }

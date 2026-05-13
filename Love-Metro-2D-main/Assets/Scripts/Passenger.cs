@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [RequireComponent(typeof(Rigidbody2D), typeof(PassangerAnimator), typeof(Collider2D))]
-public partial class Passenger : MonoBehaviour, IFieldEffectTarget
+public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Passengers.IPassengerStateHost
 {
     public static float GlobalSpeedMultiplier = 0.7f;
 
@@ -33,20 +33,11 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
     [SerializeField] private TrainManager _train;
 
     private float _timeWithoutHolding;
-    private LoveMetro.Passengers.IPassengerState _currentState;
-    private LoveMetro.Passengers.PassengerStateMachine _stateMachine;
+    private LoveMetro.Passengers.PassengerStateRuntime _stateRuntime;
     private LoveMetro.Passengers.PassengerMotionController _motionController;
     private Rigidbody2D _rigidbody;
     private Collider2D _collider;
     private ScoreCounter _scoreCounter;
-
-    private LoveMetro.Passengers.PassengerStateFactory _stateFactory;
-    private LoveMetro.Passengers.IPassengerState wanderingState;
-    private LoveMetro.Passengers.IPassengerState stayingOnHandrailState;
-    private LoveMetro.Passengers.IPassengerFallingState fallingState;
-    private LoveMetro.Passengers.IPassengerFlyingState flyingState;
-    private LoveMetro.Passengers.IPassengerState matchingState;
-    private LoveMetro.Passengers.IPassengerAbsorptionState beingAbsorbedState;
 
     private bool _isInitiated = false;
 
@@ -161,10 +152,10 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
             : "<null>";
         Diagnostics.Log($"[Passenger][init] name={name} female={IsFemale} layer={gameObject.layer} sprite='{spriteName}' ctrl='{controllerName}'");
 
-        EnsureStateMachineInitialized();
         _train = train;
-        _stateMachine.ConfigureTrain(_train);
-        ChangeState(wanderingState);
+        EnsureStateRuntimeInitialized();
+        _stateRuntime.ConfigureTrain(_train);
+        _stateRuntime.ChangeState(LoveMetro.Passengers.PassengerStateId.Wandering);
 
         GetAbilities()?.AttachAll();
 
@@ -177,38 +168,38 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
 
     private void Update()
     {
-        if (!_isInitiated || _stateMachine?.CurrentState == null)
+        if (!_isInitiated || _stateRuntime == null || !_stateRuntime.HasCurrentState)
             return;
 
-        _stateMachine.UpdateState();
+        _stateRuntime.UpdateState();
         if (!IsMatchable && Time.time >= _rematchEnableTime)
             IsMatchable = true;
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        if (_stateMachine?.CurrentState == null)
+        if (_stateRuntime == null || !_stateRuntime.HasCurrentState)
             return;
 
-        _stateMachine.OnCollision(collision);
+        _stateRuntime.OnCollision(collision);
     }
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        if (_stateMachine?.CurrentState == null)
+        if (_stateRuntime == null || !_stateRuntime.HasCurrentState)
             return;
 
-        _stateMachine.OnTriggerEnter(collision);
+        _stateRuntime.OnTriggerEnter(collision);
     }
 
     public void ForceToMatchingState(Passenger partner)
     {
         EnsureRequiredComponents();
-        EnsureStateMachineInitialized();
+        EnsureStateRuntimeInitialized();
 
         if (partner == null)
         {
-            ChangeState(matchingState);
+            _stateRuntime.ChangeState(LoveMetro.Passengers.PassengerStateId.Matching);
             return;
         }
 
@@ -219,7 +210,7 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
             AwardMatchPointsFor(partner, couple.transform.position);
         }
 
-        ChangeState(matchingState);
+        _stateRuntime.ChangeState(LoveMetro.Passengers.PassengerStateId.Matching);
     }
 
     public void Launch(Vector2 initialVelocity)
@@ -238,9 +229,8 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget
             return;
 
         EnsureRequiredComponents();
-        EnsureStateMachineInitialized();
-        beingAbsorbedState.SetAbsorptionParameters(absorptionCenter, absorptionForce);
-        ChangeState(beingAbsorbedState);
+        EnsureStateRuntimeInitialized();
+        _stateRuntime.EnterAbsorption(absorptionCenter, absorptionForce);
     }
 }
 

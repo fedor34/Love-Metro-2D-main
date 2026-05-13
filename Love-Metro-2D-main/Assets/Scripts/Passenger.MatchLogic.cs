@@ -114,9 +114,8 @@ public partial class Passenger
     private void EnterFallingState(Vector2 initialVelocity)
     {
         EnsureRequiredComponents();
-        EnsureStateMachineInitialized();
-        ChangeState(fallingState);
-        fallingState.SetInitialFallingSpeed(initialVelocity);
+        EnsureStateRuntimeInitialized();
+        _stateRuntime.EnterFalling(initialVelocity);
     }
 
     private LoveMetro.Passengers.PassengerMotionController EnsureMotionController()

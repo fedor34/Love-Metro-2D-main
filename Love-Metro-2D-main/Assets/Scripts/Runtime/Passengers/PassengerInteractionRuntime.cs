@@ -67,9 +67,7 @@ namespace LoveMetro.Passengers
             if (other == null)
                 return false;
 
-            _host.BreakCoupleOnImpact(other);
-            ResolveHost(other)?.BreakCoupleOnImpact(_host.Passenger);
-            return _host.TryMatchWith(other);
+            return _host.MatchRuntime.TryResolvePassengerImpact(other);
         }
 
         public global::Passenger FindClosestOpposite(float radius)

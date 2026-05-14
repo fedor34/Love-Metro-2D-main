@@ -385,6 +385,53 @@ public class RefactoringAcceptanceTests
     }
 
     [Test]
+    public void PassengerInteractionHost_DoesNotExposeMatchOperations()
+    {
+        string hostPath = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "IPassengerInteractionHost.cs");
+        string source = File.ReadAllText(hostPath);
+
+        StringAssert.Contains("PassengerMatchRuntime MatchRuntime { get; }", source);
+        Assert.IsFalse(source.Contains("TryMatchWith"), "IPassengerInteractionHost still exposes pairing operations.");
+        Assert.IsFalse(source.Contains("BreakCoupleOnImpact"), "IPassengerInteractionHost still exposes couple-break operations.");
+    }
+
+    [Test]
+    public void PassengerInteractionRuntime_DelegatesPassengerImpactToMatchRuntime()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "PassengerInteractionRuntime.cs");
+        string source = File.ReadAllText(path);
+
+        StringAssert.Contains("MatchRuntime.TryResolvePassengerImpact", source);
+        Assert.IsFalse(source.Contains(".TryMatchWith"), "PassengerInteractionRuntime should not call match methods directly.");
+        Assert.IsFalse(source.Contains(".BreakCoupleOnImpact"), "PassengerInteractionRuntime should not break couples directly.");
+    }
+
+    [Test]
+    public void PassengerMatchLogic_IsOnlyAFacade()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "Passenger.MatchLogic.cs");
+        string source = File.ReadAllText(path);
+        string[] forbiddenTokens =
+        {
+            "GetComponent<PassengerAbilities>",
+            "GetComponentInParent<Couple>",
+            "RuntimeServices.Instance.PairingService",
+            "RuntimeServices.Instance.ScoreService",
+            "private static bool CanMatch",
+            "private bool TryMatchWith",
+            "BreakCoupleOnImpact",
+            "ClampFlightVelocity",
+            "ReflectVelocity",
+            "ScaleLaunchVelocity",
+            "GetCurrentVelocity",
+            "ApplyReflectedVelocity"
+        };
+
+        foreach (string token in forbiddenTokens)
+            Assert.IsFalse(source.Contains(token), $"Passenger.MatchLogic.cs still owns match/runtime detail {token}.");
+    }
+
+    [Test]
     public void ExtractedPassengerStates_DoNotReachRuntimeLookupSingletons()
     {
         string statesRoot = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "States");

@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [RequireComponent(typeof(Rigidbody2D), typeof(PassangerAnimator))]
-public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Passengers.IPassengerStateHost, LoveMetro.Passengers.IPassengerInteractionHost
+public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Passengers.IPassengerStateHost, LoveMetro.Passengers.IPassengerInteractionHost, LoveMetro.Passengers.IPassengerMatchHost
 {
     public static float GlobalSpeedMultiplier = 0.7f;
 
@@ -27,6 +27,7 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
     private LoveMetro.Passengers.PassengerStateRuntime _stateRuntime;
     private LoveMetro.Passengers.PassengerPhysicsRuntime _physicsRuntime;
     private LoveMetro.Passengers.PassengerInteractionRuntime _interactionRuntime;
+    private LoveMetro.Passengers.PassengerMatchRuntime _matchRuntime;
     private LoveMetro.Passengers.PassengerStateTuning _stateTuning;
     private ScoreCounter _scoreCounter;
     private bool _stateTuningInitialized;
@@ -69,7 +70,7 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
         _stateRuntime.ConfigureTrain(_train);
         _stateRuntime.ChangeState(LoveMetro.Passengers.PassengerStateId.Wandering);
 
-        GetAbilities()?.AttachAll();
+        AttachAbilities();
 
         _isInitiated = true;
         if (LevelGameplaySettings.SlipperyFloorEnabled)

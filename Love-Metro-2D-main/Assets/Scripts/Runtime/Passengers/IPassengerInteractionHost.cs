@@ -11,8 +11,6 @@ namespace LoveMetro.Passengers
         PassengerPhysicsRuntime PhysicsRuntime { get; }
         IRuntimeServices Services { get; }
         PassengerInteractionRuntime InteractionRuntime { get; }
-
-        void BreakCoupleOnImpact(global::Passenger hitter);
-        bool TryMatchWith(global::Passenger other);
+        PassengerMatchRuntime MatchRuntime { get; }
     }
 }

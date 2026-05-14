@@ -399,6 +399,31 @@ public class RuntimeArchitectureTests
     }
 
     [Test]
+    public void PassengerMatchRuntime_CalculatesScoreAndRejectsInvalidPairs()
+    {
+        Passenger male = CreatePassenger(false, Vector3.zero);
+        Passenger female = CreatePassenger(true, Vector3.right);
+        var scoreService = new ScoreService(basePointsPerCouple: 125);
+        PassengerMatchRuntime runtime = ((IPassengerMatchHost)male).MatchRuntime;
+
+        try
+        {
+            Assert.IsTrue(runtime.CanMatchWith(female));
+            Assert.AreEqual(125, runtime.CalculateMatchPointsWith(female, scoreService));
+
+            female.IsFemale = false;
+
+            Assert.IsFalse(runtime.CanMatchWith(female));
+            Assert.IsFalse(runtime.TryResolvePassengerImpact(female));
+        }
+        finally
+        {
+            Object.DestroyImmediate(male.gameObject);
+            Object.DestroyImmediate(female.gameObject);
+        }
+    }
+
+    [Test]
     public void PassengerInteractionRuntime_UsesRuntimeInputIntentProvider()
     {
         Passenger passenger = CreatePassenger(false, Vector3.zero);

@@ -73,8 +73,7 @@ public partial class Passenger
     PassengerPhysicsRuntime IPassengerInteractionHost.PhysicsRuntime => EnsurePhysicsRuntime();
     LoveMetro.Core.IRuntimeServices IPassengerInteractionHost.Services => LoveMetro.Core.RuntimeServices.Instance;
     PassengerInteractionRuntime IPassengerInteractionHost.InteractionRuntime => EnsureInteractionRuntime();
-    void IPassengerInteractionHost.BreakCoupleOnImpact(Passenger hitter) => BreakCoupleOnImpact(hitter);
-    bool IPassengerInteractionHost.TryMatchWith(Passenger other) => TryMatchWith(other);
+    PassengerMatchRuntime IPassengerInteractionHost.MatchRuntime => EnsureMatchRuntime();
 
     void IPassengerStateHost.ChangeState(PassengerStateId id) => ChangeState(id);
     void IPassengerStateHost.EnterFallingState(Vector2 initialVelocity) => EnterFallingState(initialVelocity);

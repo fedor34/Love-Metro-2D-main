@@ -58,7 +58,7 @@ public partial class Passenger
         IsMatchable = false;
         _rematchEnableTime = Time.time + Settings.rematchCooldown;
         RefreshCoupleRegistryStatus();
-        GetAbilities()?.InvokePairBroken(null);
+        InvokePairBroken(null);
     }
 
     public string GetCurrentStateName()
@@ -125,5 +125,13 @@ public partial class Passenger
             _interactionRuntime = new LoveMetro.Passengers.PassengerInteractionRuntime(this);
 
         return _interactionRuntime;
+    }
+
+    private LoveMetro.Passengers.PassengerMatchRuntime EnsureMatchRuntime()
+    {
+        if (_matchRuntime == null)
+            _matchRuntime = new LoveMetro.Passengers.PassengerMatchRuntime(this);
+
+        return _matchRuntime;
     }
 }

@@ -96,8 +96,9 @@ public partial class Passenger
     private bool TryHandleWindForce(Vector2 force)
     {
         float windStrength = force.magnitude;
+        float minWindStrengthForFlying = Settings.minWindStrengthForFlying;
 
-        if (windStrength >= _minWindStrengthForFlying
+        if (windStrength >= minWindStrengthForFlying
             && !IsCurrentState(PassengerStateId.Flying)
             && !IsCurrentState(PassengerStateId.BeingAbsorbed)
             && !IsInCouple)
@@ -117,7 +118,7 @@ public partial class Passenger
         if (IsCurrentState(PassengerStateId.Wandering))
         {
             UpdateCurrentMovingDirection(force);
-            float forceMultiplier = windStrength < _minWindStrengthForFlying ? 0.5f : 2f;
+            float forceMultiplier = windStrength < minWindStrengthForFlying ? 0.5f : 2f;
             EnsurePhysicsRuntime().AddForce(force * forceMultiplier, ForceMode2D.Force);
             LogPassengerEvent("wind", $"{name} pushed while wandering force={windStrength:F1} multiplier={forceMultiplier:F1}");
             return true;
@@ -154,7 +155,7 @@ public partial class Passenger
             return;
         }
 
-        if (effectData.strength <= _handrailMinGrabbingSpeed || IsCurrentState(PassengerStateId.StayingOnHandrail))
+        if (effectData.strength <= Settings.handrailMinGrabbingSpeed || IsCurrentState(PassengerStateId.StayingOnHandrail))
             return;
 
         EnsureStateRuntimeInitialized();

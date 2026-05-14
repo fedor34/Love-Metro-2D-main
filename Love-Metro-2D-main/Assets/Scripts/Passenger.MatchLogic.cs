@@ -121,18 +121,19 @@ public partial class Passenger
 
     private void ConfigureMotionController()
     {
-        EnsurePhysicsRuntime().ConfigureMotion(CreateMotionConfig(), _bounceElasticity);
+        EnsurePhysicsRuntime().ConfigureMotion(CreateMotionConfig(), Settings.bounceElasticity);
     }
 
     private LoveMetro.Passengers.PassengerMotionConfig CreateMotionConfig()
     {
+        PassengerSettings settings = Settings;
         return new LoveMetro.Passengers.PassengerMotionConfig(
-            _maxFlightSpeed,
-            _minFallingSpeed,
-            _magnetRadius,
-            _magnetForce,
-            _repelRadius,
-            _repelForce,
-            _rematchCooldown);
+            settings.maxFlightSpeed,
+            settings.minFallingSpeed,
+            settings.magnetRadius,
+            settings.magnetForce,
+            settings.repelRadius,
+            settings.repelForce,
+            settings.rematchCooldown);
     }
 }

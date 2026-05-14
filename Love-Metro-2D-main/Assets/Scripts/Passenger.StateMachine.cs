@@ -77,7 +77,7 @@ public partial class Passenger
 
     void IPassengerStateHost.SetDefaultLayer()
     {
-        EnsurePhysicsRuntime().SetDefaultLayer(_defaultLayer);
+        EnsurePhysicsRuntime().SetDefaultLayer(Settings.defaultLayer);
     }
 
     void IPassengerStateHost.SetColliderEnabled(bool enabled)

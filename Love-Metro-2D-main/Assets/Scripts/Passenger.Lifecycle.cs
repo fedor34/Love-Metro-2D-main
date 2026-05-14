@@ -56,7 +56,7 @@ public partial class Passenger
 
         Launch(kickVelocity);
         IsMatchable = false;
-        _rematchEnableTime = Time.time + _rematchCooldown;
+        _rematchEnableTime = Time.time + Settings.rematchCooldown;
         RefreshCoupleRegistryStatus();
         GetAbilities()?.InvokePairBroken(null);
     }

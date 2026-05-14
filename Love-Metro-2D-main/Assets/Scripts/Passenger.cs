@@ -13,18 +13,9 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
     private delegate void ReleaseHandrail();
     private ReleaseHandrail releaseHandrail;
 
-    [SerializeField] private float _speed;
     [SerializeField] private Vector2 _initialMovingDirection;
-    [Range(0, 1)]
-    [SerializeField] private float _grabingHandrailChance;
     private Vector2 CurrentMovingDirection;
-    [SerializeField] private Vector2 HandrailStandingTimeInterval;
     [SerializeField] private GameObject CouplePref;
-    [SerializeField] private float _handrailMinGrabbingSpeed;
-    [SerializeField] private float _minFallingSpeed;
-    [SerializeField] private float _handrailCooldown = 0;
-    [SerializeField] private float _aditionalCollisionCheckTimePeriod;
-    [SerializeField] private string _defaultLayer = "Default";
 
     public bool IsFemale;
     [HideInInspector] public bool IsMatchable = true;
@@ -46,96 +37,14 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
 
     public bool IsInCouple = false;
     private float _rematchEnableTime = 0f;
-    [SerializeField] private float _rematchCooldown = 0.35f;
-
-    [Header("Impulse tuning (train inertia)")]
-    [SerializeField] private float _launchSensitivity = 1.0f;
-    [SerializeField] private float _minImpulseToLaunch = 3.0f;
-    [SerializeField] private float _aimAssistRadius = 5.0f;
-    [SerializeField] private float _aimAssistMaxStrength = 1.2f;
-    [SerializeField] private float _turbulenceStrength = 0.8f;
-    [SerializeField] private float _angleSnapDeg = 10f;
-    [SerializeField] private float _impulseToVelocityScale = 0.45f;
-    [SerializeField] private float _maxFlightSpeed = 18f;
-    [SerializeField] private float _flightSpeedMultiplier = 0.7f;
-    [SerializeField] private float _globalImpulseScale = 0.8f;
-    [SerializeField] private float _uniformLaunchScale = 1.8f;
-    [SerializeField] private float _uniformLaunchGamma = 0.75f;
-    [SerializeField] private float _flightHorizontalScale = 0.48f;
-    [SerializeField] private float _flightVerticalScale = 2.88f;
-    [SerializeField] private float _flightVerticalGamma = 0.65f;
-    [SerializeField] private float _minWindStrengthForFlying = 8f;
-    [SerializeField] private float _maxFlyingTime = 5f;
-
-    [Header("Billiards-style tuning")]
-    [SerializeField] private float _magnetRadius = 3.5f;
-    [SerializeField] private float _magnetForce = 5.0f;
-    [SerializeField] private float _repelRadius = 2.0f;
-    [SerializeField] private float _repelForce = 4.0f;
-    [SerializeField] private float _flightDeceleration = 0.65f;
-    [SerializeField] private float _bounceElasticity = 0.95f;
-    [SerializeField] private float _wallBounceBoost = 1.0f;
-    [SerializeField] private int _maxBounces = 3;
-    [SerializeField] private float _easeOutMinK = 0.985f;
-    [SerializeField] private float _easeOutMaxK = 0.9985f;
 
     public PassengerSettings Settings => PassengerSettings.Resolve(_settings);
 
-    private void ApplySettingsFromAsset()
-    {
-        PassengerSettings settings = Settings;
-
-        GlobalSpeedMultiplier = settings.globalSpeedMultiplier;
-        _speed = settings.baseSpeed * settings.globalSpeedMultiplier;
-        _minFallingSpeed = settings.minFallingSpeed;
-        _aditionalCollisionCheckTimePeriod = settings.additionalCollisionCheckTimePeriod;
-
-        _grabingHandrailChance = settings.handrailGrabChance;
-        _handrailMinGrabbingSpeed = settings.handrailMinGrabbingSpeed;
-        _handrailCooldown = settings.handrailCooldown;
-        HandrailStandingTimeInterval = settings.handrailStandingTimeInterval;
-
-        _launchSensitivity = settings.launchSensitivity;
-        _minImpulseToLaunch = settings.minImpulseToLaunch;
-        _impulseToVelocityScale = settings.impulseToVelocityScale;
-        _globalImpulseScale = settings.globalImpulseScale;
-        _uniformLaunchScale = settings.uniformLaunchScale;
-        _uniformLaunchGamma = settings.uniformLaunchGamma;
-        _flightHorizontalScale = settings.flightHorizontalScale;
-        _flightVerticalScale = settings.flightVerticalScale;
-        _flightVerticalGamma = settings.flightVerticalGamma;
-        _minWindStrengthForFlying = settings.minWindStrengthForFlying;
-        _maxFlyingTime = settings.maxFlyingTime;
-
-        _maxFlightSpeed = settings.maxFlightSpeed;
-        _flightSpeedMultiplier = settings.flightSpeedMultiplier;
-        _flightDeceleration = settings.flightDeceleration;
-        _maxBounces = settings.maxBounces;
-        _bounceElasticity = settings.bounceElasticity;
-        _wallBounceBoost = settings.wallBounceBoost;
-
-        _easeOutMinK = settings.easeOutMinK;
-        _easeOutMaxK = settings.easeOutMaxK;
-
-        _aimAssistRadius = settings.aimAssistRadius;
-        _aimAssistMaxStrength = settings.aimAssistMaxStrength;
-        _turbulenceStrength = settings.turbulenceStrength;
-        _angleSnapDeg = settings.angleSnapDeg;
-
-        _magnetRadius = settings.magnetRadius;
-        _magnetForce = settings.magnetForce;
-        _repelRadius = settings.repelRadius;
-        _repelForce = settings.repelForce;
-
-        _rematchCooldown = settings.rematchCooldown;
-        _defaultLayer = settings.defaultLayer;
-
-        RebuildStateTuning();
-    }
-
     public void Initiate(Vector3 initialMovingDirection, TrainManager train, ScoreCounter scoreCounter)
     {
-        ApplySettingsFromAsset();
+        PassengerSettings settings = Settings;
+        GlobalSpeedMultiplier = settings.globalSpeedMultiplier;
+        RebuildStateTuning();
 
         _initialMovingDirection = initialMovingDirection;
         CurrentMovingDirection = _initialMovingDirection.normalized;
@@ -143,7 +52,7 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
 
         EnsureRequiredComponents();
         ConfigureMotionController();
-        EnsurePhysicsRuntime().SetDefaultLayer(_defaultLayer);
+        EnsurePhysicsRuntime().SetDefaultLayer(settings.defaultLayer);
 
         var spriteRenderer = GetComponent<SpriteRenderer>();
         var animator = GetComponent<Animator>();
@@ -246,36 +155,37 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
 
     private void RebuildStateTuning()
     {
+        PassengerSettings settings = Settings;
         _stateTuning = new LoveMetro.Passengers.PassengerStateTuning(
-            _aditionalCollisionCheckTimePeriod,
-            _grabingHandrailChance,
-            _handrailCooldown,
-            HandrailStandingTimeInterval,
-            _launchSensitivity,
-            _minImpulseToLaunch,
-            _aimAssistRadius,
-            _aimAssistMaxStrength,
-            _turbulenceStrength,
-            _impulseToVelocityScale,
-            _maxFlightSpeed,
-            _flightSpeedMultiplier,
-            _globalImpulseScale,
-            _uniformLaunchScale,
-            _uniformLaunchGamma,
-            _flightHorizontalScale,
-            _flightVerticalScale,
-            _flightVerticalGamma,
-            _minWindStrengthForFlying,
-            _maxFlyingTime,
-            _magnetRadius,
-            _magnetForce,
-            _repelRadius,
-            _repelForce,
-            _flightDeceleration,
-            _wallBounceBoost,
-            _maxBounces,
-            _easeOutMinK,
-            _easeOutMaxK);
+            settings.additionalCollisionCheckTimePeriod,
+            settings.handrailGrabChance,
+            settings.handrailCooldown,
+            settings.handrailStandingTimeInterval,
+            settings.launchSensitivity,
+            settings.minImpulseToLaunch,
+            settings.aimAssistRadius,
+            settings.aimAssistMaxStrength,
+            settings.turbulenceStrength,
+            settings.impulseToVelocityScale,
+            settings.maxFlightSpeed,
+            settings.flightSpeedMultiplier,
+            settings.globalImpulseScale,
+            settings.uniformLaunchScale,
+            settings.uniformLaunchGamma,
+            settings.flightHorizontalScale,
+            settings.flightVerticalScale,
+            settings.flightVerticalGamma,
+            settings.minWindStrengthForFlying,
+            settings.maxFlyingTime,
+            settings.magnetRadius,
+            settings.magnetForce,
+            settings.repelRadius,
+            settings.repelForce,
+            settings.flightDeceleration,
+            settings.wallBounceBoost,
+            settings.maxBounces,
+            settings.easeOutMinK,
+            settings.easeOutMaxK);
         _stateTuningInitialized = true;
     }
 }

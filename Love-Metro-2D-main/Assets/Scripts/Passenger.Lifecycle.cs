@@ -118,4 +118,12 @@ public partial class Passenger
 
         return _physicsRuntime;
     }
+
+    private LoveMetro.Passengers.PassengerInteractionRuntime EnsureInteractionRuntime()
+    {
+        if (_interactionRuntime == null)
+            _interactionRuntime = new LoveMetro.Passengers.PassengerInteractionRuntime(this);
+
+        return _interactionRuntime;
+    }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using LoveMetro.Core;
 using LoveMetro.Input;
@@ -398,6 +399,136 @@ public class RuntimeArchitectureTests
     }
 
     [Test]
+    public void PassengerInteractionRuntime_UsesRuntimeInputIntentProvider()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+        PointerIntent intent = new PointerIntent(
+            Vector2.up,
+            true,
+            false,
+            0f,
+            0f,
+            0f,
+            0f,
+            Vector2.zero,
+            new Vector2(3f, 4f),
+            true,
+            10f);
+        RuntimeServices.Instance.RegisterInputIntentProvider(new TestInputIntentProvider(intent));
+
+        try
+        {
+            PassengerInteractionRuntime runtime = ((IPassengerInteractionHost)passenger).InteractionRuntime;
+
+            Assert.AreEqual(new Vector2(3f, 4f), runtime.GetImpulseTargetWorld(Vector2.zero));
+        }
+        finally
+        {
+            Object.DestroyImmediate(passenger.gameObject);
+        }
+    }
+
+    [Test]
+    public void PassengerInteractionRuntime_FallsBackToLegacyPointerBridge()
+    {
+        GameObject inputObject = new GameObject("ClickDirectionManager");
+        inputObject.AddComponent<ClickDirectionManager>();
+        Object.DestroyImmediate(inputObject);
+
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+
+        try
+        {
+            PassengerInteractionRuntime runtime = ((IPassengerInteractionHost)passenger).InteractionRuntime;
+
+            Assert.AreEqual(Vector2.right * 5f, runtime.GetImpulseTargetWorld(Vector2.zero));
+        }
+        finally
+        {
+            Object.DestroyImmediate(passenger.gameObject);
+        }
+    }
+
+    [Test]
+    public void PassengerInteractionRuntime_UsesRegistryForLookups()
+    {
+        GameObject registryObject = new GameObject("PassengerRegistry");
+        PassengerRegistry registry = registryObject.AddComponent<PassengerRegistry>();
+        Passenger male = CreatePassenger(false, Vector3.zero);
+        Passenger sameGender = CreatePassenger(false, Vector3.right);
+        Passenger female = CreatePassenger(true, Vector3.up);
+
+        try
+        {
+            RuntimeServices.Instance.RegisterPassengerRegistry(registry);
+            registry.Register(male);
+            registry.Register(sameGender);
+            registry.Register(female);
+
+            PassengerInteractionRuntime runtime = ((IPassengerInteractionHost)male).InteractionRuntime;
+            var sameGenderResults = new List<Passenger>();
+
+            Assert.AreSame(female, runtime.FindClosestOpposite(5f));
+            runtime.CollectSameGenderPassengers(sameGenderResults);
+            CollectionAssert.Contains(sameGenderResults, sameGender);
+        }
+        finally
+        {
+            Object.DestroyImmediate(male.gameObject);
+            Object.DestroyImmediate(sameGender.gameObject);
+            Object.DestroyImmediate(female.gameObject);
+            Object.DestroyImmediate(registryObject);
+        }
+    }
+
+    [Test]
+    public void PassengerInteractionRuntime_ClearsSameGenderBufferWithoutRegistry()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+        PassengerInteractionRuntime runtime = ((IPassengerInteractionHost)passenger).InteractionRuntime;
+        var results = new List<Passenger> { passenger };
+
+        try
+        {
+            runtime.CollectSameGenderPassengers(results);
+
+            Assert.IsEmpty(results);
+        }
+        finally
+        {
+            Object.DestroyImmediate(passenger.gameObject);
+        }
+    }
+
+    [Test]
+    public void PassengerInteractionRuntime_PreservesCollisionFallbackAndPeerBounceHelpers()
+    {
+        Passenger passenger = CreatePassenger(false, Vector3.zero);
+        Passenger other = CreatePassenger(true, Vector3.right);
+        PassengerInteractionRuntime runtime = ((IPassengerInteractionHost)passenger).InteractionRuntime;
+        PassengerPhysicsRuntime otherPhysics = ((IPassengerInteractionHost)other).PhysicsRuntime;
+
+        try
+        {
+            otherPhysics.ConfigureMotion(new PassengerMotionConfig(5f, 0.1f, 3f, 1f, 2f, 1f, 0.3f), bounceElasticity: 1f);
+            otherPhysics.SetVelocity(Vector2.right);
+
+            Assert.AreEqual(Vector2.left, runtime.GetCollisionNormal(null, Vector2.left));
+            Assert.AreEqual(Vector2.right, runtime.GetVelocity(other));
+            Assert.AreEqual(1f, runtime.GetWallBounceBoost(other));
+
+            runtime.ApplyReflectedVelocity(other, Vector2.right, Vector2.left, boostMultiplier: 1f);
+
+            Assert.AreEqual(Vector2.left, otherPhysics.CurrentVelocity);
+        }
+        finally
+        {
+            Object.DestroyImmediate(passenger.gameObject);
+            Object.DestroyImmediate(other.gameObject);
+        }
+    }
+
+    [Test]
     public void GameInitializer_DoesNotUseRuntimeReflectionConfiguration()
     {
         string path = Path.Combine(Application.dataPath, "Scripts", "Core", "GameInitializer.cs");
@@ -468,5 +599,17 @@ public class RuntimeArchitectureTests
         {
             TrainImpulseCount++;
         }
+    }
+
+    private sealed class TestInputIntentProvider : IInputIntentProvider
+    {
+        public TestInputIntentProvider(PointerIntent intent)
+        {
+            CurrentIntent = intent;
+        }
+
+        public PointerIntent CurrentIntent { get; }
+
+        public event System.Action<PointerIntent> IntentChanged;
     }
 }

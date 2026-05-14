@@ -14,13 +14,20 @@ namespace LoveMetro.Passengers
         private readonly IPassengerAbsorptionState _beingAbsorbedState;
 
         public PassengerStateRuntime(global::Passenger passenger)
-            : this((IPassengerStateHost)passenger)
+            : this(
+                (IPassengerStateHost)passenger,
+                passenger is IPassengerInteractionHost interactionHost ? interactionHost.InteractionRuntime : null)
         {
         }
 
         internal PassengerStateRuntime(IPassengerStateHost host)
+            : this(host, host is IPassengerInteractionHost interactionHost ? interactionHost.InteractionRuntime : null)
         {
-            PassengerStateContext context = new PassengerStateContext(host);
+        }
+
+        internal PassengerStateRuntime(IPassengerStateHost host, PassengerInteractionRuntime interactions)
+        {
+            PassengerStateContext context = new PassengerStateContext(host, interactions);
             _stateMachine = new PassengerStateMachine(context);
             _stateFactory = new PassengerStateFactory(context);
 

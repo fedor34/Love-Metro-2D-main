@@ -341,6 +341,65 @@ public class RefactoringAcceptanceTests
     }
 
     [Test]
+    public void PassengerStateHost_DoesNotExposeInteractionLookupMethods()
+    {
+        string hostPath = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "IPassengerStateHost.cs");
+        string source = File.ReadAllText(hostPath);
+        string[] forbiddenTokens =
+        {
+            "GetVelocity(global::Passenger",
+            "ApplyReflectedVelocity(global::Passenger",
+            "GetWallBounceBoost",
+            "GetImpulseTargetWorld",
+            "GetNormalizedTargetDelta",
+            "GetCollisionNormal",
+            "TryResolvePassengerImpact",
+            "FindClosestOpposite",
+            "CollectSameGenderPassengers"
+        };
+
+        foreach (string token in forbiddenTokens)
+            Assert.IsFalse(source.Contains(token), $"IPassengerStateHost still exposes interaction/lookup method {token}.");
+    }
+
+    [Test]
+    public void PassengerStateMachine_DoesNotContainInteractionRuntimeLogic()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "Passenger.StateMachine.cs");
+        string source = File.ReadAllText(path);
+        string[] forbiddenTokens =
+        {
+            "ClickDirectionManager",
+            "Camera.main",
+            "ResolvePassengerRegistry",
+            "FindClosestOpposite",
+            "TryResolvePassengerImpact"
+        };
+
+        foreach (string token in forbiddenTokens)
+            Assert.IsFalse(source.Contains(token), $"Passenger.StateMachine.cs still contains interaction runtime token {token}.");
+    }
+
+    [Test]
+    public void ExtractedPassengerStates_DoNotReachRuntimeLookupSingletons()
+    {
+        string statesRoot = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "States");
+        string[] forbiddenTokens =
+        {
+            "RuntimeServices",
+            "PassengerRegistry",
+            "ClickDirectionManager"
+        };
+
+        foreach (string file in Directory.GetFiles(statesRoot, "*PassengerState.cs", SearchOption.TopDirectoryOnly))
+        {
+            string source = File.ReadAllText(file);
+            foreach (string token in forbiddenTokens)
+                Assert.IsFalse(source.Contains(token), $"{file} reaches runtime lookup singleton {token} directly.");
+        }
+    }
+
+    [Test]
     public void ExtractedPassengerStates_UseContextAndMotionControllerForPassengerAccess()
     {
         string statesRoot = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "States");

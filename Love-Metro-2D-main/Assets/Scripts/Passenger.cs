@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Events;
 
 [RequireComponent(typeof(Rigidbody2D), typeof(PassangerAnimator), typeof(Collider2D))]
-public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Passengers.IPassengerStateHost
+public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Passengers.IPassengerStateHost, LoveMetro.Passengers.IPassengerInteractionHost
 {
     public static float GlobalSpeedMultiplier = 0.7f;
 
@@ -35,6 +35,7 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
     private float _timeWithoutHolding;
     private LoveMetro.Passengers.PassengerStateRuntime _stateRuntime;
     private LoveMetro.Passengers.PassengerPhysicsRuntime _physicsRuntime;
+    private LoveMetro.Passengers.PassengerInteractionRuntime _interactionRuntime;
     private LoveMetro.Passengers.PassengerStateTuning _stateTuning;
     private ScoreCounter _scoreCounter;
     private bool _stateTuningInitialized;

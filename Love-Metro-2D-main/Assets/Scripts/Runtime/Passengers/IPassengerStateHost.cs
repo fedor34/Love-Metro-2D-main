@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace LoveMetro.Passengers
@@ -23,21 +22,12 @@ namespace LoveMetro.Passengers
         void SetVelocity(Vector2 velocity);
         void AddForce(Vector2 force, ForceMode2D mode);
         Vector2 GetVelocity();
-        Vector2 GetVelocity(global::Passenger passenger);
         void SetDamping(float linearDamping, float angularDamping);
         Vector2 ClampFlightVelocity(Vector2 velocity);
         Vector2 ReflectVelocity(Vector2 velocity, Vector2 normal, float boostMultiplier);
         Vector2 ScaleLaunchVelocity(Vector2 velocity, float speedMultiplier, float impulseScale);
         void ApplyReflectedVelocity(Vector2 velocity, Vector2 normal, float boostMultiplier);
-        void ApplyReflectedVelocity(global::Passenger passenger, Vector2 velocity, Vector2 normal, float boostMultiplier);
-        float GetWallBounceBoost(global::Passenger passenger);
         void ForwardTrainSpeedChangeToCurrentState(Vector2 force);
-        Vector2 GetImpulseTargetWorld(Vector2 position);
-        float GetNormalizedTargetDelta(Vector2 position, Vector2 targetWorld, bool vertical);
-        Vector2 GetCollisionNormal(Collision2D collision, Vector2 fallback);
-        bool TryResolvePassengerImpact(global::Passenger other);
-        global::Passenger FindClosestOpposite(float radius);
-        void CollectSameGenderPassengers(List<global::Passenger> results);
         int GetContacts(ContactPoint2D[] contactPoints);
         void AttachHandrail(global::HandRailPosition handrail);
         void ReleaseHandrail();

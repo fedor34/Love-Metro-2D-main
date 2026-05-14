@@ -6,16 +6,25 @@ namespace LoveMetro.Passengers
     public readonly struct PassengerStateContext
     {
         public PassengerStateContext(global::Passenger passenger)
-            : this((IPassengerStateHost)passenger)
+            : this(
+                (IPassengerStateHost)passenger,
+                passenger is IPassengerInteractionHost interactionHost ? interactionHost.InteractionRuntime : null)
         {
         }
 
         internal PassengerStateContext(IPassengerStateHost host)
+            : this(host, host is IPassengerInteractionHost interactionHost ? interactionHost.InteractionRuntime : null)
+        {
+        }
+
+        internal PassengerStateContext(IPassengerStateHost host, PassengerInteractionRuntime interactions)
         {
             _host = host;
+            _interactions = interactions;
         }
 
         private readonly IPassengerStateHost _host;
+        private readonly PassengerInteractionRuntime _interactions;
 
         private IPassengerStateHost Host
         {
@@ -25,6 +34,17 @@ namespace LoveMetro.Passengers
                     throw new System.InvalidOperationException("Passenger state context is not bound to a host.");
 
                 return _host;
+            }
+        }
+
+        private PassengerInteractionRuntime Interactions
+        {
+            get
+            {
+                if (_interactions == null)
+                    throw new System.InvalidOperationException("Passenger state context is not bound to interaction runtime.");
+
+                return _interactions;
             }
         }
 
@@ -125,17 +145,17 @@ namespace LoveMetro.Passengers
 
         public void ApplyReflectedVelocity(global::Passenger passenger, Vector2 velocity, Vector2 normal, float boostMultiplier)
         {
-            Host.ApplyReflectedVelocity(passenger, velocity, normal, boostMultiplier);
+            Interactions.ApplyReflectedVelocity(passenger, velocity, normal, boostMultiplier);
         }
 
         public Vector2 GetVelocity(global::Passenger passenger)
         {
-            return Host.GetVelocity(passenger);
+            return Interactions.GetVelocity(passenger);
         }
 
         public float GetWallBounceBoost(global::Passenger passenger)
         {
-            return Host.GetWallBounceBoost(passenger);
+            return Interactions.GetWallBounceBoost(passenger);
         }
 
         public void ForwardTrainSpeedChangeToCurrentState(Vector2 force)
@@ -145,32 +165,32 @@ namespace LoveMetro.Passengers
 
         public Vector2 GetImpulseTargetWorld(Vector2 position)
         {
-            return Host.GetImpulseTargetWorld(position);
+            return Interactions.GetImpulseTargetWorld(position);
         }
 
         public float GetNormalizedTargetDelta(Vector2 position, Vector2 targetWorld, bool vertical)
         {
-            return Host.GetNormalizedTargetDelta(position, targetWorld, vertical);
+            return Interactions.GetNormalizedTargetDelta(position, targetWorld, vertical);
         }
 
         public Vector2 GetCollisionNormal(Collision2D collision, Vector2 fallback)
         {
-            return Host.GetCollisionNormal(collision, fallback);
+            return Interactions.GetCollisionNormal(collision, fallback);
         }
 
         public bool TryResolvePassengerImpact(global::Passenger other)
         {
-            return Host.TryResolvePassengerImpact(other);
+            return Interactions.TryResolvePassengerImpact(other);
         }
 
         public global::Passenger FindClosestOpposite(float radius)
         {
-            return Host.FindClosestOpposite(radius);
+            return Interactions.FindClosestOpposite(radius);
         }
 
         public void CollectSameGenderPassengers(List<global::Passenger> results)
         {
-            Host.CollectSameGenderPassengers(results);
+            Interactions.CollectSameGenderPassengers(results);
         }
 
         public int GetContacts(ContactPoint2D[] contactPoints)

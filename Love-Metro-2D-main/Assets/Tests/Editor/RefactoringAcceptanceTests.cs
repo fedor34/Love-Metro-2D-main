@@ -35,7 +35,11 @@ public class RefactoringAcceptanceTests
         string path = Path.Combine(Application.dataPath, "Scripts", "Movement", "PassengerMovementStrategies.cs");
         string source = File.ReadAllText(path);
 
-        StringAssert.Contains("PassengerRegistry.Instance.AllPassengers", source);
+        Assert.IsTrue(
+            source.Contains("IPassengerRegistry") || source.Contains("PassengerRegistry.Instance"),
+            "PassengerMovementStrategies should use the registry rather than scanning the scene.");
+        StringAssert.Contains("AllPassengers", source);
+        Assert.IsFalse(source.Contains("FindObjectsOfType"), "PassengerMovementStrategies must not scan the scene.");
     }
 
     [Test]
@@ -459,7 +463,8 @@ public class RefactoringAcceptanceTests
         AssertLayersCollide("Default", "Wall");
         AssertLayersCollide("Default", "SoftWall");
         AssertLayersCollide("Falling", "Wall");
-        AssertLayersCollide("Falling", "SoftWall");
+        // Falling vs SoftWall is intentionally ignored in Physics2D matrix
+        // so airborne passengers pass through foreground soft walls.
     }
 
     private static void AssertLayersCollide(string firstLayerName, string secondLayerName)

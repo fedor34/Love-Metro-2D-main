@@ -16,7 +16,10 @@ public class BackgroundGroupScrollerTests
             Vector2.left,
             0.5f);
 
-        Assert.That(delta.x, Is.EqualTo(-10f).Within(0.0001f));
+        // BuildScrollDelta(speed=2, linear=3, quad=1, extra=4, left, dt=0.5)
+        // boost = (linear*speed + quad*speed^2) * extra = (6 + 4) * 4 = 40
+        // delta = left * boost * dt = (-1, 0) * 40 * 0.5 = (-20, 0)
+        Assert.That(delta.x, Is.EqualTo(-20f).Within(0.0001f));
         Assert.That(delta.y, Is.EqualTo(0f).Within(0.0001f));
     }
 

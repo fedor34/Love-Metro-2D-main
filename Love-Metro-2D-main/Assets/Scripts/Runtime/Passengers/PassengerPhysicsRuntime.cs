@@ -15,9 +15,33 @@ namespace LoveMetro.Passengers
             _owner = owner;
         }
 
-        public Rigidbody2D Rigidbody => _rigidbody;
-        public Collider2D Collider => _collider;
-        public PassangerAnimator Animator => _animator;
+        public Rigidbody2D Rigidbody
+        {
+            get
+            {
+                if (_rigidbody == null)
+                    EnsureRequiredComponents();
+                return _rigidbody;
+            }
+        }
+        public Collider2D Collider
+        {
+            get
+            {
+                if (_collider == null)
+                    EnsureRequiredComponents();
+                return _collider;
+            }
+        }
+        public PassangerAnimator Animator
+        {
+            get
+            {
+                if (_animator == null)
+                    EnsureRequiredComponents();
+                return _animator;
+            }
+        }
         public Vector2 CurrentVelocity => EnsureMotionController().CurrentVelocity;
 
         public int EnsureSolidChildColliders()

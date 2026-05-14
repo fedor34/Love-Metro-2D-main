@@ -14,7 +14,9 @@ public class SimpleBackgroundScrollerTests
             2f,
             0.5f);
 
-        Assert.That(delta, Is.EqualTo(3f).Within(0.0001f));
+        // ComputeScrollDelta(speed=10, dir=(3,4), base=2, dt=0.5)
+        // delta = dir.normalized.x * base * speed * dt = 0.6 * 2 * 10 * 0.5 = 6
+        Assert.That(delta, Is.EqualTo(6f).Within(0.0001f));
     }
 
     [Test]

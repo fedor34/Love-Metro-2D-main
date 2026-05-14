@@ -13,12 +13,19 @@ public class PassengerAbilities : MonoBehaviour
 
     private void Awake()
     {
-        _owner = GetComponent<Passenger>();
+        EnsureOwner();
+    }
+
+    private Passenger EnsureOwner()
+    {
+        if (_owner == null)
+            _owner = GetComponent<Passenger>();
+        return _owner;
     }
 
     public void AttachAll()
     {
-        if (_owner == null) _owner = GetComponent<Passenger>();
+        EnsureOwner();
         for (int i = 0; i < _abilities.Count; i++)
         {
             var a = _abilities[i];
@@ -35,6 +42,7 @@ public class PassengerAbilities : MonoBehaviour
 
     public void InvokeMatched(Passenger partner, ref int points)
     {
+        EnsureOwner();
         for (int i = 0; i < _abilities.Count; i++)
         {
             var a = _abilities[i];
@@ -45,6 +53,7 @@ public class PassengerAbilities : MonoBehaviour
 
     public void InvokePairBroken(Passenger hitter)
     {
+        EnsureOwner();
         for (int i = 0; i < _abilities.Count; i++)
         {
             var a = _abilities[i];

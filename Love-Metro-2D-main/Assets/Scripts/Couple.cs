@@ -59,7 +59,7 @@ public class Couple : MonoBehaviour
         CouplesManager.Instance?.UnregisterCouple(this);
         _passengerMain?.RemoveFromContainerAndDestroy();
         _passengerOther?.RemoveFromContainerAndDestroy();
-        Destroy(gameObject);
+        LoveMetro.Core.UnityLifecycle.SafeDestroy(gameObject);
     }
 
     public void BreakByHit(Passenger hitter)
@@ -158,7 +158,7 @@ public class Couple : MonoBehaviour
 
         ReleasePassenger(_passengerMain, impact.Position, magnitude, Vector2.left);
         ReleasePassenger(_passengerOther, impact.Position, magnitude, Vector2.right);
-        Destroy(gameObject);
+        LoveMetro.Core.UnityLifecycle.SafeDestroy(gameObject);
     }
 
     private static void ReleasePassenger(Passenger passenger, Vector3 hitterPosition, float magnitude, Vector2 fallbackDirection)

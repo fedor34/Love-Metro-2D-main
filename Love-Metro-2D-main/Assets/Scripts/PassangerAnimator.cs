@@ -25,13 +25,29 @@ public class PassangerAnimator : MonoBehaviour
 
     private void Awake()
     {
-        _animator = GetComponent<Animator>();
-        _spriteRenderer = GetComponent<SpriteRenderer>();
-        _rigidbody = GetComponent<Rigidbody2D>();
+        EnsureComponents();
+    }
+
+    private Animator GetAnimator()
+    {
+        if (_animator == null)
+            _animator = GetComponent<Animator>();
+        return _animator;
+    }
+
+    private void EnsureComponents()
+    {
+        if (_animator == null)
+            _animator = GetComponent<Animator>();
+        if (_spriteRenderer == null)
+            _spriteRenderer = GetComponent<SpriteRenderer>();
+        if (_rigidbody == null)
+            _rigidbody = GetComponent<Rigidbody2D>();
     }
 
     private void Update()
     {
+        EnsureComponents();
         if (_rigidbody == null || _isWalkingStateForced)
             return;
 
@@ -41,6 +57,8 @@ public class PassangerAnimator : MonoBehaviour
 
     public void ChangeFacingDirection(bool isFacingRight)
     {
+        if (_spriteRenderer == null)
+            _spriteRenderer = GetComponent<SpriteRenderer>();
         if (_spriteRenderer != null)
             _spriteRenderer.flipX = !isFacingRight;
     }
@@ -109,31 +127,35 @@ public class PassangerAnimator : MonoBehaviour
 
     public void SetHoldingState(bool isHolding)
     {
-        _animator.SetBool(IsHolding, isHolding);
+        GetAnimator()?.SetBool(IsHolding, isHolding);
     }
 
     public void SetFallingState(bool isFalling)
     {
-        _animator.SetBool(IsFalling, isFalling);
+        GetAnimator()?.SetBool(IsFalling, isFalling);
     }
 
     public void ActivateBumping()
     {
-        _animator.SetTrigger(Bumping);
+        GetAnimator()?.SetTrigger(Bumping);
     }
 
     public void ResetAfterPairBreak()
     {
-        _animator.ResetTrigger(Bumping);
+        Animator animator = GetAnimator();
+        if (animator == null)
+            return;
+
+        animator.ResetTrigger(Bumping);
         SetHoldingState(false);
         SetFallingState(false);
         SetWalkingFlag(true);
         _isWalkingStateForced = false;
         _belowThresholdTimer = 0f;
         _animSpeedSmoothed = 1f;
-        _animator.speed = 1f;
-        _animator.Rebind();
-        _animator.Update(0f);
+        animator.speed = 1f;
+        animator.Rebind();
+        animator.Update(0f);
     }
 
     private void UpdateAutomaticWalking()
@@ -155,15 +177,19 @@ public class PassangerAnimator : MonoBehaviour
 
     private void UpdateAutomaticAnimationSpeed()
     {
+        Animator animator = GetAnimator();
+        if (animator == null)
+            return;
+
         float velocityMagnitude = _rigidbody.velocity.magnitude;
         float t = Mathf.InverseLerp(_movementThreshold, _movementThreshold * 10f + 0.01f, velocityMagnitude);
         float targetAnimSpeed = Mathf.Lerp(_animSpeedMin, _animSpeedMax, t);
         _animSpeedSmoothed = Mathf.Lerp(_animSpeedSmoothed, targetAnimSpeed, _animSpeedSmoothing * Time.deltaTime);
-        _animator.speed = _animSpeedSmoothed;
+        animator.speed = _animSpeedSmoothed;
     }
 
     private void SetWalkingFlag(bool isWalking)
     {
-        _animator.SetBool(IsWalking, isWalking);
+        GetAnimator()?.SetBool(IsWalking, isWalking);
     }
 }

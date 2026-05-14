@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Events;
 
-[RequireComponent(typeof(Rigidbody2D), typeof(PassangerAnimator), typeof(Collider2D))]
+[RequireComponent(typeof(Rigidbody2D), typeof(PassangerAnimator))]
 public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Passengers.IPassengerStateHost, LoveMetro.Passengers.IPassengerInteractionHost
 {
     public static float GlobalSpeedMultiplier = 0.7f;

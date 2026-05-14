@@ -27,6 +27,11 @@ public class ManualPairingManagerTests
         _managerObject = new GameObject("TestManualPairingManager");
         _manager = _managerObject.AddComponent<ManualPairingManager>();
 
+        // Awake is not invoked by AddComponent in edit-mode tests.
+        typeof(ManualPairingManager)
+            .GetMethod("Awake", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            ?.Invoke(_manager, null);
+
         SetPrivateField(_manager, "_maxPairingDistance", 3.0f);
         SetPrivateField(_manager, "_clickRadius", 0.4f);
         SetPrivateField(_manager, "_verticalSearchFactor", 2.0f);
@@ -276,6 +281,8 @@ public class ManualPairingManagerTests
     {
         var prop = type.GetProperty(propertyName,
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-        prop?.SetValue(null, value);
+        // Property has a private setter; bypass it via the setter MethodInfo with NonPublic.
+        var setter = prop?.GetSetMethod(nonPublic: true);
+        setter?.Invoke(null, new object[] { value });
     }
 }

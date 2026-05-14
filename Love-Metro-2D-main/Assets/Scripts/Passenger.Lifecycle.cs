@@ -27,7 +27,7 @@ public partial class Passenger
     public void RemoveFromContainerAndDestroy()
     {
         DetachFromContainer();
-        Destroy(gameObject);
+        LoveMetro.Core.UnityLifecycle.SafeDestroy(gameObject);
     }
 
     public void EnterCouple(Transform coupleRoot, Vector3 worldPosition, bool faceRight)

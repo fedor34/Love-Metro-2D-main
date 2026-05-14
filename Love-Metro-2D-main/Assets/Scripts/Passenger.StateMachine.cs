@@ -37,7 +37,15 @@ public partial class Passenger
     }
 
     PassengerSettings IPassengerStateHost.Settings => Settings;
-    PassangerAnimator IPassengerStateHost.Animator => PassangerAnimator;
+    PassangerAnimator IPassengerStateHost.Animator
+    {
+        get
+        {
+            if (PassangerAnimator == null)
+                PassangerAnimator = GetComponent<PassangerAnimator>();
+            return PassangerAnimator;
+        }
+    }
     bool IPassengerStateHost.IsInCouple => IsInCouple;
     bool IPassengerStateHost.IsMatchable
     {

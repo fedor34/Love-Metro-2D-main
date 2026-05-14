@@ -62,7 +62,8 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
         if (_instance == null)
         {
             _instance = this;
-            DontDestroyOnLoad(gameObject);
+            if (Application.isPlaying)
+                DontDestroyOnLoad(gameObject);
             InitializeCollections();
             LoveMetro.Core.RuntimeServices.Instance.RegisterFieldEffectSystem(this);
             return;
@@ -71,7 +72,7 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
         if (_instance != this)
         {
             Debug.LogWarning($"[FieldEffectSystem] Duplicate system detected, destroying {name}");
-            Destroy(gameObject);
+            LoveMetro.Core.UnityLifecycle.SafeDestroy(gameObject);
         }
     }
 

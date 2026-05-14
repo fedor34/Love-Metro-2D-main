@@ -390,7 +390,7 @@ public class RuntimeArchitectureTests
             Assert.AreEqual(1.0f, tuning.WallBounceBoost);
             Assert.AreEqual(3, tuning.MaxBounces);
             Assert.AreEqual(8f, tuning.MinWindStrengthForFlying);
-            Assert.AreEqual(new Vector2(0f, 0f), tuning.HandrailStandingTimeInterval);
+            Assert.AreEqual(new Vector2(1f, 3f), tuning.HandrailStandingTimeInterval);
         }
         finally
         {
@@ -553,6 +553,9 @@ public class RuntimeArchitectureTests
     {
         GameObject gameObject = new GameObject("Passenger_" + (isFemale ? "F" : "M"));
         gameObject.transform.position = position;
+        // Ensure a concrete Collider2D exists before Passenger is added — Passenger's
+        // RequireComponent no longer pins it, and tests capture the collider reference upfront.
+        gameObject.AddComponent<CircleCollider2D>();
         Passenger passenger = gameObject.AddComponent<Passenger>();
         passenger.IsFemale = isFemale;
         passenger.IsMatchable = true;

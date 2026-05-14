@@ -1,3 +1,5 @@
+using LoveMetro.Passengers;
+
 namespace LoveMetro.Pairing
 {
     public sealed class PairingService : IPairingService
@@ -35,9 +37,8 @@ namespace LoveMetro.Pairing
             if (!result.Success)
                 return false;
 
-            request.First.ForceToMatchingState(request.Second);
-            request.Second.ForceToMatchingState(request.First);
-            return true;
+            return request.First is IPassengerMatchHost host
+                && host.MatchRuntime.FormPairWith(request.Second).Success;
         }
     }
 }

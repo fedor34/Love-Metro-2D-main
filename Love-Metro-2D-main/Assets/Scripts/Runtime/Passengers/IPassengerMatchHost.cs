@@ -1,4 +1,5 @@
 using LoveMetro.Core;
+using UnityEngine;
 
 namespace LoveMetro.Passengers
 {
@@ -8,5 +9,11 @@ namespace LoveMetro.Passengers
         global::ScoreCounter ScoreCounter { get; }
         IRuntimeServices Services { get; }
         PassengerMatchRuntime MatchRuntime { get; }
+        PassengerPairFormationRuntime PairFormationRuntime { get; }
+        GameObject CouplePrefab { get; }
+        Vector3 Position { get; }
+        global::Couple CurrentCouple { get; }
+
+        void ChangeToMatchingState();
     }
 }

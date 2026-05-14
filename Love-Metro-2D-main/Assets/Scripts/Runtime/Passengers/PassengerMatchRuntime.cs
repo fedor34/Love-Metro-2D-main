@@ -51,18 +51,24 @@ namespace LoveMetro.Passengers
             return TryMatchWith(other);
         }
 
+        public PassengerPairFormationResult ForceToMatchingState(global::Passenger partner)
+        {
+            return _host.PairFormationRuntime.FormPairWith(partner);
+        }
+
+        public PassengerPairFormationResult FormPairWith(global::Passenger partner)
+        {
+            return _host.PairFormationRuntime.FormPairWith(partner);
+        }
+
         public bool TryMatchWith(global::Passenger other)
         {
             IPairingService service = _host.Services?.PairingService;
             if (service != null)
                 return service.TryPair(new PairingRequest(_host.Passenger, other, source: "collision"), out _);
 
-            if (!CanMatch(_host.Passenger, other))
-                return false;
-
-            _host.Passenger.ForceToMatchingState(other);
-            other.ForceToMatchingState(_host.Passenger);
-            return true;
+            return CanMatch(_host.Passenger, other)
+                && FormPairWith(other).Success;
         }
 
         public void BreakCoupleOnImpact(global::Passenger hitter)
@@ -71,7 +77,7 @@ namespace LoveMetro.Passengers
             if (!passenger.IsInCouple)
                 return;
 
-            passenger.GetComponentInParent<global::Couple>()?.BreakByHit(hitter);
+            _host.CurrentCouple?.BreakByHit(hitter);
         }
 
         public void AttachAbilities()

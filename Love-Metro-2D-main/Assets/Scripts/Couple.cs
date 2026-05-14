@@ -105,8 +105,8 @@ public class Couple : MonoBehaviour
             mainPosition.y,
             _passengerOther.transform.position.z);
 
-        _passengerMain.EnterCouple(transform, mainPosition, faceRight: mainIsLeft);
-        _passengerOther.EnterCouple(transform, alignedOtherPosition, faceRight: !mainIsLeft);
+        _passengerMain.EnterCouple(this, mainPosition, faceRight: mainIsLeft);
+        _passengerOther.EnterCouple(this, alignedOtherPosition, faceRight: !mainIsLeft);
     }
 
     private void ConfigureTrigger()

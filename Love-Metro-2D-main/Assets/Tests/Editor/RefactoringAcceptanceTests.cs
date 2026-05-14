@@ -432,6 +432,42 @@ public class RefactoringAcceptanceTests
     }
 
     [Test]
+    public void PassengerFacade_DoesNotOwnPairFormation()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "Passenger.cs");
+        string source = File.ReadAllText(path);
+        string[] forbiddenTokens =
+        {
+            "Instantiate(CouplePref)",
+            "Couple.Init",
+            "AwardMatchPointsFor"
+        };
+
+        foreach (string token in forbiddenTokens)
+            Assert.IsFalse(source.Contains(token), $"Passenger.cs still owns pair formation detail {token}.");
+    }
+
+    [Test]
+    public void PairingService_DelegatesPairFormationToPassengerRuntime()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Pairing", "PairingService.cs");
+        string source = File.ReadAllText(path);
+
+        StringAssert.Contains("MatchRuntime.FormPairWith", source);
+        Assert.IsFalse(source.Contains("ForceToMatchingState"), "PairingService should not drive passenger state directly.");
+    }
+
+    [Test]
+    public void PassengerMatchRuntime_UsesExplicitCurrentCoupleReference()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "PassengerMatchRuntime.cs");
+        string source = File.ReadAllText(path);
+
+        StringAssert.Contains("CurrentCouple", source);
+        Assert.IsFalse(source.Contains("GetComponentInParent<Couple>"), "PassengerMatchRuntime should not find its couple through hierarchy lookup.");
+    }
+
+    [Test]
     public void ExtractedPassengerStates_DoNotReachRuntimeLookupSingletons()
     {
         string statesRoot = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Passengers", "States");

@@ -28,7 +28,9 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
     private LoveMetro.Passengers.PassengerPhysicsRuntime _physicsRuntime;
     private LoveMetro.Passengers.PassengerInteractionRuntime _interactionRuntime;
     private LoveMetro.Passengers.PassengerMatchRuntime _matchRuntime;
+    private LoveMetro.Passengers.PassengerPairFormationRuntime _pairFormationRuntime;
     private LoveMetro.Passengers.PassengerStateTuning _stateTuning;
+    private Couple _currentCouple;
     private ScoreCounter _scoreCounter;
     private bool _stateTuningInitialized;
 
@@ -109,21 +111,7 @@ public partial class Passenger : MonoBehaviour, IFieldEffectTarget, LoveMetro.Pa
     {
         EnsureRequiredComponents();
         EnsureStateRuntimeInitialized();
-
-        if (partner == null)
-        {
-            _stateRuntime.ChangeState(LoveMetro.Passengers.PassengerStateId.Matching);
-            return;
-        }
-
-        if (transform.position.x <= partner.transform.position.x)
-        {
-            Couple couple = Instantiate(CouplePref).GetComponent<Couple>();
-            couple.Init(this, partner);
-            AwardMatchPointsFor(partner, couple.transform.position);
-        }
-
-        _stateRuntime.ChangeState(LoveMetro.Passengers.PassengerStateId.Matching);
+        EnsureMatchRuntime().ForceToMatchingState(partner);
     }
 
     public void Launch(Vector2 initialVelocity)

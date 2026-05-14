@@ -424,6 +424,107 @@ public class RuntimeArchitectureTests
     }
 
     [Test]
+    public void PairingService_TryPairCreatesOneCoupleAndAwardsScoreOnce()
+    {
+        Passenger male = CreatePassenger(false, Vector3.zero);
+        Passenger female = CreatePassenger(true, Vector3.right);
+        GameObject couplePrefab = CreateCouplePrefab();
+        var scoreService = new ScoreService(basePointsPerCouple: 100);
+        RuntimeServices.Instance.RegisterScoreService(scoreService);
+        SetPrivateField(male, "CouplePref", couplePrefab);
+        SetPrivateField(female, "CouplePref", couplePrefab);
+
+        try
+        {
+            var service = new PairingService();
+
+            bool paired = service.TryPair(new PairingRequest(female, male, source: "test"), out PairingResult result);
+
+            Assert.IsTrue(paired);
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(100, scoreService.CurrentScore);
+            Assert.IsTrue(male.IsInCouple);
+            Assert.IsTrue(female.IsInCouple);
+            Assert.AreEqual("Matching", male.GetCurrentStateName());
+            Assert.AreEqual("Matching", female.GetCurrentStateName());
+            Assert.AreEqual(1, CountCouplesExcluding(couplePrefab));
+        }
+        finally
+        {
+            DestroyCouplesExcluding(couplePrefab);
+            Object.DestroyImmediate(couplePrefab);
+            DestroyPassengerIfAlive(male);
+            DestroyPassengerIfAlive(female);
+        }
+    }
+
+    [Test]
+    public void PairingService_TryPairRejectsInvalidPairWithoutScoreOrStateChange()
+    {
+        Passenger first = CreatePassenger(false, Vector3.zero);
+        Passenger second = CreatePassenger(false, Vector3.right);
+        GameObject couplePrefab = CreateCouplePrefab();
+        var scoreService = new ScoreService(basePointsPerCouple: 100);
+        RuntimeServices.Instance.RegisterScoreService(scoreService);
+        SetPrivateField(first, "CouplePref", couplePrefab);
+        SetPrivateField(second, "CouplePref", couplePrefab);
+
+        try
+        {
+            var service = new PairingService();
+
+            bool paired = service.TryPair(new PairingRequest(first, second, source: "test"), out PairingResult result);
+
+            Assert.IsFalse(paired);
+            Assert.IsFalse(result.Success);
+            Assert.AreEqual(PairingFailureReason.SameGender, result.FailureReason);
+            Assert.AreEqual(0, scoreService.CurrentScore);
+            Assert.IsFalse(first.IsInCouple);
+            Assert.IsFalse(second.IsInCouple);
+            Assert.AreEqual("None", first.GetCurrentStateName());
+            Assert.AreEqual("None", second.GetCurrentStateName());
+            Assert.AreEqual(0, CountCouplesExcluding(couplePrefab));
+        }
+        finally
+        {
+            DestroyCouplesExcluding(couplePrefab);
+            Object.DestroyImmediate(couplePrefab);
+            DestroyPassengerIfAlive(first);
+            DestroyPassengerIfAlive(second);
+        }
+    }
+
+    [Test]
+    public void PassengerPairFormationRuntime_UsesLeftmostPassengerToCreateCouple()
+    {
+        Passenger left = CreatePassenger(false, Vector3.zero);
+        Passenger right = CreatePassenger(true, Vector3.right * 2f);
+        GameObject couplePrefab = CreateCouplePrefab();
+        SetPrivateField(left, "CouplePref", couplePrefab);
+        SetPrivateField(right, "CouplePref", couplePrefab);
+        PassengerPairFormationRuntime runtime = ((IPassengerMatchHost)right).PairFormationRuntime;
+
+        try
+        {
+            PassengerPairFormationResult result = runtime.FormPairWith(left);
+
+            Assert.IsTrue(result.Success);
+            Assert.IsFalse(result.CreatedByThisPassenger);
+            Assert.IsNotNull(result.Couple);
+            Assert.AreEqual(left.transform.position, result.Couple.transform.position);
+            Assert.AreSame(result.Couple.transform, left.transform.parent);
+            Assert.AreSame(result.Couple.transform, right.transform.parent);
+        }
+        finally
+        {
+            DestroyCouplesExcluding(couplePrefab);
+            Object.DestroyImmediate(couplePrefab);
+            DestroyPassengerIfAlive(left);
+            DestroyPassengerIfAlive(right);
+        }
+    }
+
+    [Test]
     public void PassengerInteractionRuntime_UsesRuntimeInputIntentProvider()
     {
         Passenger passenger = CreatePassenger(false, Vector3.zero);
@@ -586,6 +687,48 @@ public class RuntimeArchitectureTests
         passenger.IsMatchable = true;
         passenger.IsInCouple = false;
         return passenger;
+    }
+
+    private static GameObject CreateCouplePrefab()
+    {
+        GameObject couplePrefab = new GameObject("CouplePrefab");
+        couplePrefab.AddComponent<Couple>();
+        return couplePrefab;
+    }
+
+    private static int CountCouplesExcluding(GameObject excluded)
+    {
+        int count = 0;
+        foreach (Couple couple in Object.FindObjectsOfType<Couple>())
+        {
+            if (couple.gameObject != excluded)
+                count++;
+        }
+
+        return count;
+    }
+
+    private static void DestroyCouplesExcluding(GameObject excluded)
+    {
+        foreach (Couple couple in Object.FindObjectsOfType<Couple>())
+        {
+            if (couple.gameObject != excluded)
+                Object.DestroyImmediate(couple.gameObject);
+        }
+    }
+
+    private static void DestroyPassengerIfAlive(Passenger passenger)
+    {
+        if (passenger != null)
+            Object.DestroyImmediate(passenger.gameObject);
+    }
+
+    private static void SetPrivateField(object target, string fieldName, object value)
+    {
+        System.Reflection.FieldInfo field = target.GetType().GetField(
+            fieldName,
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        field?.SetValue(target, value);
     }
 
     private sealed class TestPassengerState : IPassengerState

@@ -32,10 +32,22 @@ public partial class Passenger
 
     public void EnterCouple(Transform coupleRoot, Vector3 worldPosition, bool faceRight)
     {
+        Couple couple = coupleRoot != null ? coupleRoot.GetComponent<Couple>() : null;
+        EnterCoupleInternal(couple, coupleRoot, worldPosition, faceRight);
+    }
+
+    internal void EnterCouple(Couple couple, Vector3 worldPosition, bool faceRight)
+    {
+        EnterCoupleInternal(couple, couple != null ? couple.transform : null, worldPosition, faceRight);
+    }
+
+    private void EnterCoupleInternal(Couple couple, Transform coupleRoot, Vector3 worldPosition, bool faceRight)
+    {
         EnsureRequiredComponents();
         Transport(worldPosition);
         PassangerAnimator?.ChangeFacingDirection(faceRight);
         transform.SetParent(coupleRoot);
+        _currentCouple = couple;
         IsInCouple = true;
         RefreshCoupleRegistryStatus();
     }
@@ -50,6 +62,7 @@ public partial class Passenger
     {
         EnsureRequiredComponents();
         IsInCouple = false;
+        _currentCouple = null;
         EnsurePhysicsRuntime().SetColliderEnabled(true);
         EnsurePhysicsRuntime().SetBodyType(RigidbodyType2D.Dynamic);
         PassangerAnimator?.ResetAfterPairBreak();
@@ -133,5 +146,13 @@ public partial class Passenger
             _matchRuntime = new LoveMetro.Passengers.PassengerMatchRuntime(this);
 
         return _matchRuntime;
+    }
+
+    private LoveMetro.Passengers.PassengerPairFormationRuntime EnsurePairFormationRuntime()
+    {
+        if (_pairFormationRuntime == null)
+            _pairFormationRuntime = new LoveMetro.Passengers.PassengerPairFormationRuntime(this);
+
+        return _pairFormationRuntime;
     }
 }

@@ -9,6 +9,15 @@ public partial class Passenger
     ScoreCounter IPassengerMatchHost.ScoreCounter => _scoreCounter;
     IRuntimeServices IPassengerMatchHost.Services => RuntimeServices.Instance;
     PassengerMatchRuntime IPassengerMatchHost.MatchRuntime => EnsureMatchRuntime();
+    PassengerPairFormationRuntime IPassengerMatchHost.PairFormationRuntime => EnsurePairFormationRuntime();
+    GameObject IPassengerMatchHost.CouplePrefab => CouplePref;
+    Vector3 IPassengerMatchHost.Position => transform.position;
+    Couple IPassengerMatchHost.CurrentCouple => _currentCouple;
+
+    void IPassengerMatchHost.ChangeToMatchingState()
+    {
+        ChangeState(LoveMetro.Passengers.PassengerStateId.Matching);
+    }
 
     public int CalculateMatchPointsWith(Passenger partner, ScoreCounter scoreCounter = null)
     {
@@ -18,11 +27,6 @@ public partial class Passenger
     public int CalculateMatchPointsWith(Passenger partner, IScoreService scoreService)
     {
         return EnsureMatchRuntime().CalculateMatchPointsWith(partner, scoreService);
-    }
-
-    private void AwardMatchPointsFor(Passenger partner, Vector3 worldPosition)
-    {
-        EnsureMatchRuntime().AwardMatchPointsFor(partner, worldPosition);
     }
 
     public bool CanMatchWith(Passenger other)

@@ -109,14 +109,13 @@ public class RefactoringAcceptanceTests
         string scriptsRoot = Path.Combine(Application.dataPath, "Scripts");
         var approved = new HashSet<string>
         {
-            NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "GameInitializer.cs")),
-            NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "GameBootstrap.cs")),
+            NormalizeAssetPath(Path.Combine(scriptsRoot, "Runtime", "Core", "RuntimeCompositionRoot.cs")),
+            NormalizeAssetPath(Path.Combine(scriptsRoot, "Runtime", "Core", "SceneObjectIndex.cs")),
             NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "AutoAttachCollisionDebugger.cs")),
             NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "FindAllBoundaries.cs")),
             NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "LayerCollisionMatrixDecoder.cs")),
             NormalizeAssetPath(Path.Combine(scriptsRoot, "UI", "MenuInitializer.cs")),
             NormalizeAssetPath(Path.Combine(scriptsRoot, "Parallax", "EnsureParallaxLayers.cs")),
-            NormalizeAssetPath(Path.Combine(scriptsRoot, "Parallax", "ParallaxBootstrap.cs")),
             NormalizeAssetPath(Path.Combine(scriptsRoot, "FieldEffects", "Core", "FieldEffectMenus.cs"))
         };
 

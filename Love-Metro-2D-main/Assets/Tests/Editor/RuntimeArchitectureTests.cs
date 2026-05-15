@@ -663,6 +663,56 @@ public class RuntimeArchitectureTests
         Assert.IsFalse(source.Contains("System.Reflection"));
         Assert.IsFalse(source.Contains("BindingFlags"));
         Assert.IsFalse(source.Contains("GetField("));
+        AssertNoRuntimeSceneDiscovery(path);
+    }
+
+    [Test]
+    public void GameBootstrap_DoesNotUseRuntimeSceneDiscovery()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "Core", "GameBootstrap.cs");
+
+        AssertNoRuntimeSceneDiscovery(path);
+    }
+
+    [Test]
+    public void ClickDirectionManager_UsesManualPairingServiceInsteadOfSingleton()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "Input", "ClickDirectionManager.Input.cs");
+        string source = File.ReadAllText(path);
+
+        StringAssert.Contains("IManualPairingService", source);
+        Assert.IsFalse(source.Contains("ManualPairingManager.Instance"));
+    }
+
+    [Test]
+    public void CouplesManager_UsesStationFlowServiceForStationStops()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "CouplesManager.cs");
+        string source = File.ReadAllText(path);
+
+        StringAssert.Contains("IStationFlowService", source);
+        Assert.IsFalse(source.Contains("_trainManager.StationStopAndSpawn"));
+    }
+
+    [Test]
+    public void ParallaxAndScoreConsumers_UseTrainMotionEventsState()
+    {
+        string scriptsRoot = Path.Combine(Application.dataPath, "Scripts");
+        string[] files =
+        {
+            Path.Combine(scriptsRoot, "ParallaxEffect.cs"),
+            Path.Combine(scriptsRoot, "Parallax", "SimpleBackgroundScroller.cs"),
+            Path.Combine(scriptsRoot, "Parallax", "BackgroundGroupScroller.cs"),
+            Path.Combine(scriptsRoot, "Parallax", "ParallaxMaterialDriver.cs"),
+            Path.Combine(scriptsRoot, "ScoreCounter.cs"),
+            Path.Combine(scriptsRoot, "CouplesManager.cs")
+        };
+
+        foreach (string file in files)
+        {
+            string source = File.ReadAllText(file);
+            Assert.IsFalse(source.Contains(".GetCurrentSpeed()"), $"{file} should read train speed through ITrainMotionEvents.CurrentMotionState.");
+        }
     }
 
     [Test]
@@ -673,6 +723,23 @@ public class RuntimeArchitectureTests
 
         Assert.IsFalse(source.Contains("GameObject.Find"));
         Assert.IsFalse(source.Contains("Resources.FindObjectsOfTypeAll"));
+    }
+
+    private static void AssertNoRuntimeSceneDiscovery(string path)
+    {
+        string source = File.ReadAllText(path);
+        string[] forbiddenTokens =
+        {
+            "FindObjectOfType<",
+            "FindObjectsOfType<",
+            "Object.FindObjectOfType<",
+            "Object.FindObjectsOfType<",
+            "GameObject.Find(",
+            "Resources.FindObjectsOfTypeAll("
+        };
+
+        foreach (string token in forbiddenTokens)
+            Assert.IsFalse(source.Contains(token), $"{path} uses runtime scene discovery token {token}.");
     }
 
     private static Passenger CreatePassenger(bool isFemale, Vector3 position)

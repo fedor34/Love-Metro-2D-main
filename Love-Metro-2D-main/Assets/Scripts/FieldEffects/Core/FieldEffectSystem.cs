@@ -41,22 +41,6 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
         OnEffectRemovedFromTarget = null;
     }
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void InitializeSystem()
-    {
-        if (_instance == null)
-        {
-            CreateSystemInstance();
-        }
-    }
-
-    private static void CreateSystemInstance()
-    {
-        GameObject systemObject = new GameObject("[FieldEffectSystem]");
-        systemObject.AddComponent<FieldEffectSystem>();
-        DontDestroyOnLoad(systemObject);
-    }
-
     private void Awake()
     {
         if (_instance == null)

@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public partial class TrainManager : MonoBehaviour, LoveMetro.Train.ITrainMotionEvents
+public partial class TrainManager : MonoBehaviour, LoveMetro.Train.ITrainMotionEvents, LoveMetro.Train.IStationFlowService
 {
     public delegate void StartInertia(Vector2 force);
     public StartInertia startInertia;
@@ -79,11 +79,13 @@ public partial class TrainManager : MonoBehaviour, LoveMetro.Train.ITrainMotionE
     {
         _motionController = new LoveMetro.Train.TrainMotionController(_minSpeed, _maxSpeed);
         LoveMetro.Core.RuntimeServices.Instance.RegisterTrainMotionEvents(this);
+        LoveMetro.Core.RuntimeServices.Instance.RegisterStationFlowService(this);
     }
 
     private void OnDestroy()
     {
         LoveMetro.Core.RuntimeServices.Instance.UnregisterTrainMotionEvents(this);
+        LoveMetro.Core.RuntimeServices.Instance.UnregisterStationFlowService(this);
     }
 
     public float GetCurrentSpeed()

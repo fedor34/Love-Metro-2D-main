@@ -22,7 +22,9 @@ namespace LoveMetro.Core
         public IPairingService PairingService { get; private set; }
         public IScoreService ScoreService { get; private set; }
         public IInputIntentProvider InputIntentProvider { get; private set; }
+        public IManualPairingService ManualPairingService { get; private set; }
         public ITrainMotionEvents TrainMotionEvents { get; private set; }
+        public IStationFlowService StationFlowService { get; private set; }
         public IFieldEffectSystem FieldEffectSystem { get; private set; }
 
         public void RegisterPassengerRegistry(IPassengerRegistry service)
@@ -63,6 +65,17 @@ namespace LoveMetro.Core
                 InputIntentProvider = null;
         }
 
+        public void RegisterManualPairingService(IManualPairingService service)
+        {
+            ManualPairingService = service;
+        }
+
+        public void UnregisterManualPairingService(IManualPairingService service)
+        {
+            if (ReferenceEquals(ManualPairingService, service))
+                ManualPairingService = null;
+        }
+
         public void RegisterTrainMotionEvents(ITrainMotionEvents service)
         {
             TrainMotionEvents = service;
@@ -72,6 +85,17 @@ namespace LoveMetro.Core
         {
             if (ReferenceEquals(TrainMotionEvents, service))
                 TrainMotionEvents = null;
+        }
+
+        public void RegisterStationFlowService(IStationFlowService service)
+        {
+            StationFlowService = service;
+        }
+
+        public void UnregisterStationFlowService(IStationFlowService service)
+        {
+            if (ReferenceEquals(StationFlowService, service))
+                StationFlowService = null;
         }
 
         public void RegisterFieldEffectSystem(IFieldEffectSystem service)
@@ -91,7 +115,9 @@ namespace LoveMetro.Core
             PairingService = new PairingService();
             ScoreService = new ScoreService();
             InputIntentProvider = null;
+            ManualPairingService = null;
             TrainMotionEvents = null;
+            StationFlowService = null;
             FieldEffectSystem = null;
         }
     }

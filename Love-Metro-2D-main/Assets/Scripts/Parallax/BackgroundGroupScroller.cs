@@ -35,11 +35,16 @@ public class BackgroundGroupScroller : MonoBehaviour
     private Transform[] _fallbackNodes;
     private float _nextResolveTime;
     private ResolutionMode _lastLoggedMode = ResolutionMode.Unresolved;
+    private LoveMetro.Train.ITrainMotionEvents _trainEvents;
 
-    public void Configure(TrainManager train, Transform group, Transform[] fallbackNodes)
+    public void Configure(LoveMetro.Train.ITrainMotionEvents train, Transform group, Transform[] fallbackNodes)
     {
         if (train != null)
-            _train = train;
+        {
+            _trainEvents = train;
+            if (train is TrainManager trainManager)
+                _train = trainManager;
+        }
 
         _group = group;
         _fallbackNodes = fallbackNodes;
@@ -66,7 +71,7 @@ public class BackgroundGroupScroller : MonoBehaviour
             return;
 
         Vector3 delta = BuildScrollDelta(
-            Mathf.Abs(_train.GetCurrentSpeed()),
+            Mathf.Abs(_trainEvents.CurrentMotionState.CurrentSpeed),
             _linearFactor,
             _quadraticFactor,
             _extraMultiplier,
@@ -88,13 +93,13 @@ public class BackgroundGroupScroller : MonoBehaviour
     private bool ResolveTargets(bool force = false)
     {
         if (!force && Time.time < _nextResolveTime)
-            return _train != null && (_group != null || HasFallbackNodes());
+            return _trainEvents != null && (_group != null || HasFallbackNodes());
 
-        if (_train == null && LoveMetro.Core.RuntimeServices.Instance.TrainMotionEvents is TrainManager trainManager)
-            _train = trainManager;
+        if (_trainEvents == null && _train != null)
+            _trainEvents = _train;
 
         _nextResolveTime = Time.time + Mathf.Max(0.1f, _resolveRetryInterval);
-        return _train != null && (_group != null || HasFallbackNodes());
+        return _trainEvents != null && (_group != null || HasFallbackNodes());
     }
 
     private void ResolveGroupOrFallbackNodes()

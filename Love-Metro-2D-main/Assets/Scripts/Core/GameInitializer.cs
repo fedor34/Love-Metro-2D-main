@@ -1,23 +1,10 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Ensures core runtime systems exist when a scene starts.
+/// Scene-level compatibility facade for runtime composition.
 /// </summary>
 public class GameInitializer : MonoBehaviour
 {
-    private static readonly string[] BackgroundLayerNames =
-    {
-        "6_\u0433\u043e\u0440\u043e\u0434_\u0444\u043e\u043d",
-        "5_\u0433\u043e\u0440\u043e\u0434_\u0434\u0430\u043b\u044c\u043d\u0438\u0439",
-        "4_\u0433\u043e\u0440\u043e\u0434_\u0441\u0440\u0435\u0434\u043d\u0438\u0439",
-        "3_\u0433\u043e\u0440\u043e\u0434_\u0431\u043b\u0438\u0436\u043d\u0438\u0439",
-        "2_\u0433\u043e\u0440\u043e\u0434_\u0434\u0435\u0440\u0435\u0432\u044c\u044f",
-        "1_\u0433\u043e\u0440\u043e\u0434_\u0440\u0435\u043b\u044c\u0441\u044b",
-        "Square"
-    };
-
-    private static readonly float[] BackgroundLayerSpeeds = { 0.3f, 0.5f, 0.8f, 1.0f, 1.2f, 1.5f, 1.0f };
     [Header("Auto-Create Settings")]
     [SerializeField] private bool _createClickDirectionManager = true;
     [SerializeField] private bool _createInertiaArrowHUD = true;
@@ -29,164 +16,29 @@ public class GameInitializer : MonoBehaviour
 
     private void Awake()
     {
-        InitializeCoreSystems();
+        BindScene();
     }
 
     private void Start()
     {
-        InitializeUiSystems();
-        ConfigureSceneDependencies();
+        BindScene();
     }
 
-    private void InitializeCoreSystems()
+    private void BindScene()
     {
-        EnsureComponent<ClickDirectionManager>(_createClickDirectionManager, "ClickDirectionManager", persistent: true);
-        EnsureComponent<ManualPairingManager>(_createManualPairingManager, "ManualPairingManager", persistent: true);
-        EnsureComponent<BackgroundMaterialOverride>(_replaceParallaxMaterialsWithDefault, "BackgroundMaterialOverride");
-        EnsureBackgroundScroller();
-        EnsureComponent<EnsureParallaxLayers>(_ensureParallaxSystems, "EnsureParallaxLayers_Auto");
-        EnsureComponent<ParallaxMaterialDriver>(_ensureParallaxMaterialDriver, "ParallaxMaterialDriver");
+        LoveMetro.Core.RuntimeCompositionRoot.BindActiveScene(BuildOptions());
     }
 
-    private void InitializeUiSystems()
+    private LoveMetro.Core.RuntimeCompositionOptions BuildOptions()
     {
-        EnsureComponent<InertiaArrowHUD>(_createInertiaArrowHUD, "InertiaArrowHUD");
+        LoveMetro.Core.RuntimeCompositionOptions options = LoveMetro.Core.RuntimeCompositionOptions.GameplayDefaults;
+        options.EnsureClickDirectionManager = _createClickDirectionManager;
+        options.EnsureManualPairingManager = _createManualPairingManager;
+        options.EnsureInertiaArrowHud = _createInertiaArrowHUD;
+        options.EnsureParallaxSystems = _ensureParallaxSystems;
+        options.EnsureBackgroundScroller = _ensureBackgroundScroller;
+        options.EnsureParallaxMaterialDriver = _ensureParallaxMaterialDriver;
+        options.EnsureBackgroundMaterialOverride = _replaceParallaxMaterialsWithDefault;
+        return options;
     }
-
-    private void ConfigureSceneDependencies()
-    {
-        TrainManager train = FindObjectOfType<TrainManager>();
-        PassangerSpawner spawner = FindObjectOfType<PassangerSpawner>();
-        ParallaxEffect parallax = FindObjectOfType<ParallaxEffect>();
-        PassangersContainer container = FindObjectOfType<PassangersContainer>();
-        SpriteRenderer[] spriteRenderers = FindObjectsOfType<SpriteRenderer>(true);
-
-        train?.Configure(spawner, parallax, container);
-
-        if (parallax != null)
-            parallax.Configure(train, FindObjectsOfType<ParallaxLayer>());
-
-        SimpleBackgroundScroller simpleScroller = FindObjectOfType<SimpleBackgroundScroller>();
-        simpleScroller?.ConfigureTrain(train);
-
-        BackgroundGroupScroller groupScroller = FindObjectOfType<BackgroundGroupScroller>();
-        groupScroller?.Configure(train, ResolveTransformByName("Background"), ResolveBackgroundTransforms(BackgroundLayerNames));
-
-        ParallaxMaterialDriver materialDriver = FindObjectOfType<ParallaxMaterialDriver>();
-        materialDriver?.Configure(train, spriteRenderers);
-
-        BackgroundMaterialOverride materialOverride = FindObjectOfType<BackgroundMaterialOverride>();
-        materialOverride?.Configure(spriteRenderers);
-
-        CouplesManager couplesManager = CouplesManager.Instance ?? FindObjectOfType<CouplesManager>();
-        couplesManager?.Configure(
-            LoveMetro.Core.RuntimeServices.Instance.PassengerRegistry ?? PassengerRegistry.Instance,
-            LoveMetro.Core.RuntimeServices.Instance.TrainMotionEvents,
-            LoveMetro.Core.RuntimeServices.Instance.ScoreService);
-
-        FieldEffectSystem fieldEffectSystem = FieldEffectSystem.Instance ?? FindObjectOfType<FieldEffectSystem>();
-        fieldEffectSystem?.RegisterSceneComponents(FindObjectsOfType<MonoBehaviour>());
-    }
-
-    private static Transform[] ResolveBackgroundTransforms(string[] objectNames)
-    {
-        if (objectNames == null || objectNames.Length == 0)
-            return System.Array.Empty<Transform>();
-
-        Transform[] transforms = new Transform[objectNames.Length];
-        for (int i = 0; i < objectNames.Length; i++)
-            transforms[i] = ResolveTransformByName(objectNames[i]);
-
-        return transforms;
-    }
-
-    private static Transform ResolveTransformByName(string objectName)
-    {
-        if (string.IsNullOrWhiteSpace(objectName))
-            return null;
-
-        Transform[] allTransforms = FindObjectsOfType<Transform>(true);
-        for (int i = 0; i < allTransforms.Length; i++)
-        {
-            Transform candidate = allTransforms[i];
-            if (candidate != null && candidate.name == objectName)
-                return candidate;
-        }
-
-        return null;
-    }
-
-    private T EnsureComponent<T>(bool shouldCreate, string objectName, bool persistent = false) where T : Component
-    {
-        if (!shouldCreate)
-            return null;
-
-        T existing = FindObjectOfType<T>();
-        if (existing != null)
-            return existing;
-
-        GameObject gameObject = new GameObject(string.IsNullOrWhiteSpace(objectName) ? typeof(T).Name : objectName, typeof(T));
-        if (persistent)
-            DontDestroyOnLoad(gameObject);
-
-        Diagnostics.Log($"[GameInitializer] Created {typeof(T).Name}.");
-        return gameObject.GetComponent<T>();
-    }
-
-    private void EnsureBackgroundScroller()
-    {
-        if (!_ensureBackgroundScroller || FindObjectOfType<SimpleBackgroundScroller>() != null)
-            return;
-
-        GameObject scrollerObject = new GameObject("SimpleBackgroundScroller", typeof(SimpleBackgroundScroller));
-        SimpleBackgroundScroller scroller = scrollerObject.GetComponent<SimpleBackgroundScroller>();
-        int layerCount = ConfigureBackgroundScroller(scroller);
-        Diagnostics.Log($"[GameInitializer] Created SimpleBackgroundScroller with {layerCount} layer(s).");
-    }
-
-    private int ConfigureBackgroundScroller(SimpleBackgroundScroller scroller)
-    {
-        if (scroller == null)
-            return 0;
-
-        List<SimpleBackgroundScroller.Layer> configuredLayers = BuildBackgroundLayers();
-        scroller.ConfigureLayers(configuredLayers.ToArray());
-        return configuredLayers.Count;
-    }
-
-    private List<SimpleBackgroundScroller.Layer> BuildBackgroundLayers()
-    {
-        var layers = new List<SimpleBackgroundScroller.Layer>(BackgroundLayerNames.Length);
-
-        for (int i = 0; i < BackgroundLayerNames.Length; i++)
-        {
-            SpriteRenderer renderer = ResolveBackgroundRenderer(BackgroundLayerNames[i]);
-            if (renderer == null)
-                continue;
-
-            layers.Add(new SimpleBackgroundScroller.Layer
-            {
-                renderer = renderer,
-                speedFactor = i < BackgroundLayerSpeeds.Length ? BackgroundLayerSpeeds[i] : 1f
-            });
-
-            renderer.gameObject.isStatic = false;
-        }
-
-        return layers;
-    }
-
-    private static SpriteRenderer ResolveBackgroundRenderer(string objectName)
-    {
-        // GameObject.Find не находит неактивные объекты (Background выключен в сцене),
-        // поэтому ищем через все SpriteRenderer включая inactive.
-        SpriteRenderer[] all = FindObjectsOfType<SpriteRenderer>(true);
-        for (int i = 0; i < all.Length; i++)
-        {
-            if (all[i].gameObject.name == objectName)
-                return all[i];
-        }
-        return null;
-    }
-
 }

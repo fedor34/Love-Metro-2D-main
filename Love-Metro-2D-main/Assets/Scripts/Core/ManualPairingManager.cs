@@ -6,7 +6,7 @@ using UnityEngine;
 /// Allows players to click two nearby compatible passengers to force them into a couple.
 /// Supports one-click pairing if passengers overlap.
 /// </summary>
-public class ManualPairingManager : MonoBehaviour
+public class ManualPairingManager : MonoBehaviour, LoveMetro.Input.IManualPairingService
 {
     public static ManualPairingManager Instance { get; private set; }
 
@@ -26,10 +26,13 @@ public class ManualPairingManager : MonoBehaviour
         }
 
         Instance = this;
+        LoveMetro.Core.RuntimeServices.Instance.RegisterManualPairingService(this);
     }
 
     private void OnDestroy()
     {
+        LoveMetro.Core.RuntimeServices.Instance.UnregisterManualPairingService(this);
+
         if (Instance == this)
             Instance = null;
     }

@@ -44,16 +44,21 @@ public class SimpleBackgroundScroller : MonoBehaviour
 
     private float _nextTrainResolveTime;
     private Camera _mainCamera;
+    private LoveMetro.Train.ITrainMotionEvents _trainEvents;
 
     public void ConfigureLayers(Layer[] layers)
     {
         _layers = layers;
     }
 
-    public void ConfigureTrain(TrainManager train)
+    public void ConfigureTrain(LoveMetro.Train.ITrainMotionEvents train)
     {
-        if (train != null)
-            _train = train;
+        if (train == null)
+            return;
+
+        _trainEvents = train;
+        if (train is TrainManager trainManager)
+            _train = trainManager;
     }
 
     private void Awake()
@@ -73,7 +78,7 @@ public class SimpleBackgroundScroller : MonoBehaviour
         if (_mainCamera == null)
             _mainCamera = Camera.main;
 
-        float speed = Mathf.Abs(_train.GetCurrentSpeed());
+        float speed = Mathf.Abs(_trainEvents.CurrentMotionState.CurrentSpeed);
         float delta = ComputeScrollDelta(speed, _direction, _baseMultiplier, Time.deltaTime);
 
         for (int i = 0; i < _layers.Length; i++)
@@ -217,16 +222,16 @@ public class SimpleBackgroundScroller : MonoBehaviour
 
     private bool ResolveTrainManager(bool force = false)
     {
-        if (_train != null) return true;
+        if (_trainEvents != null) return true;
 
         if (!force && Time.time < _nextTrainResolveTime)
             return false;
 
-        if (LoveMetro.Core.RuntimeServices.Instance.TrainMotionEvents is TrainManager trainManager)
-            _train = trainManager;
+        if (_train != null)
+            _trainEvents = _train;
 
         _nextTrainResolveTime = Time.time + Mathf.Max(0.1f, _trainResolveRetryInterval);
-        return _train != null;
+        return _trainEvents != null;
     }
 
     /// <summary>

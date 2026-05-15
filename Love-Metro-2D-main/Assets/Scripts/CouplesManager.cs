@@ -30,6 +30,7 @@ public class CouplesManager : MonoBehaviour
     private readonly List<Couple> _activeCouples = new List<Couple>();
     private LoveMetro.Core.IPassengerRegistry _passengerRegistry;
     private LoveMetro.Train.ITrainMotionEvents _trainEvents;
+    private LoveMetro.Train.IStationFlowService _stationFlow;
     private LoveMetro.Scoring.IScoreService _scoreService;
     private float _nextCheckTime;
 
@@ -105,14 +106,24 @@ public class CouplesManager : MonoBehaviour
     public void Configure(
         LoveMetro.Core.IPassengerRegistry registry,
         LoveMetro.Train.ITrainMotionEvents trainEvents,
+        LoveMetro.Train.IStationFlowService stationFlow,
         LoveMetro.Scoring.IScoreService scoreService)
     {
         _passengerRegistry = registry;
         _trainEvents = trainEvents;
+        _stationFlow = stationFlow;
         _scoreService = scoreService;
 
-        if (_trainManager == null && trainEvents is TrainManager trainManager)
+        if (_trainManager == null && stationFlow is TrainManager trainManager)
             _trainManager = trainManager;
+    }
+
+    public void Configure(
+        LoveMetro.Core.IPassengerRegistry registry,
+        LoveMetro.Train.ITrainMotionEvents trainEvents,
+        LoveMetro.Scoring.IScoreService scoreService)
+    {
+        Configure(registry, trainEvents, trainEvents as LoveMetro.Train.IStationFlowService, scoreService);
     }
 
     private void TryHandleAutoStopWhenNoPairsRemain()
@@ -175,24 +186,28 @@ public class CouplesManager : MonoBehaviour
     {
         LoveMetro.Core.RuntimeServices services = LoveMetro.Core.RuntimeServices.Instance;
 
-        _passengerRegistry ??= services.PassengerRegistry ?? PassengerRegistry.Instance;
+        _passengerRegistry ??= services.PassengerRegistry;
         _trainEvents ??= services.TrainMotionEvents;
+        _stationFlow ??= services.StationFlowService ?? (_trainEvents as LoveMetro.Train.IStationFlowService);
         _scoreService ??= services.ScoreService;
 
-        if (_trainManager == null && _trainEvents is TrainManager trainManager)
+        if (_stationFlow == null && _trainManager != null)
+            _stationFlow = _trainManager;
+
+        if (_trainManager == null && _stationFlow is TrainManager trainManager)
             _trainManager = trainManager;
     }
 
     private void TriggerStationStop()
     {
         ResolveDependencies();
-        if (_trainManager == null)
+        if (_stationFlow == null)
         {
-            Diagnostics.Warn("[Pair][Station] TrainManager not found for station stop.");
+            Diagnostics.Warn("[Pair][Station] Station flow service is not configured.");
             return;
         }
 
-        _trainManager.StationStopAndSpawn(DefaultStationPauseSeconds);
+        _stationFlow.StationStopAndSpawn(DefaultStationPauseSeconds);
     }
 
     private void CleanupMissingCouples()

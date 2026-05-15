@@ -13,6 +13,7 @@ public class ParallaxEffect : MonoBehaviour
 
     private float _lastSpeed;
     private float _lastExternalSetTime = -999f;
+    private LoveMetro.Train.ITrainMotionEvents _trainEvents;
 
     private void Start()
     {
@@ -22,10 +23,10 @@ public class ParallaxEffect : MonoBehaviour
     private void Update()
     {
         EnsureLayersInitialized();
-        ResolveTrainManager();
+        ResolveTrainEvents();
 
         if (ShouldReadSpeedFromTrain())
-            _lastSpeed = _trainManager.GetCurrentSpeed();
+            _lastSpeed = _trainEvents.CurrentMotionState.CurrentSpeed;
 
         ApplySpeedToLayers(_lastSpeed);
     }
@@ -43,6 +44,18 @@ public class ParallaxEffect : MonoBehaviour
         if (trainManager != null)
             _trainManager = trainManager;
 
+        Configure((LoveMetro.Train.ITrainMotionEvents)trainManager, layers);
+    }
+
+    public void Configure(LoveMetro.Train.ITrainMotionEvents trainEvents, ParallaxLayer[] layers)
+    {
+        if (trainEvents != null)
+        {
+            _trainEvents = trainEvents;
+            if (trainEvents is TrainManager trainManager)
+                _trainManager = trainManager;
+        }
+
         if (layers != null && layers.Length > 0)
             _parallaxLayers = layers;
     }
@@ -53,15 +66,15 @@ public class ParallaxEffect : MonoBehaviour
             _parallaxLayers = System.Array.Empty<ParallaxLayer>();
     }
 
-    private void ResolveTrainManager()
+    private void ResolveTrainEvents()
     {
-        if (_trainManager == null && LoveMetro.Core.RuntimeServices.Instance.TrainMotionEvents is TrainManager trainManager)
-            _trainManager = trainManager;
+        if (_trainEvents == null && _trainManager != null)
+            _trainEvents = _trainManager;
     }
 
     private bool ShouldReadSpeedFromTrain()
     {
-        if (!_updateViaReflection || _trainManager == null)
+        if (!_updateViaReflection || _trainEvents == null)
             return false;
 
         if (!_preferExternalSpeed)

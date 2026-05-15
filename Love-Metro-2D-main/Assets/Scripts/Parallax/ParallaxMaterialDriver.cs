@@ -25,6 +25,7 @@ public class ParallaxMaterialDriver : MonoBehaviour
     private bool _logged;
     private float _parallaxOffset;
     private float _nextTargetRefreshTime;
+    private LoveMetro.Train.ITrainMotionEvents _trainEvents;
 
     private void Awake()
     {
@@ -50,22 +51,27 @@ public class ParallaxMaterialDriver : MonoBehaviour
             return;
         }
 
-        float absoluteSpeed = Mathf.Abs(_train.GetCurrentSpeed());
+        LoveMetro.Train.TrainMotionState motionState = _trainEvents.CurrentMotionState;
+        float absoluteSpeed = Mathf.Abs(motionState.CurrentSpeed);
         float normalizedSpeed = CalculateNormalizedTrainSpeed(
             absoluteSpeed,
             _maxTrainSpeed,
             _speedResponseScale,
-            ClickDirectionManager.IsMouseHeld);
+            !motionState.IsStopped && !motionState.IsBraking && absoluteSpeed > 0f);
 
         _parallaxOffset = AdvanceParallaxTime(_parallaxOffset, _elapsedTimeScale, Time.deltaTime);
         ApplyParallaxProperties(_parallaxOffset, normalizedSpeed, _baseSpeedMod);
         LogTickOnce(absoluteSpeed, normalizedSpeed);
     }
 
-    public void Configure(TrainManager train, IEnumerable<SpriteRenderer> renderers)
+    public void Configure(LoveMetro.Train.ITrainMotionEvents train, IEnumerable<SpriteRenderer> renderers)
     {
         if (train != null)
-            _train = train;
+        {
+            _trainEvents = train;
+            if (train is TrainManager trainManager)
+                _train = trainManager;
+        }
 
         RefreshTargets(renderers);
     }
@@ -113,10 +119,10 @@ public class ParallaxMaterialDriver : MonoBehaviour
 
     private bool ResolveTrainManager()
     {
-        if (_train == null && LoveMetro.Core.RuntimeServices.Instance.TrainMotionEvents is TrainManager trainManager)
-            _train = trainManager;
+        if (_trainEvents == null && _train != null)
+            _trainEvents = _train;
 
-        return _train != null;
+        return _trainEvents != null;
     }
 
     private void RemoveMissingTargets()

@@ -112,6 +112,18 @@ public class ScoreCounter : MonoBehaviour, IScoreService
         UpdateScoreDisplay();
     }
 
+    public void ConfigureTrainEvents(LoveMetro.Train.ITrainMotionEvents trainEvents)
+    {
+        if (trainEvents == null)
+            return;
+
+        UnsubscribeFromTrainManager();
+        _trainEvents = trainEvents;
+        if (trainEvents is TrainManager trainManager)
+            _trainManager = trainManager;
+        SubscribeToTrainManager();
+    }
+
     public void UpdateScorePointFromMatching(Vector3 matchingWorldPosition)
     {
         AwardMatchPoints(matchingWorldPosition, _initialScorePointsPerCouple);
@@ -250,7 +262,7 @@ public class ScoreCounter : MonoBehaviour, IScoreService
         {
             _trainEvents = _trainManager != null
                 ? (LoveMetro.Train.ITrainMotionEvents)_trainManager
-                : LoveMetro.Core.RuntimeServices.Instance.TrainMotionEvents;
+                : null;
         }
 
         if (_trainManager == null && _trainEvents is TrainManager trainManager)

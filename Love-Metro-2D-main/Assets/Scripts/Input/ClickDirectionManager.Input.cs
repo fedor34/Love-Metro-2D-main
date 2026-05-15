@@ -78,10 +78,11 @@ public partial class ClickDirectionManager
 
     private bool TryConsumeManualPairingClick(Vector2 screenPosition)
     {
-        if (ManualPairingManager.Instance == null)
+        LoveMetro.Input.IManualPairingService manualPairing = LoveMetro.Core.RuntimeServices.Instance.ManualPairingService;
+        if (manualPairing == null)
             return false;
 
-        if (!ManualPairingManager.Instance.HandleClick(screenPosition))
+        if (!manualPairing.HandleClick(screenPosition))
             return false;
 
         _inputBlocked = true;

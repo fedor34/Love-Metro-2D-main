@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using LoveMetro.FieldEffects;
 using UnityEngine;
 
-public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEffectSystem
+public class FieldEffectSystem : MonoBehaviour, IFieldEffectSystem
 {
     private static FieldEffectSystem _instance;
     public static FieldEffectSystem Instance => _instance;
@@ -15,10 +16,9 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
     [Header("Performance")]
     [SerializeField] private bool _useFixedUpdate = true;
 
-    private Dictionary<FieldEffectCategory, List<IFieldEffect>> _effectsByCategory;
-    private Dictionary<FieldEffectType, List<IFieldEffect>> _effectsByType;
-    private Dictionary<IFieldEffectTarget, List<ActiveEffectData>> _activeEffectsPerTarget;
-    private List<IFieldEffectTarget> _allTargets;
+    private FieldEffectRegistry _registry;
+    private FieldEffectTargetRegistry _targets;
+    private FieldEffectApplicator _applicator;
     private FieldEffectSpatialQuery _spatialQuery;
     private readonly HashSet<IFieldEffect> _nearbyEffectSet = new HashSet<IFieldEffect>();
 
@@ -48,7 +48,7 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
             _instance = this;
             if (Application.isPlaying)
                 DontDestroyOnLoad(gameObject);
-            InitializeCollections();
+            InitializeRuntime();
             LoveMetro.Core.RuntimeServices.Instance.RegisterFieldEffectSystem(this);
             return;
         }
@@ -69,23 +69,27 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
         }
     }
 
-    private void InitializeCollections()
+    private void InitializeRuntime()
     {
-        _effectsByCategory = new Dictionary<FieldEffectCategory, List<IFieldEffect>>();
-        _effectsByType = new Dictionary<FieldEffectType, List<IFieldEffect>>();
-        _activeEffectsPerTarget = new Dictionary<IFieldEffectTarget, List<ActiveEffectData>>();
-        _allTargets = new List<IFieldEffectTarget>();
+        _registry = new FieldEffectRegistry();
+        _targets = new FieldEffectTargetRegistry();
         _spatialQuery = new FieldEffectSpatialQuery(CacheUpdateInterval);
+        _applicator = new FieldEffectApplicator(() => _maxEffectsPerTarget, () => Time.time);
+        _applicator.EffectApplied += HandleEffectApplied;
+        _applicator.EffectRemoved += HandleEffectRemoved;
+    }
 
-        foreach (FieldEffectCategory category in Enum.GetValues(typeof(FieldEffectCategory)))
-        {
-            _effectsByCategory[category] = new List<IFieldEffect>();
-        }
+    private void HandleEffectApplied(IFieldEffectTarget target, IFieldEffect effect)
+    {
+        OnEffectAppliedToTarget?.Invoke(target, effect);
 
-        foreach (FieldEffectType type in Enum.GetValues(typeof(FieldEffectType)))
-        {
-            _effectsByType[type] = new List<IFieldEffect>();
-        }
+        if (_enableDebugMode && effect != null && effect.GetEffectData()?.effectType == FieldEffectType.Wind)
+            Debug.Log($"[FieldEffectSystem] Applying wind to {target.GetPosition()} via {effect.GetType().Name}");
+    }
+
+    private void HandleEffectRemoved(IFieldEffectTarget target, IFieldEffect effect)
+    {
+        OnEffectRemovedFromTarget?.Invoke(target, effect);
     }
 
     #endregion
@@ -94,39 +98,31 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
 
     public void RegisterEffect(IFieldEffect effect)
     {
-        if (!TryGetEffectMetadata(effect, out FieldEffectData data, out FieldEffectCategory category))
-            return;
+        if (_registry == null)
+            InitializeRuntime();
 
-        List<IFieldEffect> categoryEffects = _effectsByCategory[category];
-        if (categoryEffects.Contains(effect))
+        if (!_registry.TryRegister(effect, out FieldEffectData data, out FieldEffectCategory category))
             return;
-
-        categoryEffects.Add(effect);
-        _effectsByType[data.effectType].Add(effect);
 
         OnEffectRegistered?.Invoke(effect);
 
         if (_enableDebugMode)
-        {
             Debug.Log($"[FieldEffectSystem] Registered {data.effectType} in {category}");
-        }
     }
 
     public void UnregisterEffect(IFieldEffect effect)
     {
-        if (!TryGetEffectMetadata(effect, out FieldEffectData data, out FieldEffectCategory category))
+        if (_registry == null)
             return;
 
-        _effectsByCategory[category].Remove(effect);
-        _effectsByType[data.effectType].Remove(effect);
-        RemoveEffectFromAllTargets(effect);
+        if (!_registry.TryUnregister(effect, out FieldEffectData data, out _))
+            return;
 
+        RemoveEffectFromAllTargets(effect);
         OnEffectUnregistered?.Invoke(effect);
 
         if (_enableDebugMode)
-        {
             Debug.Log($"[FieldEffectSystem] Unregistered {data.effectType}");
-        }
     }
 
     #endregion
@@ -135,20 +131,21 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
 
     public void RegisterTarget(IFieldEffectTarget target)
     {
-        if (target == null || _allTargets.Contains(target))
-            return;
+        if (_targets == null)
+            InitializeRuntime();
 
-        _allTargets.Add(target);
-        GetOrCreateActiveEffects(target);
+        _targets.Register(target);
     }
 
     public void UnregisterTarget(IFieldEffectTarget target)
     {
-        if (target == null)
+        if (target == null || _targets == null)
             return;
 
-        RemoveAllEffectsFromTarget(target);
-        RemoveTargetReference(target);
+        if (_targets.TryGetActiveEffects(target, out List<ActiveEffectData> activeEffects))
+            _applicator.RemoveAllFromTarget(target, activeEffects);
+
+        _targets.RemoveTarget(target);
     }
 
     #endregion
@@ -157,10 +154,8 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
 
     private void Start()
     {
-        if (_enableDebugMode)
-        {
-            Debug.Log($"[FieldEffectSystem] Found {GetTotalEffectsCount()} effects and {_allTargets.Count} targets");
-        }
+        if (_enableDebugMode && _registry != null)
+            Debug.Log($"[FieldEffectSystem] Found {_registry.GetTotalEffectsCount()} effects and {_targets.Count} targets");
     }
 
     public void RegisterSceneComponents(IEnumerable<MonoBehaviour> sceneComponents)
@@ -174,47 +169,40 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
                 continue;
 
             if (component is IFieldEffect effect)
-            {
                 RegisterEffect(effect);
-            }
 
             if (component is IFieldEffectTarget target)
-            {
                 RegisterTarget(target);
-            }
         }
     }
 
     private void Update()
     {
         if (!_useFixedUpdate)
-        {
             UpdateEffects();
-        }
     }
 
     private void FixedUpdate()
     {
         if (_useFixedUpdate)
-        {
             UpdateEffects();
-        }
     }
 
     private void UpdateEffects()
     {
-        float deltaTime = _useFixedUpdate ? Time.fixedDeltaTime : Time.deltaTime;
-        UpdateSpatialCache();
-
-        if (_allTargets == null)
+        if (_targets == null || _registry == null)
             return;
 
-        for (int i = _allTargets.Count - 1; i >= 0; i--)
+        float deltaTime = _useFixedUpdate ? Time.fixedDeltaTime : Time.deltaTime;
+        _spatialQuery?.Update(Time.time);
+
+        IReadOnlyList<IFieldEffectTarget> targets = _targets.AllTargets;
+        for (int i = targets.Count - 1; i >= 0; i--)
         {
-            IFieldEffectTarget target = _allTargets[i];
+            IFieldEffectTarget target = targets[i];
             if (target == null)
             {
-                RemoveTargetReferenceAt(i, target);
+                _targets.RemoveTargetAt(i, target);
                 continue;
             }
 
@@ -225,19 +213,16 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
             catch (Exception exception)
             {
                 Debug.LogWarning($"[FieldEffectSystem] Failed to update target: {exception.Message}");
-                RemoveTargetReferenceAt(i, target);
+                _targets.RemoveTargetAt(i, target);
             }
         }
     }
 
     private void UpdateEffectsForTarget(IFieldEffectTarget target, float deltaTime)
     {
-        if (target == null || _activeEffectsPerTarget == null)
-            return;
-
-        if (!TryGetTargetPosition(target, out Vector3 targetPosition))
+        if (!FieldEffectTargetRegistry.TryGetTargetPosition(target, out Vector3 targetPosition))
         {
-            RemoveTargetReference(target);
+            _targets.RemoveTarget(target);
             return;
         }
 
@@ -245,19 +230,16 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
         _nearbyEffectSet.Clear();
         for (int i = 0; i < nearbyEffects.Count; i++)
         {
-            IFieldEffect nearbyEffect = nearbyEffects[i];
-            if (nearbyEffect != null)
-                _nearbyEffectSet.Add(nearbyEffect);
+            if (nearbyEffects[i] != null)
+                _nearbyEffectSet.Add(nearbyEffects[i]);
         }
 
-        List<ActiveEffectData> activeEffects = GetOrCreateActiveEffects(target);
+        List<ActiveEffectData> activeEffects = _targets.GetOrCreateActiveEffects(target);
 
         foreach (IFieldEffect effect in nearbyEffects)
         {
-            if (CanApplyEffect(target, activeEffects, effect))
-            {
-                ApplyEffectToTarget(target, effect, activeEffects, deltaTime);
-            }
+            if (_applicator.CanApply(target, activeEffects, effect))
+                _applicator.Apply(target, effect, activeEffects, deltaTime);
         }
 
         for (int i = activeEffects.Count - 1; i >= 0; i--)
@@ -270,9 +252,7 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
             }
 
             if (!_nearbyEffectSet.Contains(effect))
-            {
-                RemoveEffectFromTarget(target, effect, activeEffects);
-            }
+                _applicator.Remove(target, effect, activeEffects);
         }
     }
 
@@ -280,247 +260,64 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
 
     #region Effect Application
 
-    private bool CanApplyEffect(IFieldEffectTarget target, List<ActiveEffectData> activeEffects, IFieldEffect effect)
-    {
-        if (target == null || effect == null)
-            return false;
-
-        FieldEffectData data = effect.GetEffectData();
-        if (data == null || !target.CanBeAffectedBy(data.effectType))
-            return false;
-
-        return HasActiveEffect(activeEffects, effect) || activeEffects.Count < _maxEffectsPerTarget;
-    }
-
-    private void ApplyEffectToTarget(IFieldEffectTarget target, IFieldEffect effect, List<ActiveEffectData> activeEffects, float deltaTime)
-    {
-        ActiveEffectData existingEffect = activeEffects.Find(activeEffect => activeEffect.Effect == effect);
-        if (existingEffect == null)
-        {
-            activeEffects.Add(new ActiveEffectData(effect, Time.time));
-            target.OnEnterFieldEffect(effect);
-            OnEffectAppliedToTarget?.Invoke(target, effect);
-        }
-
-        if (_enableDebugMode && effect.GetEffectData().effectType == FieldEffectType.Wind)
-        {
-            Debug.Log($"[FieldEffectSystem] Applying wind to {target.GetPosition()} via {effect.GetType().Name}");
-        }
-
-        effect.ApplyEffect(target, deltaTime);
-    }
-
-    private bool RemoveEffectFromTarget(IFieldEffectTarget target, IFieldEffect effect, List<ActiveEffectData> activeEffects = null)
-    {
-        if (target == null || effect == null)
-            return false;
-
-        activeEffects ??= GetOrCreateActiveEffects(target);
-
-        bool removed = false;
-        for (int i = activeEffects.Count - 1; i >= 0; i--)
-        {
-            if (activeEffects[i].Effect != effect)
-                continue;
-
-            activeEffects.RemoveAt(i);
-            removed = true;
-        }
-
-        if (!removed)
-            return false;
-
-        effect.RemoveEffect(target);
-        target.OnExitFieldEffect(effect);
-        OnEffectRemovedFromTarget?.Invoke(target, effect);
-        return true;
-    }
-
     private void RemoveEffectFromAllTargets(IFieldEffect effect)
     {
-        List<IFieldEffectTarget> targets = new List<IFieldEffectTarget>(_activeEffectsPerTarget.Keys);
-        foreach (IFieldEffectTarget target in targets)
+        if (_targets == null)
+            return;
+
+        foreach (IFieldEffectTarget target in _targets.SnapshotTargets())
         {
             if (target == null)
                 continue;
 
-            RemoveEffectFromTarget(target, effect);
+            if (_targets.TryGetActiveEffects(target, out List<ActiveEffectData> activeEffects))
+                _applicator.Remove(target, effect, activeEffects);
         }
     }
 
     #endregion
 
-    #region Spatial Cache And Queries
-
-    private void UpdateSpatialCache()
-    {
-        _spatialQuery?.Update(Time.time);
-    }
+    #region Query API
 
     public List<IFieldEffect> GetEffectsAtPosition(Vector3 position)
     {
-        if (_spatialQuery == null || _effectsByCategory == null)
+        if (_spatialQuery == null || _registry == null)
             return new List<IFieldEffect>();
 
-        return _spatialQuery.GetEffectsAtPosition(position, _effectsByCategory);
+        return _spatialQuery.GetEffectsAtPosition(position, _registry.EffectsByCategory);
     }
 
     public List<IFieldEffect> GetEffectsByCategory(FieldEffectCategory category)
     {
-        return _effectsByCategory.TryGetValue(category, out List<IFieldEffect> effects)
-            ? new List<IFieldEffect>(effects)
-            : new List<IFieldEffect>();
+        return _registry?.GetEffectsByCategory(category) ?? new List<IFieldEffect>();
     }
 
     public List<IFieldEffect> GetEffectsByType(FieldEffectType type)
     {
-        return _effectsByType.TryGetValue(type, out List<IFieldEffect> effects)
-            ? new List<IFieldEffect>(effects)
-            : new List<IFieldEffect>();
-    }
-
-    #endregion
-
-    #region Utility
-
-    private bool TryGetEffectMetadata(IFieldEffect effect, out FieldEffectData data, out FieldEffectCategory category)
-    {
-        data = effect?.GetEffectData();
-        if (effect == null || data == null)
-        {
-            category = FieldEffectCategory.Other;
-            return false;
-        }
-
-        category = GetEffectCategory(data.effectType);
-        return true;
-    }
-
-    private List<ActiveEffectData> GetOrCreateActiveEffects(IFieldEffectTarget target)
-    {
-        if (!_activeEffectsPerTarget.TryGetValue(target, out List<ActiveEffectData> activeEffects))
-        {
-            activeEffects = new List<ActiveEffectData>();
-            _activeEffectsPerTarget[target] = activeEffects;
-        }
-
-        return activeEffects;
-    }
-
-    private bool HasActiveEffect(List<ActiveEffectData> activeEffects, IFieldEffect effect)
-    {
-        return activeEffects.Exists(activeEffect => activeEffect.Effect == effect);
-    }
-
-    private void RemoveAllEffectsFromTarget(IFieldEffectTarget target)
-    {
-        if (target == null || !_activeEffectsPerTarget.TryGetValue(target, out List<ActiveEffectData> activeEffects))
-            return;
-
-        for (int i = activeEffects.Count - 1; i >= 0; i--)
-        {
-            RemoveEffectFromTarget(target, activeEffects[i].Effect, activeEffects);
-        }
-    }
-
-    private void RemoveTargetReference(IFieldEffectTarget target)
-    {
-        _allTargets?.Remove(target);
-        _activeEffectsPerTarget?.Remove(target);
-    }
-
-    private void RemoveTargetReferenceAt(int index, IFieldEffectTarget target)
-    {
-        if (_allTargets != null && index >= 0 && index < _allTargets.Count)
-        {
-            _allTargets.RemoveAt(index);
-        }
-
-        _activeEffectsPerTarget?.Remove(target);
-    }
-
-    private bool TryGetTargetPosition(IFieldEffectTarget target, out Vector3 targetPosition)
-    {
-        try
-        {
-            targetPosition = target.GetPosition();
-            return true;
-        }
-        catch (Exception)
-        {
-            targetPosition = Vector3.zero;
-            return false;
-        }
-    }
-
-    private FieldEffectCategory GetEffectCategory(FieldEffectType type)
-    {
-        switch (type)
-        {
-            case FieldEffectType.Gravity:
-            case FieldEffectType.Repulsion:
-            case FieldEffectType.Wind:
-            case FieldEffectType.Magnetic:
-            case FieldEffectType.Vortex:
-                return FieldEffectCategory.Movement;
-
-            case FieldEffectType.Slowdown:
-            case FieldEffectType.Speedup:
-            case FieldEffectType.Friction:
-            case FieldEffectType.Bounce:
-                return FieldEffectCategory.Modifier;
-
-            case FieldEffectType.Teleport:
-            case FieldEffectType.Checkpoint:
-            case FieldEffectType.Activator:
-                return FieldEffectCategory.Trigger;
-
-            case FieldEffectType.Visual:
-                return FieldEffectCategory.Visual;
-
-            case FieldEffectType.Audio:
-                return FieldEffectCategory.Audio;
-
-            default:
-                return FieldEffectCategory.Other;
-        }
+        return _registry?.GetEffectsByType(type) ?? new List<IFieldEffect>();
     }
 
     public int GetTotalEffectsCount()
     {
-        int count = 0;
-        foreach (List<IFieldEffect> effects in _effectsByCategory.Values)
-        {
-            count += effects.Count;
-        }
-
-        return count;
+        return _registry?.GetTotalEffectsCount() ?? 0;
     }
 
     public int GetTargetsCount()
     {
-        return _allTargets?.Count ?? 0;
+        return _targets?.Count ?? 0;
     }
 
     public List<IFieldEffect> GetActiveEffects()
     {
-        List<IFieldEffect> allActiveEffects = new List<IFieldEffect>();
-        foreach (List<IFieldEffect> effects in _effectsByCategory.Values)
-        {
-            allActiveEffects.AddRange(effects);
-        }
-
-        return allActiveEffects;
+        return _registry?.GetAllEffects() ?? new List<IFieldEffect>();
     }
 
     public void ClearAllEffects()
     {
-        List<IFieldEffect> effectsToRemove = new List<IFieldEffect>();
-        foreach (List<IFieldEffect> effects in _effectsByCategory.Values)
-        {
-            effectsToRemove.AddRange(effects);
-        }
+        if (_registry == null)
+            return;
 
+        List<IFieldEffect> effectsToRemove = _registry.GetAllEffects();
         foreach (IFieldEffect effect in effectsToRemove)
         {
             if (effect == null)
@@ -529,16 +326,7 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
             UnregisterEffect(effect);
 
             if (effect is MonoBehaviour behaviour && behaviour != null)
-            {
-                if (Application.isPlaying)
-                {
-                    Destroy(behaviour.gameObject);
-                }
-                else
-                {
-                    DestroyImmediate(behaviour.gameObject);
-                }
-            }
+                LoveMetro.Core.UnityLifecycle.SafeDestroy(behaviour.gameObject);
         }
 
         Debug.Log($"[FieldEffectSystem] Cleared all effects ({effectsToRemove.Count} removed)");
@@ -550,7 +338,7 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
 
     private void OnDrawGizmos()
     {
-        if (!_enableGizmos || _instance != this)
+        if (!_enableGizmos || _instance != this || _registry == null)
             return;
 
         Gizmos.color = Color.white;
@@ -559,7 +347,7 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
 #if UNITY_EDITOR
         UnityEditor.Handles.Label(
             cameraPosition + Vector3.up * 3f,
-            $"Field Effects: {GetTotalEffectsCount()}\nTargets: {_allTargets?.Count ?? 0}");
+            $"Field Effects: {_registry.GetTotalEffectsCount()}\nTargets: {_targets?.Count ?? 0}");
 #endif
     }
 
@@ -589,55 +377,5 @@ public class ActiveEffectData
         Effect = effect;
         StartTime = startTime;
         Priority = priority;
-    }
-}
-
-internal sealed class FieldEffectSpatialQuery
-{
-    private readonly Dictionary<Vector3, List<IFieldEffect>> _cache = new Dictionary<Vector3, List<IFieldEffect>>();
-    private readonly float _cacheUpdateInterval;
-    private float _cacheUpdateTime;
-
-    public FieldEffectSpatialQuery(float cacheUpdateInterval)
-    {
-        _cacheUpdateInterval = Mathf.Max(0.01f, cacheUpdateInterval);
-    }
-
-    public void Update(float time)
-    {
-        if (time - _cacheUpdateTime <= _cacheUpdateInterval)
-            return;
-
-        _cache.Clear();
-        _cacheUpdateTime = time;
-    }
-
-    public List<IFieldEffect> GetEffectsAtPosition(
-        Vector3 position,
-        Dictionary<FieldEffectCategory, List<IFieldEffect>> effectsByCategory)
-    {
-        Vector3 gridPosition = new Vector3(
-            Mathf.Round(position.x),
-            Mathf.Round(position.y),
-            Mathf.Round(position.z));
-
-        if (_cache.TryGetValue(gridPosition, out List<IFieldEffect> cachedEffects))
-            return cachedEffects;
-
-        List<IFieldEffect> effects = new List<IFieldEffect>();
-        foreach (List<IFieldEffect> categoryEffects in effectsByCategory.Values)
-        {
-            if (categoryEffects == null)
-                continue;
-
-            foreach (IFieldEffect effect in categoryEffects)
-            {
-                if (effect != null && effect.IsInEffectZone(position))
-                    effects.Add(effect);
-            }
-        }
-
-        _cache[gridPosition] = effects;
-        return effects;
     }
 }

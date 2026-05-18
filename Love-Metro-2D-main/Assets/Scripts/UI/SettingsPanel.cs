@@ -1,37 +1,80 @@
+using System.Collections.Generic;
+using LoveMetro.UI;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
 public class SettingsPanel : MonoBehaviour
 {
-    [Header("Звук")]
+    [Header("Sound")]
     [SerializeField] private Slider _masterVolumeSlider;
     [SerializeField] private Slider _musicVolumeSlider;
     [SerializeField] private Slider _sfxVolumeSlider;
     [SerializeField] private Toggle _muteToggle;
-    
-    [Header("Графика")]
+
+    [Header("Graphics")]
     [SerializeField] private TMP_Dropdown _qualityDropdown;
     [SerializeField] private TMP_Dropdown _resolutionDropdown;
     [SerializeField] private Toggle _fullscreenToggle;
     [SerializeField] private Toggle _vsyncToggle;
-    
-    [Header("Игра")]
+
+    [Header("Game")]
     [SerializeField] private Slider _gameSpeedSlider;
     [SerializeField] private Toggle _debugModeToggle;
-    
-    [Header("Кнопки")]
+
+    [Header("Buttons")]
     [SerializeField] private Button _applyButton;
     [SerializeField] private Button _defaultsButton;
     [SerializeField] private Button _backButton;
-    
-    // Ссылка на менеджер меню
+
     [SerializeField] private MenuManager _menuManager;
-    
+
+    private ISettingsStore _settingsStore;
+    private SettingsApplier _settingsApplier;
+    private bool _syncingControls;
+
     public void Configure(MenuManager menuManager)
     {
         if (menuManager != null)
             _menuManager = menuManager;
+    }
+
+    private ISettingsStore SettingsStore
+    {
+        get
+        {
+            if (_settingsStore == null)
+                _settingsStore = new PlayerPrefsSettingsStore();
+
+            return _settingsStore;
+        }
+    }
+
+    private SettingsApplier SettingsApplier
+    {
+        get
+        {
+            if (_settingsApplier == null)
+                _settingsApplier = new SettingsApplier();
+
+            return _settingsApplier;
+        }
+    }
+
+    internal void ConfigureForTests(ISettingsStore settingsStore, SettingsApplier settingsApplier)
+    {
+        if (settingsStore != null)
+            _settingsStore = settingsStore;
+
+        if (settingsApplier != null)
+            _settingsApplier = settingsApplier;
+    }
+
+    internal void InitializeForTests()
+    {
+        InitializeSettings();
+        SetupButtonListeners();
+        LoadSettings();
     }
 
     private void Start()
@@ -40,204 +83,164 @@ public class SettingsPanel : MonoBehaviour
         SetupButtonListeners();
         LoadSettings();
     }
-    
+
     private void InitializeSettings()
     {
-        // Инициализация качества графики
         if (_qualityDropdown != null)
         {
             _qualityDropdown.ClearOptions();
-            _qualityDropdown.AddOptions(new System.Collections.Generic.List<string>
+            _qualityDropdown.AddOptions(new List<string>
             {
-                "Низкое", "Среднее", "Высокое", "Ультра"
+                "\u041D\u0438\u0437\u043A\u043E\u0435",
+                "\u0421\u0440\u0435\u0434\u043D\u0435\u0435",
+                "\u0412\u044B\u0441\u043E\u043A\u043E\u0435",
+                "\u0423\u043B\u044C\u0442\u0440\u0430"
             });
         }
-        
-        // Инициализация разрешений (базовые варианты)
+
         if (_resolutionDropdown != null)
         {
             _resolutionDropdown.ClearOptions();
-            _resolutionDropdown.AddOptions(new System.Collections.Generic.List<string>
+            _resolutionDropdown.AddOptions(new List<string>
             {
-                "1280x720", "1920x1080", "2560x1440", "3840x2160"
+                "1280x720",
+                "1920x1080",
+                "2560x1440",
+                "3840x2160"
             });
         }
     }
-    
+
     private void SetupButtonListeners()
     {
-        if (_applyButton != null)
-            _applyButton.onClick.AddListener(ApplySettings);
-            
-        if (_defaultsButton != null)
-            _defaultsButton.onClick.AddListener(ResetToDefaults);
-            
-        if (_backButton != null)
-            _backButton.onClick.AddListener(BackToMenu);
-        
-        // Настройка слайдеров
-        if (_masterVolumeSlider != null)
-            _masterVolumeSlider.onValueChanged.AddListener(OnMasterVolumeChanged);
-            
-        if (_musicVolumeSlider != null)
-            _musicVolumeSlider.onValueChanged.AddListener(OnMusicVolumeChanged);
-            
-        if (_sfxVolumeSlider != null)
-            _sfxVolumeSlider.onValueChanged.AddListener(OnSFXVolumeChanged);
+        BindButton(_applyButton, ApplySettings);
+        BindButton(_defaultsButton, ResetToDefaults);
+        BindButton(_backButton, BackToMenu);
+
+        BindSlider(_masterVolumeSlider, OnMasterVolumeChanged);
+        BindSlider(_musicVolumeSlider, OnMusicVolumeChanged);
+        BindSlider(_sfxVolumeSlider, OnSFXVolumeChanged);
     }
-    
-    #region Settings Handlers
-    
+
+    private static void BindButton(Button button, UnityEngine.Events.UnityAction action)
+    {
+        if (button == null)
+            return;
+
+        button.onClick.RemoveListener(action);
+        button.onClick.AddListener(action);
+    }
+
+    private static void BindSlider(Slider slider, UnityEngine.Events.UnityAction<float> action)
+    {
+        if (slider == null)
+            return;
+
+        slider.onValueChanged.RemoveListener(action);
+        slider.onValueChanged.AddListener(action);
+    }
+
     private void OnMasterVolumeChanged(float value)
     {
-        AudioListener.volume = value;
-        SaveSettings();
+        SaveAndApplyCurrentSettings();
     }
-    
+
     private void OnMusicVolumeChanged(float value)
     {
-        // Здесь можно настроить громкость музыки через AudioMixer
-        SaveSettings();
+        SaveAndApplyCurrentSettings();
     }
-    
+
     private void OnSFXVolumeChanged(float value)
     {
-        // Здесь можно настроить громкость звуковых эффектов
-        SaveSettings();
+        SaveAndApplyCurrentSettings();
     }
-    
+
     public void ApplySettings()
     {
-        // Применяем настройки графики
-        if (_qualityDropdown != null)
-        {
-            QualitySettings.SetQualityLevel(_qualityDropdown.value);
-        }
-        
-        if (_fullscreenToggle != null)
-        {
-            Screen.fullScreen = _fullscreenToggle.isOn;
-        }
-        
-        if (_vsyncToggle != null)
-        {
-            QualitySettings.vSyncCount = _vsyncToggle.isOn ? 1 : 0;
-        }
-        
-        SaveSettings();
-        Debug.Log("SettingsPanel: Настройки применены");
+        SaveAndApplyCurrentSettings();
+        Debug.Log("SettingsPanel: settings applied.");
     }
-    
+
     public void ResetToDefaults()
     {
-        // Сброс к стандартным значениям
-        if (_masterVolumeSlider != null) _masterVolumeSlider.value = 1.0f;
-        if (_musicVolumeSlider != null) _musicVolumeSlider.value = 0.8f;
-        if (_sfxVolumeSlider != null) _sfxVolumeSlider.value = 1.0f;
-        if (_muteToggle != null) _muteToggle.isOn = false;
-        
-        if (_qualityDropdown != null) _qualityDropdown.value = 2; // Высокое
-        if (_fullscreenToggle != null) _fullscreenToggle.isOn = true;
-        if (_vsyncToggle != null) _vsyncToggle.isOn = true;
-        
-        if (_gameSpeedSlider != null) _gameSpeedSlider.value = 1.0f;
-        if (_debugModeToggle != null) _debugModeToggle.isOn = false;
-        
-        ApplySettings();
-        Debug.Log("SettingsPanel: Настройки сброшены к умолчанию");
+        SettingsSnapshot defaults = SettingsSnapshot.Defaults;
+        ApplySnapshotToControls(defaults);
+        SaveAndApply(defaults);
+        Debug.Log("SettingsPanel: settings reset to defaults.");
     }
-    
+
     public void BackToMenu()
     {
         if (_menuManager != null)
-        {
             _menuManager.BackToMainMenu();
-        }
     }
-    
-    #endregion
-    
-    #region Save/Load Settings
-    
-    private void SaveSettings()
+
+    private void SaveAndApplyCurrentSettings()
     {
-        // Сохранение настроек в PlayerPrefs
-        if (_masterVolumeSlider != null)
-            PlayerPrefs.SetFloat("MasterVolume", _masterVolumeSlider.value);
-            
-        if (_musicVolumeSlider != null)
-            PlayerPrefs.SetFloat("MusicVolume", _musicVolumeSlider.value);
-            
-        if (_sfxVolumeSlider != null)
-            PlayerPrefs.SetFloat("SFXVolume", _sfxVolumeSlider.value);
-            
-        if (_muteToggle != null)
-            PlayerPrefs.SetInt("Mute", _muteToggle.isOn ? 1 : 0);
-            
-        if (_qualityDropdown != null)
-            PlayerPrefs.SetInt("Quality", _qualityDropdown.value);
-            
-        if (_fullscreenToggle != null)
-            PlayerPrefs.SetInt("Fullscreen", _fullscreenToggle.isOn ? 1 : 0);
-            
-        if (_vsyncToggle != null)
-            PlayerPrefs.SetInt("VSync", _vsyncToggle.isOn ? 1 : 0);
-            
-        if (_gameSpeedSlider != null)
-            PlayerPrefs.SetFloat("GameSpeed", _gameSpeedSlider.value);
-            
-        if (_debugModeToggle != null)
-            PlayerPrefs.SetInt("DebugMode", _debugModeToggle.isOn ? 1 : 0);
-        
-        PlayerPrefs.Save();
+        if (_syncingControls)
+            return;
+
+        SaveAndApply(ReadSnapshotFromControls(SettingsStore.Load()));
     }
-    
+
+    private void SaveAndApply(SettingsSnapshot settings)
+    {
+        SettingsStore.Save(settings);
+        SettingsApplier.Apply(settings);
+    }
+
+    private SettingsSnapshot ReadSnapshotFromControls(SettingsSnapshot fallback)
+    {
+        float masterVolume = _masterVolumeSlider != null ? _masterVolumeSlider.value : fallback.MasterVolume;
+        float musicVolume = _musicVolumeSlider != null ? _musicVolumeSlider.value : fallback.MusicVolume;
+        float sfxVolume = _sfxVolumeSlider != null ? _sfxVolumeSlider.value : fallback.SfxVolume;
+        bool mute = _muteToggle != null ? _muteToggle.isOn : fallback.Mute;
+        int quality = _qualityDropdown != null ? _qualityDropdown.value : fallback.Quality;
+        bool fullscreen = _fullscreenToggle != null ? _fullscreenToggle.isOn : fallback.Fullscreen;
+        bool vSync = _vsyncToggle != null ? _vsyncToggle.isOn : fallback.VSync;
+        float gameSpeed = _gameSpeedSlider != null ? _gameSpeedSlider.value : fallback.GameSpeed;
+        bool debugMode = _debugModeToggle != null ? _debugModeToggle.isOn : fallback.DebugMode;
+
+        return new SettingsSnapshot(
+            masterVolume,
+            musicVolume,
+            sfxVolume,
+            mute,
+            quality,
+            fullscreen,
+            vSync,
+            gameSpeed,
+            debugMode);
+    }
+
     private void LoadSettings()
     {
-        // Загрузка настроек из PlayerPrefs
-        if (_masterVolumeSlider != null)
-        {
-            float volume = PlayerPrefs.GetFloat("MasterVolume", 1.0f);
-            _masterVolumeSlider.value = volume;
-            AudioListener.volume = volume;
-        }
-        
-        if (_musicVolumeSlider != null)
-            _musicVolumeSlider.value = PlayerPrefs.GetFloat("MusicVolume", 0.8f);
-            
-        if (_sfxVolumeSlider != null)
-            _sfxVolumeSlider.value = PlayerPrefs.GetFloat("SFXVolume", 1.0f);
-            
-        if (_muteToggle != null)
-            _muteToggle.isOn = PlayerPrefs.GetInt("Mute", 0) == 1;
-            
-        if (_qualityDropdown != null)
-        {
-            int quality = PlayerPrefs.GetInt("Quality", 2);
-            _qualityDropdown.value = quality;
-            QualitySettings.SetQualityLevel(quality);
-        }
-        
-        if (_fullscreenToggle != null)
-        {
-            bool fullscreen = PlayerPrefs.GetInt("Fullscreen", 1) == 1;
-            _fullscreenToggle.isOn = fullscreen;
-            Screen.fullScreen = fullscreen;
-        }
-        
-        if (_vsyncToggle != null)
-        {
-            bool vsync = PlayerPrefs.GetInt("VSync", 1) == 1;
-            _vsyncToggle.isOn = vsync;
-            QualitySettings.vSyncCount = vsync ? 1 : 0;
-        }
-        
-        if (_gameSpeedSlider != null)
-            _gameSpeedSlider.value = PlayerPrefs.GetFloat("GameSpeed", 1.0f);
-            
-        if (_debugModeToggle != null)
-            _debugModeToggle.isOn = PlayerPrefs.GetInt("DebugMode", 0) == 1;
+        SettingsSnapshot settings = SettingsStore.Load();
+        ApplySnapshotToControls(settings);
+        SettingsApplier.Apply(settings);
     }
-    
-    #endregion
+
+    private void ApplySnapshotToControls(SettingsSnapshot settings)
+    {
+        _syncingControls = true;
+        try
+        {
+            if (_masterVolumeSlider != null) _masterVolumeSlider.value = settings.MasterVolume;
+            if (_musicVolumeSlider != null) _musicVolumeSlider.value = settings.MusicVolume;
+            if (_sfxVolumeSlider != null) _sfxVolumeSlider.value = settings.SfxVolume;
+            if (_muteToggle != null) _muteToggle.isOn = settings.Mute;
+            if (_qualityDropdown != null) _qualityDropdown.value = settings.Quality;
+            if (_fullscreenToggle != null) _fullscreenToggle.isOn = settings.Fullscreen;
+            if (_vsyncToggle != null) _vsyncToggle.isOn = settings.VSync;
+            if (_gameSpeedSlider != null) _gameSpeedSlider.value = settings.GameSpeed;
+            if (_debugModeToggle != null) _debugModeToggle.isOn = settings.DebugMode;
+
+            _qualityDropdown?.RefreshShownValue();
+            _resolutionDropdown?.RefreshShownValue();
+        }
+        finally
+        {
+            _syncingControls = false;
+        }
+    }
 }

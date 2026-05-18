@@ -1,25 +1,28 @@
+using LoveMetro.UI;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class MenuManager : MonoBehaviour
 {
-    [Header("UI Элементы")]
+    [Header("UI Elements")]
     [SerializeField] private Button _playButton;
     [SerializeField] private Button _charactersButton;
     [SerializeField] private Button _settingsButton;
     [SerializeField] private Button _exitButton;
-    
-    [Header("Панели меню")]
+
+    [Header("Menu Panels")]
     [SerializeField] private GameObject _mainMenuPanel;
     [SerializeField] private GameObject _charactersPanel;
     [SerializeField] private GameObject _settingsPanel;
-    
-    [Header("Настройки игры")]
+
+    [Header("Game Settings")]
     [SerializeField] private string _gameSceneName = "Scene2";
-    
-    [Header("Анимация")]
+
+    [Header("Animation")]
     [SerializeField] private Animator _menuAnimator;
+
+    private MenuPanelRouter _panelRouter;
+    private IMenuSceneActions _sceneActions;
 
     public void Configure(
         Button playButton,
@@ -41,6 +44,8 @@ public class MenuManager : MonoBehaviour
 
         if (!string.IsNullOrEmpty(gameSceneName))
             _gameSceneName = gameSceneName;
+
+        RebuildPanelRouter();
     }
 
     public void Configure(
@@ -70,193 +75,154 @@ public class MenuManager : MonoBehaviour
 
         if (exitButton != null)
             _exitButton = exitButton;
+
+        RebuildPanelRouter();
+        SetupButtonListeners();
     }
-    
-    private void Start()
+
+    private MenuPanelRouter PanelRouter
     {
-        // На всякий случай убедимся, что UI кликается
-        GameBootstrap.EnsureRuntimeServices();
-
-        var canvas = GetComponentInParent<Canvas>();
-        if (canvas != null && canvas.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
+        get
         {
-            canvas.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-        }
+            if (_panelRouter == null)
+                RebuildPanelRouter();
 
+            return _panelRouter;
+        }
+    }
+
+    private IMenuSceneActions SceneActions
+    {
+        get
+        {
+            if (_sceneActions == null)
+                _sceneActions = UnityMenuSceneActions.Instance;
+
+            return _sceneActions;
+        }
+    }
+
+    internal void ConfigureSceneActionsForTests(IMenuSceneActions sceneActions)
+    {
+        _sceneActions = sceneActions;
+    }
+
+    internal void InitializeForTests()
+    {
         InitializeMenu();
         SetupButtonListeners();
     }
-    
+
+    private void Start()
+    {
+        GameBootstrap.EnsureRuntimeServices();
+        EnsureGraphicRaycaster();
+        InitializeMenu();
+        SetupButtonListeners();
+    }
+
     private void InitializeMenu()
     {
-        // Автоматически ищем панели при необходимости
-        // Показываем главное меню
         ShowMainMenu();
-        
-        // Настройка курсора
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
     }
-    
-    private void SetupButtonListeners()
+
+    private void EnsureGraphicRaycaster()
     {
-        // Если ссылки не назначены в инспекторе, пытаемся найти по имени
-        if (_playButton != null)
-        {
-            _playButton.onClick.RemoveListener(OnPlayButtonClicked);
-            _playButton.onClick.AddListener(OnPlayButtonClicked);
-        }
-
-        if (_charactersButton != null)
-        {
-            _charactersButton.onClick.RemoveListener(OnCharactersButtonClicked);
-            _charactersButton.onClick.AddListener(OnCharactersButtonClicked);
-        }
-
-        if (_settingsButton != null)
-        {
-            _settingsButton.onClick.RemoveListener(OnSettingsButtonClicked);
-            _settingsButton.onClick.AddListener(OnSettingsButtonClicked);
-        }
-
-        if (_exitButton != null)
-        {
-            _exitButton.onClick.RemoveListener(OnExitButtonClicked);
-            _exitButton.onClick.AddListener(OnExitButtonClicked);
-        }
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas != null && canvas.GetComponent<GraphicRaycaster>() == null)
+            canvas.gameObject.AddComponent<GraphicRaycaster>();
     }
 
-    #region Button Handlers
-    
+    private void SetupButtonListeners()
+    {
+        BindButton(_playButton, OnPlayButtonClicked);
+        BindButton(_charactersButton, OnCharactersButtonClicked);
+        BindButton(_settingsButton, OnSettingsButtonClicked);
+        BindButton(_exitButton, OnExitButtonClicked);
+    }
+
+    private static void BindButton(Button button, UnityEngine.Events.UnityAction action)
+    {
+        if (button == null)
+            return;
+
+        button.onClick.RemoveListener(action);
+        button.onClick.AddListener(action);
+    }
+
     public void OnPlayButtonClicked()
     {
-        Debug.Log("MenuManager: Начинаем игру!");
-        
-        // Анимация перехода (если есть)
+        Debug.Log("MenuManager: starting game.");
+
         if (_menuAnimator != null)
         {
             _menuAnimator.SetTrigger("FadeOut");
-            // Задержка для проигрывания анимации
             Invoke(nameof(LoadGameScene), 0.5f);
+            return;
         }
-        else
-        {
-            LoadGameScene();
-        }
+
+        LoadGameScene();
     }
-    
+
     public void OnCharactersButtonClicked()
     {
-        Debug.Log("MenuManager: Открываем панель персонажей");
+        Debug.Log("MenuManager: opening characters panel.");
         ShowCharactersPanel();
     }
-    
+
     public void OnSettingsButtonClicked()
     {
-        Debug.Log("MenuManager: Открываем настройки");
+        Debug.Log("MenuManager: opening settings panel.");
         ShowSettingsPanel();
     }
-    
+
     public void OnExitButtonClicked()
     {
-        Debug.Log("MenuManager: Выход из игры");
-        
-        // Используем GameSceneManager если он доступен
-        if (GameSceneManager.Instance != null)
-        {
-            GameSceneManager.Instance.QuitGame();
-        }
-        else
-        {
-            #if UNITY_EDITOR
-                UnityEditor.EditorApplication.isPlaying = false;
-            #else
-                Application.Quit();
-            #endif
-        }
+        Debug.Log("MenuManager: exiting game.");
+        SceneActions.QuitGame();
     }
-    
-    #endregion
-    
-    #region Panel Management
-    
+
     public void ShowMainMenu()
     {
-        SetActivePanel(_mainMenuPanel);
+        PanelRouter.Show(MenuPanelId.Main);
     }
-    
+
     public void ShowCharactersPanel()
     {
-        SetActivePanel(_charactersPanel);
+        PanelRouter.Show(MenuPanelId.Characters);
     }
-    
+
     public void ShowSettingsPanel()
     {
-        SetActivePanel(_settingsPanel);
+        PanelRouter.Show(MenuPanelId.Settings);
     }
-    
+
     public void BackToMainMenu()
     {
         ShowMainMenu();
     }
-    
-    private void SetActivePanel(GameObject targetPanel)
-    {
-        // Скрываем все панели
-        if (_mainMenuPanel != null) _mainMenuPanel.SetActive(false);
-        if (_charactersPanel != null) _charactersPanel.SetActive(false);
-        if (_settingsPanel != null) _settingsPanel.SetActive(false);
-        
-        // Показываем целевую панель
-        if (targetPanel != null)
-            targetPanel.SetActive(true);
-    }
-    
-    #endregion
-    
-    #region Scene Loading
-    
+
     private void LoadGameScene()
     {
-        // Используем GameSceneManager если он доступен
-        if (GameSceneManager.Instance != null)
-        {
-            GameSceneManager.Instance.LoadGameScene();
-        }
-        else if (!string.IsNullOrEmpty(_gameSceneName))
-        {
-            SceneManager.LoadScene(_gameSceneName);
-        }
-        else
-        {
-            Debug.LogError("MenuManager: Имя игровой сцены не задано!");
-        }
+        SceneActions.LoadGameScene(_gameSceneName);
     }
-    
-    #endregion
-    
-    #region Input Handling
-    
+
     private void Update()
     {
-        // ESC для возврата в главное меню
-        if (Input.GetKeyDown(KeyCode.Escape))
+        if (Input.GetKeyDown(KeyCode.Escape) && !PanelRouter.IsVisible(MenuPanelId.Main))
+            BackToMainMenu();
+
+        if ((Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) &&
+            PanelRouter.IsVisible(MenuPanelId.Main))
         {
-            if (_mainMenuPanel != null && !_mainMenuPanel.activeInHierarchy)
-            {
-                BackToMainMenu();
-            }
-        }
-        
-        // Enter для быстрого старта игры
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-        {
-            if (_mainMenuPanel != null && _mainMenuPanel.activeInHierarchy)
-            {
-                OnPlayButtonClicked();
-            }
+            OnPlayButtonClicked();
         }
     }
-    
-    #endregion
+
+    private void RebuildPanelRouter()
+    {
+        _panelRouter = new MenuPanelRouter(_mainMenuPanel, _charactersPanel, _settingsPanel);
+    }
 }

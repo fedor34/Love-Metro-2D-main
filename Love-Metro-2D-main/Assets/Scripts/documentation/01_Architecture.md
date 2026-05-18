@@ -43,9 +43,7 @@ Assets/Scripts/
 │   └── EndlessModeManager.cs# Управление бесконечным режимом
 │
 ├── _Deprecated/             # Устаревший/тестовый код
-│   ├── BoundaryDiagnostic.cs
-│   ├── UltimateDiagnostic.cs
-│   └── ...
+│   └── FieldEffectsTest/
 │
 ├── Passenger.cs             # Главный класс пассажира
 ├── TrainManager.cs          # Управление поездом

@@ -1,160 +1,67 @@
-# Руководство по рефакторингу Love Metro 2D
+# Love Metro 2D Refactoring Guide
 
-## Текущий консервативный этап
+## Current State
 
-Этот этап снижает техдолг без переименования `Passanger*` классов и без массовой миграции префабов:
+The active refactoring path keeps Unity scene and prefab compatibility intact. Public `Passanger*` names, serialized fields, prefab references, and compatibility methods stay in place until a dedicated migration step.
 
-- Runtime-сервисы централизованы через `GameBootstrap.EnsureRuntimeServices()`.
-- `MenuInitializer` больше не настраивает `MenuManager` и `GameSceneManager` через reflection; вместо этого используются явные `Configure(...)` методы.
-- Состояния `Passenger` вынесены в `Assets/Scripts/Passenger/States/`, но остаются private nested-классами внутри `partial Passenger`, поэтому serialized API не меняется.
-- `PassangersContainer` получил новый API `AddPassenger`, `RemovePassenger`, `ClearPassengers`, `Count`, `Passengers`; старые `Passangers` и `RemovePassanger` оставлены для совместимости.
-- Пустые `includeLayers` на пассажирских префабах исправлены в prefab, а аварийные auto-fix скрипты запускаются только в Editor/Development Build.
-- `PassengerSettings` пока не применяется как глобальный default ко всем префабам автоматически; используйте `Love Metro/Reports/Passenger Settings Migration Report` перед ручной миграцией значений.
+The current runtime architecture is organized around these seams:
 
-## Что проверять после изменений
+- `Runtime/Core/RuntimeCompositionRoot.cs` is the single composition point for scene runtime services.
+- `Runtime/Core/SceneObjectIndex.cs` owns scene discovery for composition. Runtime gameplay code should not call `FindObjectOfType`, `FindObjectsOfType`, or `GameObject.Find`.
+- `Runtime/Core/RuntimeServices.cs` exposes stable service contracts for passenger registry, scoring, train motion, station flow, field effects, and manual pairing.
+- `Passenger` remains one serialized `partial` MonoBehaviour split across focused files: lifecycle, motion, matching, field effects, and state machine.
+- `Runtime/Passengers/` contains pure runtime collaborators for passenger state, physics, interaction, matching, and pair formation.
+- `Runtime/Spawning/` contains the extracted passenger spawn planning, prefab pool, spawn-location, and VIP-pair assignment logic.
 
-- EditMode tests: весь набор в `Assets/Tests/Editor`.
-- PlayMode smoke: `Assets/Tests/PlayMode/RuntimeSmokeTests.cs`.
-- Static acceptance: отсутствие reflection-конфигурации в runtime UI и пустых physics `includeLayers` на passenger prefab.
+## Compatibility Rules
 
-## Что было сделано
+- Do not rename `PassangerSpawner`, `PassangersContainer`, `PassangerAnimator`, `spawnPassangers()`, or serialized prefab fields in broad refactors.
+- Do not migrate scenes or prefabs implicitly. If a change needs manual Unity relinking, make it a separate task.
+- Keep `PassengerSettings` as the source for passenger tuning. New movement or interaction constants should go through settings/tuning objects instead of new scattered private fields.
+- Keep `PassengerRegistry` as the access path for passenger collections in gameplay code.
+- Keep direct scene discovery limited to composition, diagnostics, installers, and tests.
 
-### 1. PassengerRegistry (Core/PassengerRegistry.cs)
-Централизованный реестр всех пассажиров, заменяющий дорогие вызовы `FindObjectsOfType<Passenger>()`.
+## Current Passenger Extraction
 
-**Преимущества:**
-- O(1) доступ к спискам пассажиров вместо O(n) сканирования сцены
-- Отдельные списки для мужчин, женщин и одиноких
-- Методы `FindClosestOpposite()` и `GetSameGenderInRadius()` для быстрого поиска
+`Passenger.cs` is the public serialized surface. The implementation is distributed into partial files:
 
-**Использование:**
-```csharp
-// Вместо FindObjectsOfType<Passenger>()
-var allPassengers = PassengerRegistry.Instance.AllPassengers;
+- `Passenger.Lifecycle.cs`
+- `Passenger.Motion.cs`
+- `Passenger.MatchLogic.cs`
+- `Passenger.FieldEffects.cs`
+- `Passenger.StateMachine.cs`
 
-// Поиск ближайшего противоположного пола
-Passenger target = PassengerRegistry.Instance.FindClosestOpposite(self, radius);
+The runtime collaborators live under `Runtime/Passengers/`:
 
-// Получить количество возможных пар
-int pairs = PassengerRegistry.Instance.GetPossiblePairsCount();
-```
+- `PassengerStateRuntime`
+- `PassengerStateMachine`
+- `PassengerStateFactory`
+- `PassengerPhysicsRuntime`
+- `PassengerMotionController`
+- `PassengerInteractionRuntime`
+- `PassengerMatchRuntime`
+- `PassengerPairFormationRuntime`
 
-### 2. PassengerSettings (Passenger/PassengerSettings.cs)
-ScriptableObject со всеми настройками пассажира. Заменяет "magic numbers" в коде.
+When changing passenger behavior, prefer moving logic into these runtime collaborators while keeping the MonoBehaviour as a thin host for serialized Unity state and lifecycle callbacks.
 
-**Создание ассета:**
-1. Правый клик в Project → Create → Love Metro → Passenger Settings
-2. Назовите файл "PassengerSettings" и положите в папку Resources
-3. Настройте параметры в инспекторе
+## Current Spawning Extraction
 
-**Категории настроек:**
-- Базовое движение (скорость, множители)
-- Поручни (шанс схватиться, время удержания)
-- Импульс от поезда (чувствительность, пороги)
-- Полёт (скорость, затухание, отскоки)
-- Магнитное притяжение/отталкивание
-- Aim Assist
+`PassangerSpawner` is now an orchestrator. It delegates:
 
-### 3. Состояния Passenger (Passenger/States/)
-Все состояния вынесены в отдельные файлы:
+- wave size and gender distribution to `SpawnPlanner`
+- prefab shuffling and cycling to `PrefabPool`
+- spawn point filtering and coordinate normalization to `SpawnLocationProvider`
+- VIP pair selection and ability attachment to `VipPairAssigner`
 
-- `PassengerState.cs` — базовый абстрактный класс
-- `WanderingState.cs` — ожидание/прогулка
-- `FallingState.cs` — падение после импульса
-- `FlyingState.cs` — полёт под действием ветра
-- `StayingOnHandrailState.cs` — удержание за поручень
-- `MatchingState.cs` — создание пары
-- `BeingAbsorbedState.cs` — поглощение чёрной дырой
+Tests for the pure spawning rules live in `Assets/Tests/Editor/SpawnPlannerTests.cs` and `Assets/Tests/Editor/PrefabPoolTests.cs`.
 
-### 4. PassengerRefactored (Passenger/PassengerRefactored.cs)
-Новый рефакторированный класс пассажира, использующий все новые компоненты.
+## Verification Checklist
 
-**Миграция:**
-1. Переименуйте `Passenger.cs` в `PassengerLegacy.cs`
-2. Переименуйте `PassengerRefactored.cs` в `Passenger.cs`
-3. Обновите префабы
+Run these before committing runtime refactors:
 
-### 5. Оптимизированные классы
-- `CouplesManager.cs` — использует PassengerRegistry
-- `Couple.cs` — кеширует ScoreCounter
+- EditMode tests: full `Assets/Tests/Editor` suite.
+- PlayMode smoke tests when spawn/train/scene composition behavior changes.
+- `git diff --check`.
+- Static acceptance tests for runtime scene discovery and hot-path singleton use.
 
-## Структура папок
-
-```
-Assets/Scripts/
-├── Core/
-│   ├── PassengerRegistry.cs    ← НОВЫЙ
-│   ├── GameBootstrap.cs        ← НОВЫЙ
-│   └── ...
-├── Passenger/                   ← НОВАЯ ПАПКА
-│   ├── PassengerSettings.cs    ← НОВЫЙ
-│   ├── PassengerRefactored.cs  ← НОВЫЙ
-│   └── States/                 ← НОВЫЕ
-│       ├── PassengerState.cs
-│       ├── WanderingState.cs
-│       ├── FallingState.cs
-│       ├── FlyingState.cs
-│       ├── StayingOnHandrailState.cs
-│       ├── MatchingState.cs
-│       └── BeingAbsorbedState.cs
-├── _Deprecated/                 ← Перемещённые тестовые скрипты
-└── ...
-```
-
-## Шаги миграции
-
-### Минимальная миграция (рекомендуется)
-1. Добавьте в сцену пустой GameObject с компонентом `GameBootstrap`
-2. Старый `Passenger.cs` будет работать, но использовать PassengerRegistry для оптимизации
-
-### Полная миграция
-1. Создайте ассет PassengerSettings в Resources
-2. Замените `Passenger.cs` на `PassengerRefactored.cs`
-3. Обновите все префабы пассажиров:
-   - Добавьте ссылку на PassengerSettings
-   - Удалите неиспользуемые SerializedField
-
-## Важные изменения API
-
-### Passenger
-```csharp
-// Старый API (работает через fallback)
-passenger.GetRigidbody()
-
-// Новый API
-passenger.Rigidbody  // Публичное свойство
-passenger.Settings   // Доступ к настройкам
-passenger.WanderingState  // Доступ к состояниям
-```
-
-### Couple
-```csharp
-// При смене сцены вызывайте
-Couple.ClearCache();
-```
-
-## Производительность
-
-### До рефакторинга
-- `FindObjectsOfType<Passenger>()` вызывался каждый кадр в:
-  - `Passenger.UpdateState()` (2 раза — магнит и отталкивание)
-  - `CouplesManager.Update()`
-  - `Couple.init()`
-
-### После рефакторинга
-- Все поиски через `PassengerRegistry.Instance`
-- O(1) доступ к кешированным спискам
-- При 30 пассажирах: ~30x ускорение поиска
-
-## Обратная совместимость
-
-- Старый `Passenger.cs` продолжает работать
-- `CouplesManager` и `Couple` имеют fallback на старое поведение
-- Новые компоненты опциональны
-
-## Что НЕ менять
-
-- Префабы пассажиров (без полной миграции)
-- Анимации и контроллеры
-- Спрайты и материалы
-- Сцены (только добавить GameBootstrap)
+If the same Unity CLI/test error repeats twice, follow the repository rule: investigate external documentation or web results, compare several fixes, then apply the most effective one.

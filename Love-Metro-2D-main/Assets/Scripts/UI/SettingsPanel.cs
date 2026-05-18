@@ -6,6 +6,9 @@ using UnityEngine.UI;
 
 public class SettingsPanel : MonoBehaviour
 {
+    private const float VolumeStep = 0.05f;
+    private const float GameSpeedStep = 0.1f;
+
     [Header("Sound")]
     [SerializeField] private Slider _masterVolumeSlider;
     [SerializeField] private Slider _musicVolumeSlider;
@@ -26,6 +29,26 @@ public class SettingsPanel : MonoBehaviour
     [SerializeField] private Button _applyButton;
     [SerializeField] private Button _defaultsButton;
     [SerializeField] private Button _backButton;
+
+    [Header("Step Buttons")]
+    [SerializeField] private Button _masterVolumeDecreaseButton;
+    [SerializeField] private Button _masterVolumeIncreaseButton;
+    [SerializeField] private Button _musicVolumeDecreaseButton;
+    [SerializeField] private Button _musicVolumeIncreaseButton;
+    [SerializeField] private Button _sfxVolumeDecreaseButton;
+    [SerializeField] private Button _sfxVolumeIncreaseButton;
+    [SerializeField] private Button _gameSpeedDecreaseButton;
+    [SerializeField] private Button _gameSpeedIncreaseButton;
+    [SerializeField] private Button _qualityPreviousButton;
+    [SerializeField] private Button _qualityNextButton;
+    [SerializeField] private Button _resolutionPreviousButton;
+    [SerializeField] private Button _resolutionNextButton;
+
+    [Header("Value Labels")]
+    [SerializeField] private TextMeshProUGUI _masterVolumeValueText;
+    [SerializeField] private TextMeshProUGUI _musicVolumeValueText;
+    [SerializeField] private TextMeshProUGUI _sfxVolumeValueText;
+    [SerializeField] private TextMeshProUGUI _gameSpeedValueText;
 
     [SerializeField] private MenuManager _menuManager;
 
@@ -79,9 +102,31 @@ public class SettingsPanel : MonoBehaviour
 
     private void Start()
     {
+        InitializeControls();
+    }
+
+    private void OnEnable()
+    {
+        InitializeControls();
+    }
+
+    private void OnRectTransformDimensionsChange()
+    {
+        if (isActiveAndEnabled)
+            ApplyResponsiveLayout();
+    }
+
+    private void InitializeControls()
+    {
+        ApplyResponsiveLayout();
         InitializeSettings();
         SetupButtonListeners();
         LoadSettings();
+    }
+
+    private void ApplyResponsiveLayout()
+    {
+        SettingsPanelLayout.Apply(transform as RectTransform);
     }
 
     private void InitializeSettings()
@@ -116,10 +161,23 @@ public class SettingsPanel : MonoBehaviour
         BindButton(_applyButton, ApplySettings);
         BindButton(_defaultsButton, ResetToDefaults);
         BindButton(_backButton, BackToMenu);
+        BindButton(_masterVolumeDecreaseButton, DecreaseMasterVolume);
+        BindButton(_masterVolumeIncreaseButton, IncreaseMasterVolume);
+        BindButton(_musicVolumeDecreaseButton, DecreaseMusicVolume);
+        BindButton(_musicVolumeIncreaseButton, IncreaseMusicVolume);
+        BindButton(_sfxVolumeDecreaseButton, DecreaseSfxVolume);
+        BindButton(_sfxVolumeIncreaseButton, IncreaseSfxVolume);
+        BindButton(_gameSpeedDecreaseButton, DecreaseGameSpeed);
+        BindButton(_gameSpeedIncreaseButton, IncreaseGameSpeed);
+        BindButton(_qualityPreviousButton, PreviousQuality);
+        BindButton(_qualityNextButton, NextQuality);
+        BindButton(_resolutionPreviousButton, PreviousResolution);
+        BindButton(_resolutionNextButton, NextResolution);
 
         BindSlider(_masterVolumeSlider, OnMasterVolumeChanged);
         BindSlider(_musicVolumeSlider, OnMusicVolumeChanged);
         BindSlider(_sfxVolumeSlider, OnSFXVolumeChanged);
+        BindSlider(_gameSpeedSlider, OnGameSpeedChanged);
     }
 
     private static void BindButton(Button button, UnityEngine.Events.UnityAction action)
@@ -142,16 +200,25 @@ public class SettingsPanel : MonoBehaviour
 
     private void OnMasterVolumeChanged(float value)
     {
+        UpdateValueLabels();
         SaveAndApplyCurrentSettings();
     }
 
     private void OnMusicVolumeChanged(float value)
     {
+        UpdateValueLabels();
         SaveAndApplyCurrentSettings();
     }
 
     private void OnSFXVolumeChanged(float value)
     {
+        UpdateValueLabels();
+        SaveAndApplyCurrentSettings();
+    }
+
+    private void OnGameSpeedChanged(float value)
+    {
+        UpdateValueLabels();
         SaveAndApplyCurrentSettings();
     }
 
@@ -175,12 +242,93 @@ public class SettingsPanel : MonoBehaviour
             _menuManager.BackToMainMenu();
     }
 
+    public void DecreaseMasterVolume()
+    {
+        AdjustSlider(_masterVolumeSlider, -VolumeStep);
+    }
+
+    public void IncreaseMasterVolume()
+    {
+        AdjustSlider(_masterVolumeSlider, VolumeStep);
+    }
+
+    public void DecreaseMusicVolume()
+    {
+        AdjustSlider(_musicVolumeSlider, -VolumeStep);
+    }
+
+    public void IncreaseMusicVolume()
+    {
+        AdjustSlider(_musicVolumeSlider, VolumeStep);
+    }
+
+    public void DecreaseSfxVolume()
+    {
+        AdjustSlider(_sfxVolumeSlider, -VolumeStep);
+    }
+
+    public void IncreaseSfxVolume()
+    {
+        AdjustSlider(_sfxVolumeSlider, VolumeStep);
+    }
+
+    public void DecreaseGameSpeed()
+    {
+        AdjustSlider(_gameSpeedSlider, -GameSpeedStep);
+    }
+
+    public void IncreaseGameSpeed()
+    {
+        AdjustSlider(_gameSpeedSlider, GameSpeedStep);
+    }
+
+    public void PreviousQuality()
+    {
+        StepDropdown(_qualityDropdown, -1);
+    }
+
+    public void NextQuality()
+    {
+        StepDropdown(_qualityDropdown, 1);
+    }
+
+    public void PreviousResolution()
+    {
+        StepDropdown(_resolutionDropdown, -1);
+    }
+
+    public void NextResolution()
+    {
+        StepDropdown(_resolutionDropdown, 1);
+    }
+
     private void SaveAndApplyCurrentSettings()
     {
         if (_syncingControls)
             return;
 
         SaveAndApply(ReadSnapshotFromControls(SettingsStore.Load()));
+    }
+
+    private void AdjustSlider(Slider slider, float delta)
+    {
+        if (slider == null)
+            return;
+
+        float value = Mathf.Clamp(slider.value + delta, slider.minValue, slider.maxValue);
+        slider.SetValueWithoutNotify(value);
+        UpdateValueLabels();
+        SaveAndApplyCurrentSettings();
+    }
+
+    private void StepDropdown(TMP_Dropdown dropdown, int delta)
+    {
+        if (dropdown == null || dropdown.options.Count == 0)
+            return;
+
+        dropdown.value = Mathf.Clamp(dropdown.value + delta, 0, dropdown.options.Count - 1);
+        dropdown.RefreshShownValue();
+        SaveAndApplyCurrentSettings();
     }
 
     private void SaveAndApply(SettingsSnapshot settings)
@@ -237,10 +385,31 @@ public class SettingsPanel : MonoBehaviour
 
             _qualityDropdown?.RefreshShownValue();
             _resolutionDropdown?.RefreshShownValue();
+            UpdateValueLabels();
         }
         finally
         {
             _syncingControls = false;
         }
+    }
+
+    private void UpdateValueLabels()
+    {
+        if (_masterVolumeValueText != null)
+            _masterVolumeValueText.text = ToPercentText(_masterVolumeSlider);
+
+        if (_musicVolumeValueText != null)
+            _musicVolumeValueText.text = ToPercentText(_musicVolumeSlider);
+
+        if (_sfxVolumeValueText != null)
+            _sfxVolumeValueText.text = ToPercentText(_sfxVolumeSlider);
+
+        if (_gameSpeedValueText != null && _gameSpeedSlider != null)
+            _gameSpeedValueText.text = _gameSpeedSlider.value.ToString("0.0") + "X";
+    }
+
+    private static string ToPercentText(Slider slider)
+    {
+        return slider != null ? Mathf.RoundToInt(slider.value * 100f).ToString() : string.Empty;
     }
 }

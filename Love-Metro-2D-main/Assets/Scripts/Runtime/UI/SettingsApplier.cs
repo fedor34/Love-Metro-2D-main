@@ -6,6 +6,9 @@ namespace LoveMetro.UI
     {
         public virtual void Apply(SettingsSnapshot settings)
         {
+            if (!Application.isPlaying)
+                return;
+
             AudioListener.volume = settings.MasterVolume;
             QualitySettings.SetQualityLevel(settings.Quality);
             Screen.fullScreen = settings.Fullscreen;

@@ -9,6 +9,7 @@ namespace LoveMetro.Core
     public sealed class RuntimeServices : IRuntimeServices
     {
         private static readonly RuntimeServices SharedInstance = new RuntimeServices();
+        private IScoreService _scoreService;
 
         public static RuntimeServices Instance => SharedInstance;
 
@@ -20,7 +21,22 @@ namespace LoveMetro.Core
 
         public IPassengerRegistry PassengerRegistry { get; private set; }
         public IPairingService PairingService { get; private set; }
-        public IScoreService ScoreService { get; private set; }
+        public IScoreService ScoreService
+        {
+            get
+            {
+                if (IsDestroyedUnityObject(_scoreService))
+                    _scoreService = new ScoreService();
+
+                return _scoreService;
+            }
+            private set
+            {
+                _scoreService = IsDestroyedUnityObject(value)
+                    ? new ScoreService()
+                    : value ?? new ScoreService();
+            }
+        }
         public IInputIntentProvider InputIntentProvider { get; private set; }
         public IManualPairingService ManualPairingService { get; private set; }
         public ITrainMotionEvents TrainMotionEvents { get; private set; }
@@ -119,6 +135,11 @@ namespace LoveMetro.Core
             TrainMotionEvents = null;
             StationFlowService = null;
             FieldEffectSystem = null;
+        }
+
+        private static bool IsDestroyedUnityObject(IScoreService service)
+        {
+            return service is UnityEngine.Object unityObject && unityObject == null;
         }
     }
 }

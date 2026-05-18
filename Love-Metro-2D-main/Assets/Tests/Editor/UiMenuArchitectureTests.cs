@@ -125,6 +125,32 @@ public class UiMenuArchitectureTests
     }
 
     [Test]
+    public void MenuInitializer_ConfiguresInactiveSettingsPanel()
+    {
+        GameObject canvasObject = CreateGameObject("Canvas", typeof(RectTransform), typeof(Canvas), typeof(MenuInitializer));
+        GameObject mainPanel = CreateGameObject("MainMenuPanel");
+        GameObject settingsPanel = CreateGameObject("SettingsPanel", typeof(SettingsPanel));
+        CreateButton("PlayButton");
+        CreateButton("CharactersButton");
+        CreateButton("SettingsButton");
+        CreateButton("ExitButton");
+        mainPanel.transform.SetParent(canvasObject.transform);
+        settingsPanel.transform.SetParent(canvasObject.transform);
+        settingsPanel.SetActive(false);
+        MenuInitializer initializer = canvasObject.GetComponent<MenuInitializer>();
+
+        typeof(MenuInitializer)
+            .GetMethod("AutoConfigureMenuManager", BindingFlags.NonPublic | BindingFlags.Instance)
+            .Invoke(initializer, null);
+
+        MenuManager menuManager = canvasObject.GetComponent<MenuManager>();
+        FieldInfo settingsField = typeof(MenuManager).GetField("_settingsPanel", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        Assert.IsNotNull(menuManager);
+        Assert.AreSame(settingsPanel, settingsField.GetValue(menuManager));
+    }
+
+    [Test]
     public void SettingsPanel_ResetAndApplyUseConfiguredStoreAndApplier()
     {
         GameObject panelObject = CreateGameObject("SettingsPanel", typeof(SettingsPanel));
@@ -163,6 +189,45 @@ public class UiMenuArchitectureTests
 
         Assert.AreEqual(SettingsSnapshot.Defaults, store.Current);
         Assert.AreEqual(SettingsSnapshot.Defaults, applier.LastApplied);
+    }
+
+    [Test]
+    public void SettingsPanel_StepControlsAdjustValuesAndPersist()
+    {
+        GameObject panelObject = CreateGameObject("SettingsPanel", typeof(SettingsPanel));
+        SettingsPanel panel = panelObject.GetComponent<SettingsPanel>();
+        Slider master = CreateComponentObject<Slider>("MasterVolume");
+        Slider speed = CreateComponentObject<Slider>("GameSpeed");
+        TMP_Dropdown quality = CreateComponentObject<TMP_Dropdown>("Quality");
+        Button masterDecrease = CreateButton("MasterDecrease");
+        Button speedIncrease = CreateButton("SpeedIncrease");
+        Button qualityNext = CreateButton("QualityNext");
+        var store = new MemorySettingsStore(SettingsSnapshot.Defaults);
+        var applier = new TestSettingsApplier();
+
+        speed.minValue = 0.5f;
+        speed.maxValue = 2f;
+        SetPrivateField(panel, "_masterVolumeSlider", master);
+        SetPrivateField(panel, "_gameSpeedSlider", speed);
+        SetPrivateField(panel, "_qualityDropdown", quality);
+        SetPrivateField(panel, "_masterVolumeDecreaseButton", masterDecrease);
+        SetPrivateField(panel, "_gameSpeedIncreaseButton", speedIncrease);
+        SetPrivateField(panel, "_qualityNextButton", qualityNext);
+        panel.ConfigureForTests(store, applier);
+
+        panel.InitializeForTests();
+        panel.InitializeForTests();
+        masterDecrease.onClick.Invoke();
+        speedIncrease.onClick.Invoke();
+        qualityNext.onClick.Invoke();
+
+        Assert.AreEqual(0.95f, master.value, 0.001f);
+        Assert.AreEqual(1.1f, speed.value, 0.001f);
+        Assert.AreEqual(3, quality.value);
+        Assert.AreEqual(0.95f, store.Current.MasterVolume, 0.001f);
+        Assert.AreEqual(1.1f, store.Current.GameSpeed, 0.001f);
+        Assert.AreEqual(3, store.Current.Quality);
+        Assert.AreEqual(store.Current, applier.LastApplied);
     }
 
     [Test]

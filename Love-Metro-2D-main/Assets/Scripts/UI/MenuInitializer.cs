@@ -77,14 +77,14 @@ public class MenuInitializer : MonoBehaviour
         }
 
         // Находим UI объекты
-        UnityEngine.UI.Button playBtn = FindButton(_playButtonName);
-        UnityEngine.UI.Button charBtn = FindButton(_charactersButtonName);
-        UnityEngine.UI.Button setBtn  = FindButton(_settingsButtonName);
-        UnityEngine.UI.Button exitBtn = FindButton(_exitButtonName);
+        UnityEngine.UI.Button playBtn = FindButton(_playButtonName, root);
+        UnityEngine.UI.Button charBtn = FindButton(_charactersButtonName, root);
+        UnityEngine.UI.Button setBtn  = FindButton(_settingsButtonName, root);
+        UnityEngine.UI.Button exitBtn = FindButton(_exitButtonName, root);
 
-        GameObject mainMenuPanel = GameObject.Find(_mainMenuPanelName);
-        GameObject charactersPanel = GameObject.Find(_charactersPanelName);
-        GameObject settingsPanel = GameObject.Find(_settingsPanelName);
+        GameObject mainMenuPanel = FindSceneObject(_mainMenuPanelName, root);
+        GameObject charactersPanel = FindSceneObject(_charactersPanelName, root);
+        GameObject settingsPanel = FindSceneObject(_settingsPanelName, root);
 
         menuManager.Configure(
             playBtn,
@@ -105,6 +105,18 @@ public class MenuInitializer : MonoBehaviour
 
     private Canvas FindMenuCanvas()
     {
+        Canvas localCanvas = GetComponent<Canvas>();
+        if (IsMenuCanvas(localCanvas))
+            return localCanvas;
+
+        Canvas parentCanvas = GetComponentInParent<Canvas>();
+        if (IsMenuCanvas(parentCanvas))
+            return parentCanvas;
+
+        Canvas childCanvas = GetComponentInChildren<Canvas>(true);
+        if (IsMenuCanvas(childCanvas))
+            return childCanvas;
+
         Canvas[] canvases = FindObjectsOfType<Canvas>();
         Canvas fallback = null;
 
@@ -123,9 +135,14 @@ public class MenuInitializer : MonoBehaviour
         return fallback;
     }
 
-    private UnityEngine.UI.Button FindButton(string name)
+    private bool IsMenuCanvas(Canvas canvas)
     {
-        GameObject go = GameObject.Find(name);
+        return canvas != null && canvas.name != "ScoreHudCanvas";
+    }
+
+    private UnityEngine.UI.Button FindButton(string name, GameObject preferredRoot)
+    {
+        GameObject go = FindSceneObject(name, preferredRoot);
         if (go == null)
         {
             Debug.LogWarning($"MenuInitializer: Не найден объект {name}");
@@ -137,5 +154,32 @@ public class MenuInitializer : MonoBehaviour
             Debug.LogWarning($"MenuInitializer: На объекте {name} отсутствует компонент Button");
         }
         return btn;
+    }
+
+    private GameObject FindSceneObject(string name, GameObject preferredRoot = null)
+    {
+        if (string.IsNullOrEmpty(name))
+            return null;
+
+        if (preferredRoot != null)
+        {
+            foreach (Transform childTransform in preferredRoot.GetComponentsInChildren<Transform>(true))
+            {
+                if (childTransform != null && childTransform.name == name)
+                    return childTransform.gameObject;
+            }
+        }
+
+        GameObject activeObject = GameObject.Find(name);
+        if (activeObject != null)
+            return activeObject;
+
+        foreach (Transform sceneTransform in FindObjectsOfType<Transform>(true))
+        {
+            if (sceneTransform != null && sceneTransform.name == name)
+                return sceneTransform.gameObject;
+        }
+
+        return null;
     }
 }

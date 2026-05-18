@@ -86,6 +86,19 @@ public class RuntimeArchitectureTests
     }
 
     [Test]
+    public void RuntimeServices_ReplacesDestroyedUnityScoreService()
+    {
+        GameObject scoreObject = new GameObject("DestroyedScoreCounter", typeof(RectTransform), typeof(Animator));
+        ScoreCounter scoreCounter = scoreObject.AddComponent<ScoreCounter>();
+
+        Object.DestroyImmediate(scoreObject);
+        RuntimeServices.Instance.RegisterScoreService(scoreCounter);
+
+        Assert.IsNotNull(RuntimeServices.Instance.ScoreService);
+        Assert.IsFalse(RuntimeServices.Instance.ScoreService is ScoreCounter);
+    }
+
+    [Test]
     public void PointerIntent_ResolvedDirectionFallsBackToRight()
     {
         PointerIntent intent = PointerIntent.Empty;

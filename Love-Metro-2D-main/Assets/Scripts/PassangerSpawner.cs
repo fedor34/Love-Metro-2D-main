@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using LoveMetro.Spawning;
 using UnityEngine;
 
 public class PassangerSpawner : MonoBehaviour
@@ -26,6 +27,11 @@ public class PassangerSpawner : MonoBehaviour
     [SerializeField] private VipAbility _vipAbility;
     [Range(0f, 1f)] [SerializeField] private float _vipPairChance = 1f;
 
+    private ISpawnRandom _random;
+    private ISpawnPlanner _spawnPlanner;
+    private ISpawnLocationProvider _locationProvider;
+    private VipPairAssigner _vipPairAssigner;
+
     public void spawnPassangers()
     {
         SpawnPassengers();
@@ -33,6 +39,7 @@ public class PassangerSpawner : MonoBehaviour
 
     public void SpawnPassengers()
     {
+        EnsureRuntimeServices();
         Diagnostics.Log("========== SPAWN PASSENGERS BEGIN ==========");
 
         if (!ValidateSpawnConfiguration())
@@ -41,22 +48,23 @@ public class PassangerSpawner : MonoBehaviour
         if (!TryPrepareContainer(out int currentCount))
             return;
 
-        List<Transform> availableLocations = CollectAvailableLocations();
+        List<Transform> availableLocations = _locationProvider.CollectAvailableLocations(_spawnLocations);
         if (availableLocations.Count == 0)
             return;
 
-        ShuffleList(availableLocations);
+        PrefabPool.ShuffleList(availableLocations, _random);
+        SpawnLocationMetrics locationMetrics = _locationProvider.CalculateMetrics(availableLocations);
+        Diagnostics.Log($"[Spawner] typicalY={locationMetrics.TypicalY:F2}; minY={locationMetrics.MinY:F2}; maxY={locationMetrics.MaxY:F2}");
 
-        bool hasTypicalY;
-        float typicalY = CalculateTypicalY(availableLocations, out hasTypicalY);
-        Diagnostics.Log($"[Spawner] typicalY={typicalY:F2}; minY={MinY(availableLocations):F2}; maxY={MaxY(availableLocations):F2}");
-
-        int spawnCount = CalculateSpawnCount(availableLocations.Count, currentCount);
+        int spawnCount = _spawnPlanner.CalculateSpawnCount(CreateSpawnRequest(availableLocations.Count, currentCount));
         Diagnostics.Log($"[Spawner] spawnCount={spawnCount} / available={availableLocations.Count}");
 
-        List<Passenger> femalePool = CreatePrefabPool(_passangerFemalePrefs);
-        List<Passenger> malePool = CreatePrefabPool(_passangerMalePrefs);
-        List<bool> genderDistribution = BuildGenderDistribution(spawnCount);
+        if (spawnCount <= 0)
+            return;
+
+        List<Passenger> femalePool = PrefabPool.Create(_passangerFemalePrefs, _random);
+        List<Passenger> malePool = PrefabPool.Create(_passangerMalePrefs, _random);
+        List<bool> genderDistribution = _spawnPlanner.BuildGenderDistribution(spawnCount);
         List<Passenger> spawnedThisWave = new List<Passenger>(spawnCount);
 
         int femalesCreated = 0;
@@ -69,11 +77,11 @@ public class PassangerSpawner : MonoBehaviour
             if (prefab == null)
                 continue;
 
-            Transform spawnPoint = TakeNextLocation(availableLocations);
+            Transform spawnPoint = _locationProvider.TakeNextLocation(availableLocations);
             if (spawnPoint == null)
                 continue;
 
-            Passenger passenger = TrySpawnPassenger(prefab, spawnPoint, createFemale, typicalY, hasTypicalY);
+            Passenger passenger = TrySpawnPassenger(prefab, spawnPoint, createFemale, locationMetrics);
             if (passenger == null)
                 continue;
 
@@ -84,9 +92,15 @@ public class PassangerSpawner : MonoBehaviour
                 malesCreated++;
         }
 
-        TryAssignVipPair(spawnedThisWave);
-        Diagnostics.Log($"========== SPAWN DONE females={femalesCreated} males={malesCreated} ==========");
-        Diagnostics.Log($"[Spawner] container total={_passiveContainer.Passangers?.Count ?? 0}");
+        _vipPairAssigner.TryAssignVipPair(spawnedThisWave, _vipAbility, _vipPairChance);
+        SpawnResult result = new SpawnResult(
+            spawnedThisWave.Count,
+            femalesCreated,
+            malesCreated,
+            _passiveContainer.Passangers?.Count ?? 0);
+
+        Diagnostics.Log($"========== SPAWN DONE females={result.FemalesCreated} males={result.MalesCreated} ==========");
+        Diagnostics.Log($"[Spawner] container total={result.ContainerCount}");
     }
 
     private void Start()
@@ -100,6 +114,14 @@ public class PassangerSpawner : MonoBehaviour
         }
 
         SpawnPassengers();
+    }
+
+    private void EnsureRuntimeServices()
+    {
+        _random ??= new UnitySpawnRandom();
+        _spawnPlanner ??= new SpawnPlanner(_random);
+        _locationProvider ??= new SpawnLocationProvider();
+        _vipPairAssigner ??= new VipPairAssigner(_random);
     }
 
     private bool ValidateSpawnConfiguration()
@@ -166,109 +188,32 @@ public class PassangerSpawner : MonoBehaviour
         return true;
     }
 
-    private List<Transform> CollectAvailableLocations()
+    private SpawnRequest CreateSpawnRequest(int availableLocationsCount, int currentCount)
     {
-        List<Transform> availableLocations = new List<Transform>(_spawnLocations.Count);
-        for (int i = 0; i < _spawnLocations.Count; i++)
-        {
-            Transform location = _spawnLocations[i];
-            if (location != null)
-                availableLocations.Add(location);
-        }
-
-        return availableLocations;
-    }
-
-    private int CalculateSpawnCount(int availableLocationsCount, int currentCount)
-    {
-        int remainingSlots = _maxPassengersInScene - currentCount;
-        int maxPossibleSpawn = Mathf.Min(MaxPassengersPerWave, availableLocationsCount, remainingSlots);
-        int minDesired = Mathf.Min(MinPassengersPerWave, maxPossibleSpawn);
-        return Random.Range(minDesired, maxPossibleSpawn + 1);
-    }
-
-    private static float CalculateTypicalY(List<Transform> availableLocations, out bool hasTypicalY)
-    {
-        float typicalY = 0f;
-        int count = 0;
-
-        for (int i = 0; i < availableLocations.Count; i++)
-        {
-            Transform location = availableLocations[i];
-            if (location == null)
-                continue;
-
-            typicalY += location.position.y;
-            count++;
-        }
-
-        hasTypicalY = count > 0;
-        return hasTypicalY ? typicalY / count : 0f;
-    }
-
-    private List<Passenger> CreatePrefabPool(List<Passenger> prefabs)
-    {
-        List<Passenger> pool = new List<Passenger>(prefabs);
-        ShuffleList(pool);
-        return pool;
-    }
-
-    private List<bool> BuildGenderDistribution(int spawnCount)
-    {
-        List<bool> genderDistribution = new List<bool>(spawnCount);
-        int femaleCount = spawnCount / 2;
-        int maleCount = spawnCount / 2;
-
-        if (spawnCount % 2 == 1)
-        {
-            if (Random.value < 0.5f)
-                femaleCount++;
-            else
-                maleCount++;
-        }
-
-        for (int i = 0; i < femaleCount; i++)
-            genderDistribution.Add(true);
-        for (int i = 0; i < maleCount; i++)
-            genderDistribution.Add(false);
-
-        ShuffleList(genderDistribution);
-        return genderDistribution;
+        return new SpawnRequest(
+            availableLocationsCount,
+            currentCount,
+            _maxPassengersInScene,
+            MinPassengersPerWave,
+            MaxPassengersPerWave);
     }
 
     private Passenger TakeNextPrefab(bool createFemale, List<Passenger> femalePool, List<Passenger> malePool)
     {
         return createFemale
-            ? TakeNextPrefabFromPool(femalePool, _passangerFemalePrefs)
-            : TakeNextPrefabFromPool(malePool, _passangerMalePrefs);
+            ? PrefabPool.TakeNext(femalePool, _passangerFemalePrefs)
+            : PrefabPool.TakeNext(malePool, _passangerMalePrefs);
     }
 
-    private static Passenger TakeNextPrefabFromPool(List<Passenger> pool, List<Passenger> source)
-    {
-        if (pool == null || pool.Count == 0)
-            return null;
-
-        Passenger prefab = pool[0];
-        pool.RemoveAt(0);
-
-        if (pool.Count == 0 && source != null && source.Count > 0)
-            pool.AddRange(source);
-
-        return prefab;
-    }
-
-    private static Transform TakeNextLocation(List<Transform> availableLocations)
-    {
-        Transform spawnPoint = availableLocations[0];
-        availableLocations.RemoveAt(0);
-        return spawnPoint;
-    }
-
-    private Passenger TrySpawnPassenger(Passenger prefab, Transform spawnPoint, bool createFemale, float typicalY, bool hasTypicalY)
+    private Passenger TrySpawnPassenger(
+        Passenger prefab,
+        Transform spawnPoint,
+        bool createFemale,
+        SpawnLocationMetrics locationMetrics)
     {
         try
         {
-            Vector3 position = BuildSpawnPosition(spawnPoint, typicalY, hasTypicalY);
+            Vector3 position = _locationProvider.BuildSpawnPosition(spawnPoint, locationMetrics);
             Vector3 direction = PickStartDirection();
 
             Diagnostics.Log($"[Spawner] spawn {(createFemale ? "F" : "M")} at {position} (origY={spawnPoint.position.y:F2}) dir={direction}");
@@ -278,7 +223,6 @@ public class PassangerSpawner : MonoBehaviour
             _passiveContainer.AddPassenger(passenger);
 
             ApplyGlobalAbilities(passenger);
-            LogPassengerSummary(passenger, "spawned");
             return passenger;
         }
         catch (System.Exception exception)
@@ -288,18 +232,12 @@ public class PassangerSpawner : MonoBehaviour
         }
     }
 
-    private Vector3 BuildSpawnPosition(Transform spawnPoint, float typicalY, bool hasTypicalY)
-    {
-        Vector3 position = spawnPoint.position;
-        if (hasTypicalY && position.y < typicalY - 0.5f)
-            position.y = typicalY;
-
-        return position;
-    }
-
     private Vector3 PickStartDirection()
     {
-        int directionIndex = Mathf.Clamp(Random.Range(0, _possibleStartMovingDirections.Length), 0, _possibleStartMovingDirections.Length - 1);
+        int directionIndex = Mathf.Clamp(
+            _random.Range(0, _possibleStartMovingDirections.Length),
+            0,
+            _possibleStartMovingDirections.Length - 1);
         return _possibleStartMovingDirections[directionIndex];
     }
 
@@ -308,7 +246,7 @@ public class PassangerSpawner : MonoBehaviour
         if (_globalAbilities == null || _globalAbilities.Count == 0)
             return;
 
-        PassengerAbilities runner = GetOrAddAbilities(passenger);
+        PassengerAbilities runner = VipPairAssigner.GetOrAddAbilities(passenger);
         for (int i = 0; i < _globalAbilities.Count; i++)
         {
             PassengerAbility ability = _globalAbilities[i];
@@ -317,117 +255,5 @@ public class PassangerSpawner : MonoBehaviour
         }
 
         runner.AttachAll();
-    }
-
-    private void TryAssignVipPair(List<Passenger> spawned)
-    {
-        if (_vipAbility == null)
-        {
-            Diagnostics.Log("[Spawner][VIP] ability is null - skip");
-            return;
-        }
-
-        if (spawned == null || spawned.Count < 2)
-            return;
-
-        if (Random.value > _vipPairChance)
-            return;
-
-        Passenger female = null;
-        Passenger male = null;
-        for (int i = 0; i < spawned.Count; i++)
-        {
-            Passenger passenger = spawned[i];
-            if (passenger == null || passenger.IsInCouple)
-                continue;
-
-            if (passenger.IsFemale && female == null)
-                female = passenger;
-            if (!passenger.IsFemale && male == null)
-                male = passenger;
-            if (female != null && male != null)
-                break;
-        }
-
-        if (female == null || male == null)
-        {
-            Diagnostics.Log("[Spawner][VIP] not found both genders in wave");
-            return;
-        }
-
-        ApplyVip(female);
-        ApplyVip(male);
-        Diagnostics.Log($"[Spawner][VIP] Assigned to pair: F={female.name} M={male.name}");
-    }
-
-    private void ApplyVip(Passenger passenger)
-    {
-        PassengerAbilities runner = GetOrAddAbilities(passenger);
-        runner.AddAbility(_vipAbility);
-        runner.AttachAll();
-    }
-
-    private static PassengerAbilities GetOrAddAbilities(Passenger passenger)
-    {
-        PassengerAbilities runner = passenger.GetComponent<PassengerAbilities>();
-        if (runner == null)
-            runner = passenger.gameObject.AddComponent<PassengerAbilities>();
-
-        return runner;
-    }
-
-    private static void ShuffleList<T>(List<T> list)
-    {
-        int count = list.Count;
-        for (int i = 0; i < count; i++)
-        {
-            int swapIndex = i + Random.Range(0, count - i);
-            T temp = list[i];
-            list[i] = list[swapIndex];
-            list[swapIndex] = temp;
-        }
-    }
-
-    private static float MinY(List<Transform> transforms)
-    {
-        float min = float.PositiveInfinity;
-        for (int i = 0; i < transforms.Count; i++)
-        {
-            Transform transformItem = transforms[i];
-            if (transformItem != null)
-                min = Mathf.Min(min, transformItem.position.y);
-        }
-
-        return float.IsInfinity(min) ? 0f : min;
-    }
-
-    private static float MaxY(List<Transform> transforms)
-    {
-        float max = float.NegativeInfinity;
-        for (int i = 0; i < transforms.Count; i++)
-        {
-            Transform transformItem = transforms[i];
-            if (transformItem != null)
-                max = Mathf.Max(max, transformItem.position.y);
-        }
-
-        return float.IsNegativeInfinity(max) ? 0f : max;
-    }
-
-    private static void LogPassengerSummary(Passenger passenger, string tag)
-    {
-        if (passenger == null)
-            return;
-
-        SpriteRenderer spriteRenderer = passenger.GetComponent<SpriteRenderer>();
-        Animator animator = passenger.GetComponent<Animator>();
-        string controllerName = animator != null && animator.runtimeAnimatorController != null
-            ? animator.runtimeAnimatorController.name
-            : "<null>";
-        string spriteName = spriteRenderer != null && spriteRenderer.sprite != null
-            ? spriteRenderer.sprite.name
-            : "<null>";
-
-        Diagnostics.Log($"[Spawner][{tag}] name={passenger.name} female={passenger.IsFemale} layer={passenger.gameObject.layer} sprite='{spriteName}' ctrl='{controllerName}' pos={passenger.transform.position}");
     }
 }

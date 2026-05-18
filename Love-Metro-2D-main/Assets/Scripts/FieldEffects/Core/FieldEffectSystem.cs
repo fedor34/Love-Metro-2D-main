@@ -20,6 +20,7 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
     private Dictionary<IFieldEffectTarget, List<ActiveEffectData>> _activeEffectsPerTarget;
     private List<IFieldEffectTarget> _allTargets;
     private FieldEffectSpatialQuery _spatialQuery;
+    private readonly List<IFieldEffect> _nearbyEffectsBuffer = new List<IFieldEffect>(8);
     private readonly HashSet<IFieldEffect> _nearbyEffectSet = new HashSet<IFieldEffect>();
 
     private const float CacheUpdateInterval = 0.1f;
@@ -103,6 +104,7 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
 
         categoryEffects.Add(effect);
         _effectsByType[data.effectType].Add(effect);
+        _spatialQuery?.MarkDirty();
 
         OnEffectRegistered?.Invoke(effect);
 
@@ -119,6 +121,7 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
 
         _effectsByCategory[category].Remove(effect);
         _effectsByType[data.effectType].Remove(effect);
+        _spatialQuery?.MarkDirty();
         RemoveEffectFromAllTargets(effect);
 
         OnEffectUnregistered?.Invoke(effect);
@@ -241,7 +244,8 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
             return;
         }
 
-        List<IFieldEffect> nearbyEffects = GetEffectsAtPosition(targetPosition);
+        List<IFieldEffect> nearbyEffects = _nearbyEffectsBuffer;
+        FillEffectsAtPosition(targetPosition, nearbyEffects);
         _nearbyEffectSet.Clear();
         for (int i = 0; i < nearbyEffects.Count; i++)
         {
@@ -354,7 +358,7 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
 
     private void UpdateSpatialCache()
     {
-        _spatialQuery?.Update(Time.time);
+        _spatialQuery?.Update(Time.time, _effectsByCategory);
     }
 
     public List<IFieldEffect> GetEffectsAtPosition(Vector3 position)
@@ -362,7 +366,21 @@ public class FieldEffectSystem : MonoBehaviour, LoveMetro.FieldEffects.IFieldEff
         if (_spatialQuery == null || _effectsByCategory == null)
             return new List<IFieldEffect>();
 
-        return _spatialQuery.GetEffectsAtPosition(position, _effectsByCategory);
+        List<IFieldEffect> effects = new List<IFieldEffect>();
+        _spatialQuery.FillEffectsAtPosition(position, _effectsByCategory, effects, Time.time);
+        return effects;
+    }
+
+    private void FillEffectsAtPosition(Vector3 position, List<IFieldEffect> results)
+    {
+        if (results == null)
+            return;
+
+        results.Clear();
+        if (_spatialQuery == null || _effectsByCategory == null)
+            return;
+
+        _spatialQuery.FillEffectsAtPosition(position, _effectsByCategory, results, Time.time);
     }
 
     public List<IFieldEffect> GetEffectsByCategory(FieldEffectCategory category)
@@ -594,50 +612,124 @@ public class ActiveEffectData
 
 internal sealed class FieldEffectSpatialQuery
 {
-    private readonly Dictionary<Vector3, List<IFieldEffect>> _cache = new Dictionary<Vector3, List<IFieldEffect>>();
+    private readonly Dictionary<Vector2Int, List<IFieldEffect>> _cells = new Dictionary<Vector2Int, List<IFieldEffect>>();
     private readonly float _cacheUpdateInterval;
-    private float _cacheUpdateTime;
+    private float _lastRebuildTime = float.NegativeInfinity;
+    private bool _dirty = true;
+
+    private const float CellSize = 2f;
 
     public FieldEffectSpatialQuery(float cacheUpdateInterval)
     {
         _cacheUpdateInterval = Mathf.Max(0.01f, cacheUpdateInterval);
     }
 
-    public void Update(float time)
+    public void MarkDirty()
     {
-        if (time - _cacheUpdateTime <= _cacheUpdateInterval)
-            return;
-
-        _cache.Clear();
-        _cacheUpdateTime = time;
+        _dirty = true;
     }
 
-    public List<IFieldEffect> GetEffectsAtPosition(
-        Vector3 position,
-        Dictionary<FieldEffectCategory, List<IFieldEffect>> effectsByCategory)
+    public void Update(float time, Dictionary<FieldEffectCategory, List<IFieldEffect>> effectsByCategory)
     {
-        Vector3 gridPosition = new Vector3(
-            Mathf.Round(position.x),
-            Mathf.Round(position.y),
-            Mathf.Round(position.z));
+        EnsureCurrent(time, effectsByCategory);
+    }
 
-        if (_cache.TryGetValue(gridPosition, out List<IFieldEffect> cachedEffects))
-            return cachedEffects;
+    public void FillEffectsAtPosition(
+        Vector3 position,
+        Dictionary<FieldEffectCategory, List<IFieldEffect>> effectsByCategory,
+        List<IFieldEffect> results,
+        float time)
+    {
+        if (results == null)
+            return;
 
-        List<IFieldEffect> effects = new List<IFieldEffect>();
+        results.Clear();
+        if (effectsByCategory == null)
+            return;
+
+        EnsureCurrent(time, effectsByCategory);
+
+        Vector2Int cell = PositionToCell(position);
+        if (!_cells.TryGetValue(cell, out List<IFieldEffect> candidates))
+            return;
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            IFieldEffect effect = candidates[i];
+            if (effect != null && effect.IsInEffectZone(position))
+                results.Add(effect);
+        }
+    }
+
+    private void EnsureCurrent(float time, Dictionary<FieldEffectCategory, List<IFieldEffect>> effectsByCategory)
+    {
+        if (effectsByCategory == null)
+            return;
+
+        if (Application.isPlaying && !_dirty && time - _lastRebuildTime < _cacheUpdateInterval)
+            return;
+
+        Rebuild(time, effectsByCategory);
+    }
+
+    private void Rebuild(float time, Dictionary<FieldEffectCategory, List<IFieldEffect>> effectsByCategory)
+    {
+        _cells.Clear();
         foreach (List<IFieldEffect> categoryEffects in effectsByCategory.Values)
         {
             if (categoryEffects == null)
                 continue;
 
-            foreach (IFieldEffect effect in categoryEffects)
+            for (int i = 0; i < categoryEffects.Count; i++)
             {
-                if (effect != null && effect.IsInEffectZone(position))
-                    effects.Add(effect);
+                IFieldEffect effect = categoryEffects[i];
+                if (!TryGetEffectBounds(effect, out Vector3 center, out float radius))
+                    continue;
+
+                Vector2Int minCell = PositionToCell(center - new Vector3(radius, radius, 0f));
+                Vector2Int maxCell = PositionToCell(center + new Vector3(radius, radius, 0f));
+                for (int x = minCell.x; x <= maxCell.x; x++)
+                {
+                    for (int y = minCell.y; y <= maxCell.y; y++)
+                    {
+                        Vector2Int cell = new Vector2Int(x, y);
+                        if (!_cells.TryGetValue(cell, out List<IFieldEffect> effects))
+                        {
+                            effects = new List<IFieldEffect>();
+                            _cells[cell] = effects;
+                        }
+
+                        effects.Add(effect);
+                    }
+                }
             }
         }
 
-        _cache[gridPosition] = effects;
-        return effects;
+        _dirty = false;
+        _lastRebuildTime = time;
+    }
+
+    private static bool TryGetEffectBounds(IFieldEffect effect, out Vector3 center, out float radius)
+    {
+        center = Vector3.zero;
+        radius = 0f;
+
+        FieldEffectData data = effect?.GetEffectData();
+        if (effect == null || data == null)
+            return false;
+
+        center = data.center;
+        if (effect is MonoBehaviour behaviour && behaviour != null)
+            center = behaviour.transform.position;
+
+        radius = Mathf.Max(0f, data.radius);
+        return true;
+    }
+
+    private static Vector2Int PositionToCell(Vector3 position)
+    {
+        return new Vector2Int(
+            Mathf.FloorToInt(position.x / CellSize),
+            Mathf.FloorToInt(position.y / CellSize));
     }
 }

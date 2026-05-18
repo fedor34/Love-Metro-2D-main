@@ -289,6 +289,25 @@ public class PassengerRegistryTests
     }
 
     [Test]
+    public void FindClosestOpposite_FindsPassengerAcrossSpatialBucketBoundary()
+    {
+        var male = CreateMockPassenger(false);
+        var female = CreateMockPassenger(true);
+        male.transform.position = new Vector3(1.9f, 0f, 0f);
+        female.transform.position = new Vector3(2.1f, 0f, 0f);
+
+        registry.Register(male);
+        registry.Register(female);
+
+        var result = registry.FindClosestOpposite(male, 0.5f);
+
+        Assert.AreEqual(female, result);
+
+        CleanupPassenger(male);
+        CleanupPassenger(female);
+    }
+
+    [Test]
     public void GetSameGenderInRadius_FindsMalesForMale()
     {
         var male1 = CreateMockPassenger(false);
@@ -334,6 +353,52 @@ public class PassengerRegistryTests
 
         CleanupPassenger(male1);
         CleanupPassenger(male2);
+    }
+
+    [Test]
+    public void GetSameGenderInRadius_PreservesRegistrationOrder()
+    {
+        var male1 = CreateMockPassenger(false);
+        var male2 = CreateMockPassenger(false);
+        var male3 = CreateMockPassenger(false);
+        male1.transform.position = Vector3.zero;
+        male2.transform.position = new Vector3(3f, 0f, 0f);
+        male3.transform.position = new Vector3(1f, 0f, 0f);
+
+        registry.Register(male1);
+        registry.Register(male2);
+        registry.Register(male3);
+
+        var results = new System.Collections.Generic.List<Passenger>();
+        registry.GetSameGenderInRadius(male1, 5f, results);
+
+        CollectionAssert.AreEqual(new[] { male2, male3 }, results);
+
+        CleanupPassenger(male1);
+        CleanupPassenger(male2);
+        CleanupPassenger(male3);
+    }
+
+    [Test]
+    public void CleanupNullReferences_RemovesDestroyedPassengersFromSpatialIndex()
+    {
+        var male1 = CreateMockPassenger(false);
+        var male2 = CreateMockPassenger(false);
+        male1.transform.position = Vector3.zero;
+        male2.transform.position = new Vector3(1f, 0f, 0f);
+
+        registry.Register(male1);
+        registry.Register(male2);
+        Object.DestroyImmediate(male2.gameObject);
+
+        registry.CleanupNullReferences();
+
+        var results = new System.Collections.Generic.List<Passenger>();
+        registry.GetSameGenderInRadius(male1, 5f, results);
+
+        Assert.AreEqual(0, results.Count);
+
+        CleanupPassenger(male1);
     }
 
     [Test]
@@ -389,6 +454,11 @@ public class PassengerRegistryTests
         Assert.AreEqual(0, registry.Singles.Count);
         Assert.AreEqual(0, registry.MaleSinglesCount);
         Assert.AreEqual(0, registry.FemaleSinglesCount);
+
+        Assert.IsNull(registry.FindClosestOpposite(male, 5f));
+        var results = new System.Collections.Generic.List<Passenger>();
+        registry.GetSameGenderInRadius(male, 5f, results);
+        Assert.AreEqual(0, results.Count);
 
         CleanupPassenger(male);
         CleanupPassenger(female);

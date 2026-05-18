@@ -2,8 +2,13 @@ using UnityEngine;
 
 public class StartupLog : MonoBehaviour
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void LogOnStartup()
+    [ContextMenu("Log Startup Marker")]
+    private void LogStartupMarker()
+    {
+        LogMarker();
+    }
+
+    public static void LogMarker()
     {
         Debug.Log("===============================================================");
         Debug.Log("<<<<< SCRIPT COMPILATION AND EXECUTION IS WORKING >>>>>");

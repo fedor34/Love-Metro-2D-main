@@ -7,21 +7,12 @@ using System.Linq;
 /// </summary>
 public class LayerCollisionMatrixDecoder : MonoBehaviour
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void Initialize()
-    {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD || DIAGNOSTICS_ENABLED
-        var go = new GameObject("LayerCollisionMatrixDecoder");
-        go.AddComponent<LayerCollisionMatrixDecoder>();
-        DontDestroyOnLoad(go);
-#endif
-    }
-
     private void Start()
     {
         Invoke(nameof(DecodeAndCheck), 1f);
     }
 
+    [ContextMenu("Decode And Check")]
     private void DecodeAndCheck()
     {
         Debug.Log("=== LAYER COLLISION MATRIX ANALYSIS ===");

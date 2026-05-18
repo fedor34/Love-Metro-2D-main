@@ -7,21 +7,12 @@ using System.Collections.Generic;
 /// </summary>
 public class FindAllBoundaries : MonoBehaviour
 {
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void Initialize()
-    {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD || DIAGNOSTICS_ENABLED
-        var go = new GameObject("FindAllBoundaries");
-        go.AddComponent<FindAllBoundaries>();
-        DontDestroyOnLoad(go);
-#endif
-    }
-
     private void Start()
     {
         Invoke(nameof(FindBoundaries), 1f);
     }
 
+    [ContextMenu("Find Boundaries")]
     private void FindBoundaries()
     {
         Debug.Log("=== SEARCHING FOR ALL POSSIBLE BOUNDARIES ===");

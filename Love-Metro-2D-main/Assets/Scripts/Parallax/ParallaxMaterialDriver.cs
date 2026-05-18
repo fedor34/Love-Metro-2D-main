@@ -8,7 +8,20 @@ public class ParallaxMaterialDriver : MonoBehaviour
         public SpriteRenderer Renderer;
         public Material Material;
         public ParallaxLayer ParallaxLayer;
+        public bool HasElapsedTime;
+        public bool HasElapsedTimePlain;
+        public bool HasSpeed;
+        public bool HasSpeedPlain;
+        public bool HasSpeedModificator;
+        public bool HasSpeedModificatorPlain;
     }
+
+    private static readonly int ElapsedTimeId = Shader.PropertyToID("_elapsedTime");
+    private static readonly int ElapsedTimePlainId = Shader.PropertyToID("elapsedTime");
+    private static readonly int SpeedId = Shader.PropertyToID("_Speed");
+    private static readonly int SpeedPlainId = Shader.PropertyToID("Speed");
+    private static readonly int SpeedModificatorId = Shader.PropertyToID("_SpeedModificator");
+    private static readonly int SpeedModificatorPlainId = Shader.PropertyToID("SpeedModificator");
 
     [Header("Speed Coupling")]
     [SerializeField] private float _maxTrainSpeed = 480f;
@@ -104,7 +117,13 @@ public class ParallaxMaterialDriver : MonoBehaviour
             {
                 Renderer = renderer,
                 Material = runtimeMaterial,
-                ParallaxLayer = renderer.GetComponent<ParallaxLayer>()
+                ParallaxLayer = renderer.GetComponent<ParallaxLayer>(),
+                HasElapsedTime = runtimeMaterial.HasProperty(ElapsedTimeId),
+                HasElapsedTimePlain = runtimeMaterial.HasProperty(ElapsedTimePlainId),
+                HasSpeed = runtimeMaterial.HasProperty(SpeedId),
+                HasSpeedPlain = runtimeMaterial.HasProperty(SpeedPlainId),
+                HasSpeedModificator = runtimeMaterial.HasProperty(SpeedModificatorId),
+                HasSpeedModificatorPlain = runtimeMaterial.HasProperty(SpeedModificatorPlainId)
             });
 
             renderer.gameObject.isStatic = false;
@@ -152,16 +171,17 @@ public class ParallaxMaterialDriver : MonoBehaviour
     {
         for (int i = 0; i < _targets.Count; i++)
         {
-            Material material = _targets[i].Material;
+            TargetBinding target = _targets[i];
+            Material material = target.Material;
             if (material == null)
                 continue;
 
-            SetFloatIfPresent(material, "_elapsedTime", parallaxTime);
-            SetFloatIfPresent(material, "elapsedTime", parallaxTime);
-            SetFloatIfPresent(material, "_Speed", normalizedSpeed);
-            SetFloatIfPresent(material, "Speed", normalizedSpeed);
-            SetFloatIfPresent(material, "_SpeedModificator", baseSpeedMod);
-            SetFloatIfPresent(material, "SpeedModificator", baseSpeedMod);
+            SetFloatIfPresent(material, ElapsedTimeId, target.HasElapsedTime, parallaxTime);
+            SetFloatIfPresent(material, ElapsedTimePlainId, target.HasElapsedTimePlain, parallaxTime);
+            SetFloatIfPresent(material, SpeedId, target.HasSpeed, normalizedSpeed);
+            SetFloatIfPresent(material, SpeedPlainId, target.HasSpeedPlain, normalizedSpeed);
+            SetFloatIfPresent(material, SpeedModificatorId, target.HasSpeedModificator, baseSpeedMod);
+            SetFloatIfPresent(material, SpeedModificatorPlainId, target.HasSpeedModificatorPlain, baseSpeedMod);
         }
     }
 
@@ -202,10 +222,10 @@ public class ParallaxMaterialDriver : MonoBehaviour
         return currentOffset + Mathf.Max(0f, elapsedTimeScale) * Mathf.Max(0f, deltaTime);
     }
 
-    private static void SetFloatIfPresent(Material material, string propertyName, float value)
+    private static void SetFloatIfPresent(Material material, int propertyId, bool hasProperty, float value)
     {
-        if (material != null && material.HasFloat(propertyName))
-            material.SetFloat(propertyName, value);
+        if (material != null && hasProperty)
+            material.SetFloat(propertyId, value);
     }
 
     private static bool IsMissingTarget(TargetBinding target)

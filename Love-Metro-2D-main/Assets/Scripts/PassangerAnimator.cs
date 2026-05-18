@@ -7,8 +7,8 @@ public class PassangerAnimator : MonoBehaviour
     private SpriteRenderer _spriteRenderer;
     private Rigidbody2D _rigidbody;
 
-    [SerializeField] private float _movementThreshold = 0.1f;
-    [SerializeField] private float _stopHoldSeconds = 0.9f;
+    [SerializeField] private float _movementThreshold = 0.02f;
+    [SerializeField] private float _stopHoldSeconds = 0.15f;
     [Header("Walking Animation Speed")]
     [SerializeField] private float _animSpeedMin = 0.8f;
     [SerializeField] private float _animSpeedMax = 1.3f;
@@ -17,6 +17,8 @@ public class PassangerAnimator : MonoBehaviour
     private bool _isWalkingStateForced;
     private float _belowThresholdTimer;
     private float _animSpeedSmoothed = 1f;
+    private Vector3 _lastObservedPosition;
+    private bool _hasObservedPosition;
 
     private const string IsWalking = "IsWalking";
     private const string IsFalling = "IsFalling";
@@ -26,6 +28,12 @@ public class PassangerAnimator : MonoBehaviour
     private void Awake()
     {
         EnsureComponents();
+        TrackCurrentPosition();
+    }
+
+    private void OnEnable()
+    {
+        TrackCurrentPosition();
     }
 
     private Animator GetAnimator()
@@ -48,11 +56,16 @@ public class PassangerAnimator : MonoBehaviour
     private void Update()
     {
         EnsureComponents();
-        if (_rigidbody == null || _isWalkingStateForced)
+        float observedSpeed = CalculateObservedSpeed();
+        if (_isWalkingStateForced)
+        {
+            TrackCurrentPosition();
             return;
+        }
 
-        UpdateAutomaticWalking();
-        UpdateAutomaticAnimationSpeed();
+        UpdateAutomaticWalking(observedSpeed);
+        UpdateAutomaticAnimationSpeed(observedSpeed);
+        TrackCurrentPosition();
     }
 
     public void ChangeFacingDirection(bool isFacingRight)
@@ -117,12 +130,15 @@ public class PassangerAnimator : MonoBehaviour
     public void EnableAutomaticWalkingAnimation()
     {
         _isWalkingStateForced = false;
+        _belowThresholdTimer = 0f;
+        TrackCurrentPosition();
     }
 
     public void ForceWalkingState(bool isWalking)
     {
         _isWalkingStateForced = true;
         SetWalkingFlag(isWalking);
+        TrackCurrentPosition();
     }
 
     public void SetHoldingState(bool isHolding)
@@ -153,15 +169,15 @@ public class PassangerAnimator : MonoBehaviour
         _isWalkingStateForced = false;
         _belowThresholdTimer = 0f;
         _animSpeedSmoothed = 1f;
+        TrackCurrentPosition();
         animator.speed = 1f;
         animator.Rebind();
         animator.Update(0f);
     }
 
-    private void UpdateAutomaticWalking()
+    private void UpdateAutomaticWalking(float observedSpeed)
     {
-        float velocityMagnitude = _rigidbody.velocity.magnitude;
-        bool aboveThreshold = velocityMagnitude > _movementThreshold;
+        bool aboveThreshold = observedSpeed > _movementThreshold;
 
         if (aboveThreshold)
         {
@@ -175,17 +191,40 @@ public class PassangerAnimator : MonoBehaviour
             SetWalkingFlag(false);
     }
 
-    private void UpdateAutomaticAnimationSpeed()
+    private void UpdateAutomaticAnimationSpeed(float observedSpeed)
     {
         Animator animator = GetAnimator();
         if (animator == null)
             return;
 
-        float velocityMagnitude = _rigidbody.velocity.magnitude;
-        float t = Mathf.InverseLerp(_movementThreshold, _movementThreshold * 10f + 0.01f, velocityMagnitude);
+        float t = Mathf.InverseLerp(_movementThreshold, _movementThreshold * 10f + 0.01f, observedSpeed);
         float targetAnimSpeed = Mathf.Lerp(_animSpeedMin, _animSpeedMax, t);
         _animSpeedSmoothed = Mathf.Lerp(_animSpeedSmoothed, targetAnimSpeed, _animSpeedSmoothing * Time.deltaTime);
         animator.speed = _animSpeedSmoothed;
+    }
+
+    private float CalculateObservedSpeed()
+    {
+        float rigidbodySpeed = _rigidbody != null ? _rigidbody.velocity.magnitude : 0f;
+        if (!_hasObservedPosition || Time.deltaTime <= 0f)
+            return rigidbodySpeed;
+
+        float transformSpeed = CalculateTransformSpeed(transform.position, Time.deltaTime);
+        return Mathf.Max(rigidbodySpeed, transformSpeed);
+    }
+
+    private float CalculateTransformSpeed(Vector3 currentPosition, float deltaTime)
+    {
+        if (!_hasObservedPosition || deltaTime <= 0f)
+            return 0f;
+
+        return (currentPosition - _lastObservedPosition).magnitude / deltaTime;
+    }
+
+    private void TrackCurrentPosition()
+    {
+        _lastObservedPosition = transform.position;
+        _hasObservedPosition = true;
     }
 
     private void SetWalkingFlag(bool isWalking)

@@ -155,7 +155,7 @@ public partial class ClickDirectionManager
 
     private Vector2 ScreenToWorld(Vector2 screenPosition)
     {
-        return _mainCamera != null ? _mainCamera.ScreenToWorldPoint(screenPosition) : Vector2.zero;
+        return _mainCamera != null ? (Vector2)_mainCamera.ScreenToWorldPoint(screenPosition) : Vector2.zero;
     }
 
     private float SmoothValue(float current, float target, float smooth)

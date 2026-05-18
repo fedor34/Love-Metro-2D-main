@@ -79,6 +79,7 @@ public class ManualPairingManagerTests
         Vector2 screenPos = _testCamera.WorldToScreenPoint(new Vector3(50f, 50f, 0f));
 
         Assert.IsFalse(_manager.HandleClick(screenPos));
+        Assert.AreEqual(16, GetPrivateField<Collider2D[]>(_manager, "_overlapHits").Length);
     }
 
     [Test]
@@ -212,6 +213,25 @@ public class ManualPairingManagerTests
     }
 
     [Test]
+    public void CollectClickedPassengers_GrowsNonAllocBufferForDenseClick()
+    {
+        var passengers = new System.Collections.Generic.List<Passenger>();
+        var clickedPassengers = new System.Collections.Generic.List<Passenger>();
+        for (int i = 0; i < 20; i++)
+            passengers.Add(CreateMockPassenger(false, new Vector3(i * 0.005f, 0f, 0f)));
+
+        Physics2D.SyncTransforms();
+
+        InvokePrivateMethod<object>(_manager, "CollectClickedPassengers", Vector2.zero, clickedPassengers);
+
+        Assert.AreEqual(passengers.Count, clickedPassengers.Count);
+        Assert.GreaterOrEqual(GetPrivateField<Collider2D[]>(_manager, "_overlapHits").Length, 32);
+
+        foreach (var passenger in passengers)
+            CleanupPassenger(passenger);
+    }
+
+    [Test]
     public void PairPassengers_AwardsScoreOnlyOnce()
     {
         var male = CreateMockPassenger(false, Vector3.zero);
@@ -275,6 +295,13 @@ public class ManualPairingManagerTests
         var field = obj.GetType().GetField(fieldName,
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         field?.SetValue(obj, value);
+    }
+
+    private static T GetPrivateField<T>(object obj, string fieldName)
+    {
+        var field = obj.GetType().GetField(fieldName,
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        return (T)field.GetValue(obj);
     }
 
     private static void SetStaticProperty(System.Type type, string propertyName, object value)

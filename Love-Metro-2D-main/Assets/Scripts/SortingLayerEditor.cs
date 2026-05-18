@@ -8,8 +8,10 @@ public class SortingLayerEditor : MonoBehaviour
 {
     [SerializeField] private SortingLayer _wandererLayer;
     private PassangersContainer _container;
-    private List<SpriteRenderer> _passangerSprites;
+    private readonly List<SpriteRenderer> _passangerSprites = new List<SpriteRenderer>();
+    private readonly List<float> _lastSortedY = new List<float>();
     private int _lastPassengerCount = 0;
+    private static readonly PassangerComparer Comparer = new PassangerComparer();
 
     private void Start()
     {
@@ -20,10 +22,12 @@ public class SortingLayerEditor : MonoBehaviour
     private void Update()
     {
         // Обновляем список только при изменении количества пассажиров
+        if (_container == null || _container.Passangers == null)
+            return;
+
         if (_container.Passangers.Count != _lastPassengerCount)
         {
             UpdatePassangerSprites();
-            _lastPassengerCount = _container.Passangers.Count;
         }
         
         SortDepth();
@@ -36,7 +40,8 @@ public class SortingLayerEditor : MonoBehaviour
 
     private void UpdatePassangerSprites()
     {
-        _passangerSprites = new List<SpriteRenderer>();
+        _passangerSprites.Clear();
+        _lastSortedY.Clear();
         if (_container != null && _container.Passangers != null)
         {
             foreach (Passenger p in _container.Passangers)
@@ -50,6 +55,8 @@ public class SortingLayerEditor : MonoBehaviour
                     }
                 }
             }
+
+            _lastPassengerCount = _container.Passangers.Count;
         }
     }
 
@@ -62,14 +69,19 @@ public class SortingLayerEditor : MonoBehaviour
         }
 
         // Удаляем null объекты из списка
-        _passangerSprites.RemoveAll(sprite => sprite == null);
+        bool needsSort = RemoveMissingSprites();
 
         if (_passangerSprites.Count == 0)
         {
+            _lastSortedY.Clear();
             return;
         }
 
-        _passangerSprites.Sort(new PassangerComparer());
+        needsSort |= HaveSpritePositionsChanged();
+        if (!needsSort)
+            return;
+
+        _passangerSprites.Sort(Comparer);
 
         for (int i = 0; i < _passangerSprites.Count; i++)
         {
@@ -78,9 +90,49 @@ public class SortingLayerEditor : MonoBehaviour
                 _passangerSprites[i].sortingOrder = i;
             }
         }
+
+        StoreSortedPositions();
     }
 
-    class PassangerComparer : IComparer<SpriteRenderer>
+    private bool RemoveMissingSprites()
+    {
+        bool removed = false;
+        for (int i = _passangerSprites.Count - 1; i >= 0; i--)
+        {
+            SpriteRenderer sprite = _passangerSprites[i];
+            if (sprite != null && sprite)
+                continue;
+
+            _passangerSprites.RemoveAt(i);
+            removed = true;
+        }
+
+        return removed;
+    }
+
+    private bool HaveSpritePositionsChanged()
+    {
+        if (_lastSortedY.Count != _passangerSprites.Count)
+            return true;
+
+        for (int i = 0; i < _passangerSprites.Count; i++)
+        {
+            SpriteRenderer sprite = _passangerSprites[i];
+            if (sprite == null || !Mathf.Approximately(sprite.transform.position.y, _lastSortedY[i]))
+                return true;
+        }
+
+        return false;
+    }
+
+    private void StoreSortedPositions()
+    {
+        _lastSortedY.Clear();
+        for (int i = 0; i < _passangerSprites.Count; i++)
+            _lastSortedY.Add(_passangerSprites[i] != null ? _passangerSprites[i].transform.position.y : float.NaN);
+    }
+
+    private class PassangerComparer : IComparer<SpriteRenderer>
     {
         public int Compare(SpriteRenderer x, SpriteRenderer y)
         {

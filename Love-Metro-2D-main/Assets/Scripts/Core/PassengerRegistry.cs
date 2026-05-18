@@ -13,6 +13,8 @@ public class PassengerRegistry : MonoBehaviour, LoveMetro.Core.IPassengerRegistr
     private readonly List<Passenger> _males = new List<Passenger>();
     private readonly List<Passenger> _females = new List<Passenger>();
     private readonly List<Passenger> _singles = new List<Passenger>();
+    private readonly Dictionary<Vector2Int, List<Passenger>> _spatialBuckets = new Dictionary<Vector2Int, List<Passenger>>();
+    private readonly Dictionary<Passenger, int> _registrationOrder = new Dictionary<Passenger, int>();
 
     // Публичные readonly свойства для доступа к спискам
     public IReadOnlyList<Passenger> AllPassengers => _allPassengers;
@@ -25,7 +27,11 @@ public class PassengerRegistry : MonoBehaviour, LoveMetro.Core.IPassengerRegistr
 
     // Периодическая очистка null-ссылок
     [SerializeField] private float _cleanupInterval = 2f;
+    [SerializeField] private float _spatialCellSize = 2f;
     private float _nextCleanupTime = 0f;
+    private int _lastSpatialRebuildFrame = -1;
+    private int _nextRegistrationOrder;
+    private bool _spatialIndexDirty = true;
 
     private void Awake()
     {
@@ -65,8 +71,10 @@ public class PassengerRegistry : MonoBehaviour, LoveMetro.Core.IPassengerRegistr
             return;
 
         _allPassengers.Add(passenger);
+        _registrationOrder[passenger] = _nextRegistrationOrder++;
         GetGenderList(passenger).Add(passenger);
         SetSingleMembership(passenger, !passenger.IsInCouple);
+        MarkSpatialIndexDirty();
     }
 
     /// <summary>
@@ -80,7 +88,9 @@ public class PassengerRegistry : MonoBehaviour, LoveMetro.Core.IPassengerRegistr
         _allPassengers.Remove(passenger);
         _males.Remove(passenger);
         _females.Remove(passenger);
+        _registrationOrder.Remove(passenger);
         SetSingleMembership(passenger, false);
+        MarkSpatialIndexDirty();
     }
 
     /// <summary>
@@ -149,21 +159,35 @@ public class PassengerRegistry : MonoBehaviour, LoveMetro.Core.IPassengerRegistr
     {
         if (self == null) return null;
 
-        var targetList = self.IsFemale ? _males : _females;
+        EnsureSpatialIndexCurrent();
+
         Passenger best = null;
         float bestDistSq = radius * radius;
+        float searchRadius = Mathf.Abs(radius);
         Vector3 selfPos = self.transform.position;
 
-        for (int i = 0; i < targetList.Count; i++)
+        Vector2Int minCell = PositionToCell(selfPos - new Vector3(searchRadius, searchRadius, 0f));
+        Vector2Int maxCell = PositionToCell(selfPos + new Vector3(searchRadius, searchRadius, 0f));
+        for (int x = minCell.x; x <= maxCell.x; x++)
         {
-            var p = targetList[i];
-            if (p == null || p == self || p.IsInCouple) continue;
-
-            float distSq = (p.transform.position - selfPos).sqrMagnitude;
-            if (distSq < bestDistSq)
+            for (int y = minCell.y; y <= maxCell.y; y++)
             {
-                bestDistSq = distSq;
-                best = p;
+                if (!_spatialBuckets.TryGetValue(new Vector2Int(x, y), out List<Passenger> bucket))
+                    continue;
+
+                for (int i = 0; i < bucket.Count; i++)
+                {
+                    Passenger p = bucket[i];
+                    if (p == null || p == self || p.IsInCouple || p.IsFemale == self.IsFemale)
+                        continue;
+
+                    float distSq = (p.transform.position - selfPos).sqrMagnitude;
+                    if (distSq < bestDistSq)
+                    {
+                        bestDistSq = distSq;
+                        best = p;
+                    }
+                }
             }
         }
 
@@ -181,21 +205,35 @@ public class PassengerRegistry : MonoBehaviour, LoveMetro.Core.IPassengerRegistr
         results.Clear();
         if (self == null) return;
 
-        var targetList = self.IsFemale ? _females : _males;
+        EnsureSpatialIndexCurrent();
+
         float radiusSq = radius * radius;
+        float searchRadius = Mathf.Abs(radius);
         Vector3 selfPos = self.transform.position;
 
-        for (int i = 0; i < targetList.Count; i++)
+        Vector2Int minCell = PositionToCell(selfPos - new Vector3(searchRadius, searchRadius, 0f));
+        Vector2Int maxCell = PositionToCell(selfPos + new Vector3(searchRadius, searchRadius, 0f));
+        for (int x = minCell.x; x <= maxCell.x; x++)
         {
-            var p = targetList[i];
-            if (p == null || p == self) continue;
-
-            float distSq = (p.transform.position - selfPos).sqrMagnitude;
-            if (distSq < radiusSq)
+            for (int y = minCell.y; y <= maxCell.y; y++)
             {
-                results.Add(p);
+                if (!_spatialBuckets.TryGetValue(new Vector2Int(x, y), out List<Passenger> bucket))
+                    continue;
+
+                for (int i = 0; i < bucket.Count; i++)
+                {
+                    Passenger p = bucket[i];
+                    if (p == null || p == self || p.IsFemale != self.IsFemale)
+                        continue;
+
+                    float distSq = (p.transform.position - selfPos).sqrMagnitude;
+                    if (distSq < radiusSq)
+                        results.Add(p);
+                }
             }
         }
+
+        results.Sort(CompareRegistrationOrder);
     }
 
     /// <summary>
@@ -217,7 +255,9 @@ public class PassengerRegistry : MonoBehaviour, LoveMetro.Core.IPassengerRegistr
         _males.RemoveAll(IsMissingPassenger);
         _females.RemoveAll(IsMissingPassenger);
         _singles.RemoveAll(IsMissingPassenger);
+        RemoveMissingRegistrationOrderEntries();
         RecalculateSinglesCounts();
+        MarkSpatialIndexDirty();
     }
 
     /// <summary>
@@ -229,12 +269,107 @@ public class PassengerRegistry : MonoBehaviour, LoveMetro.Core.IPassengerRegistr
         _males.Clear();
         _females.Clear();
         _singles.Clear();
+        _spatialBuckets.Clear();
+        _registrationOrder.Clear();
         MaleSinglesCount = 0;
         FemaleSinglesCount = 0;
+        _nextRegistrationOrder = 0;
+        MarkSpatialIndexDirty();
     }
 
     private static bool IsMissingPassenger(Passenger passenger)
     {
         return passenger == null || !passenger;
+    }
+
+    private void EnsureSpatialIndexCurrent()
+    {
+        if (!Application.isPlaying)
+        {
+            RebuildSpatialIndex();
+            return;
+        }
+
+        if (!_spatialIndexDirty && _lastSpatialRebuildFrame == Time.frameCount)
+            return;
+
+        RebuildSpatialIndex();
+    }
+
+    private void RebuildSpatialIndex()
+    {
+        _spatialBuckets.Clear();
+        float safeCellSize = GetSafeSpatialCellSize();
+
+        for (int i = 0; i < _allPassengers.Count; i++)
+        {
+            Passenger passenger = _allPassengers[i];
+            if (IsMissingPassenger(passenger))
+                continue;
+
+            Vector2Int cell = PositionToCell(passenger.transform.position, safeCellSize);
+            if (!_spatialBuckets.TryGetValue(cell, out List<Passenger> bucket))
+            {
+                bucket = new List<Passenger>();
+                _spatialBuckets[cell] = bucket;
+            }
+
+            bucket.Add(passenger);
+        }
+
+        _spatialIndexDirty = false;
+        _lastSpatialRebuildFrame = Time.frameCount;
+    }
+
+    private Vector2Int PositionToCell(Vector3 position)
+    {
+        return PositionToCell(position, GetSafeSpatialCellSize());
+    }
+
+    private static Vector2Int PositionToCell(Vector3 position, float cellSize)
+    {
+        return new Vector2Int(
+            Mathf.FloorToInt(position.x / cellSize),
+            Mathf.FloorToInt(position.y / cellSize));
+    }
+
+    private float GetSafeSpatialCellSize()
+    {
+        return Mathf.Max(0.1f, _spatialCellSize);
+    }
+
+    private void MarkSpatialIndexDirty()
+    {
+        _spatialIndexDirty = true;
+    }
+
+    private int CompareRegistrationOrder(Passenger first, Passenger second)
+    {
+        int firstOrder = first != null && _registrationOrder.TryGetValue(first, out int orderA)
+            ? orderA
+            : int.MaxValue;
+        int secondOrder = second != null && _registrationOrder.TryGetValue(second, out int orderB)
+            ? orderB
+            : int.MaxValue;
+        return firstOrder.CompareTo(secondOrder);
+    }
+
+    private void RemoveMissingRegistrationOrderEntries()
+    {
+        List<Passenger> missingPassengers = null;
+        foreach (Passenger passenger in _registrationOrder.Keys)
+        {
+            if (!IsMissingPassenger(passenger))
+                continue;
+
+            missingPassengers ??= new List<Passenger>();
+            missingPassengers.Add(passenger);
+        }
+
+        if (missingPassengers == null)
+            return;
+
+        for (int i = 0; i < missingPassengers.Count; i++)
+            _registrationOrder.Remove(missingPassengers[i]);
     }
 }

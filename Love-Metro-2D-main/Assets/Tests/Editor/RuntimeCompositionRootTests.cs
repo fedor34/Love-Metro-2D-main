@@ -15,6 +15,7 @@ public class RuntimeCompositionRootTests
         DestroyAll<FieldEffectSystem>();
         DestroyAll<ClickDirectionManager>();
         DestroyAll<ManualPairingManager>();
+        DestroyAll<TrainManager>();
         DestroyAll<EventSystem>();
     }
 
@@ -28,6 +29,7 @@ public class RuntimeCompositionRootTests
         DestroyAll<FieldEffectSystem>();
         DestroyAll<ClickDirectionManager>();
         DestroyAll<ManualPairingManager>();
+        DestroyAll<TrainManager>();
         DestroyAll<EventSystem>();
     }
 
@@ -75,6 +77,35 @@ public class RuntimeCompositionRootTests
         }
     }
 
+    [Test]
+    public void SceneObjectIndex_CoreDefaults_DoesNotCollectHeavySceneArrays()
+    {
+        GameObject spriteObject = new GameObject("HeavySpriteRenderer");
+        GameObject parallaxObject = new GameObject("HeavyParallaxLayer");
+        GameObject markerObject = new GameObject("HeavyMonoBehaviourMarker");
+
+        try
+        {
+            spriteObject.AddComponent<SpriteRenderer>();
+            parallaxObject.AddComponent<SpriteRenderer>();
+            parallaxObject.AddComponent<ParallaxLayer>();
+            markerObject.AddComponent<LightweightCaptureMarker>();
+
+            SceneObjectIndex index = SceneObjectIndex.CaptureActiveScene(RuntimeCompositionOptions.CoreDefaults);
+
+            Assert.IsNull(index.SpriteRenderers);
+            Assert.IsNull(index.ParallaxLayers);
+            Assert.IsNull(index.MonoBehaviours);
+            Assert.IsNull(index.Transforms);
+        }
+        finally
+        {
+            Object.DestroyImmediate(spriteObject);
+            Object.DestroyImmediate(parallaxObject);
+            Object.DestroyImmediate(markerObject);
+        }
+    }
+
     private static void DestroyAll<T>() where T : Component
     {
         foreach (T component in Object.FindObjectsOfType<T>())
@@ -82,5 +113,9 @@ public class RuntimeCompositionRootTests
             if (component != null)
                 Object.DestroyImmediate(component.gameObject);
         }
+    }
+
+    private sealed class LightweightCaptureMarker : MonoBehaviour
+    {
     }
 }

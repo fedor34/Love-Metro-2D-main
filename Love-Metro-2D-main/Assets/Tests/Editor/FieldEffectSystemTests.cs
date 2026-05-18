@@ -72,6 +72,53 @@ public class FieldEffectSystemTests
         Assert.AreEqual(0, target.ExitCount);
     }
 
+    [Test]
+    public void UpdateEffects_DoesNotZoneCheckDistantIndexedEffects()
+    {
+        var target = CreateTarget(Vector3.zero);
+        var nearbyEffect = CreateEffect("Nearby", Vector3.zero, 10f);
+        var distantEffect = CreateEffect("Distant", new Vector3(100f, 0f, 0f), 1f);
+
+        _system.RegisterTarget(target);
+        _system.RegisterEffect(nearbyEffect);
+        _system.RegisterEffect(distantEffect);
+
+        InvokePrivateMethod<object>(_system, "UpdateEffects");
+
+        Assert.Greater(nearbyEffect.ZoneCheckCount, 0);
+        Assert.AreEqual(0, distantEffect.ZoneCheckCount);
+    }
+
+    [Test]
+    public void UnregisterEffect_RemovesEffectFromSpatialIndex()
+    {
+        var effect = CreateEffect("Nearby", Vector3.zero, 10f);
+
+        _system.RegisterEffect(effect);
+        Assert.Contains(effect, _system.GetEffectsAtPosition(Vector3.zero));
+
+        _system.UnregisterEffect(effect);
+
+        CollectionAssert.DoesNotContain(_system.GetEffectsAtPosition(Vector3.zero), effect);
+    }
+
+    [Test]
+    public void UpdateEffects_ReindexesMovedEffect()
+    {
+        var target = CreateTarget(Vector3.zero);
+        var effect = CreateEffect("Mover", new Vector3(100f, 0f, 0f), 1f);
+
+        _system.RegisterTarget(target);
+        _system.RegisterEffect(effect);
+        InvokePrivateMethod<object>(_system, "UpdateEffects");
+        Assert.AreEqual(0, effect.ApplyCount);
+
+        effect.transform.position = Vector3.zero;
+        InvokePrivateMethod<object>(_system, "UpdateEffects");
+
+        Assert.AreEqual(1, effect.ApplyCount);
+    }
+
     private static void ResetFieldEffectSystemStatics()
     {
         typeof(FieldEffectSystem)
@@ -117,6 +164,7 @@ internal sealed class FieldEffectSystemTestEffect : MonoBehaviour, IFieldEffect
 
     public int ApplyCount { get; private set; }
     public int RemoveCount { get; private set; }
+    public int ZoneCheckCount { get; private set; }
 
     public void Configure(Vector3 position, float radius)
     {
@@ -136,6 +184,7 @@ internal sealed class FieldEffectSystemTestEffect : MonoBehaviour, IFieldEffect
 
     public bool IsInEffectZone(Vector3 targetPosition)
     {
+        ZoneCheckCount++;
         return Vector3.Distance(transform.position, targetPosition) <= _data.radius;
     }
 

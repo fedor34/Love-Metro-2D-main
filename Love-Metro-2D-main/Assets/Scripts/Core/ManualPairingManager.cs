@@ -16,6 +16,10 @@ public class ManualPairingManager : MonoBehaviour, LoveMetro.Input.IManualPairin
     [SerializeField] private float _verticalSearchFactor = 2.0f;
 
     private readonly List<Passenger> _clickedPassengers = new List<Passenger>(4);
+    private readonly HashSet<Passenger> _clickedPassengerSet = new HashSet<Passenger>();
+    private Collider2D[] _overlapHits = new Collider2D[16];
+
+    private const int MaxOverlapHits = 128;
 
     private void Awake()
     {
@@ -59,18 +63,37 @@ public class ManualPairingManager : MonoBehaviour, LoveMetro.Input.IManualPairin
     private void CollectClickedPassengers(Vector2 worldPos, List<Passenger> clickedPassengers)
     {
         clickedPassengers.Clear();
+        _clickedPassengerSet.Clear();
 
         Vector2 boxSize = new Vector2(_clickRadius * 2f, _clickRadius * 2f * _verticalSearchFactor);
-        Collider2D[] hits = Physics2D.OverlapBoxAll(worldPos, boxSize, 0f);
-        for (int i = 0; i < hits.Length; i++)
+        int hitCount = CollectOverlapHits(worldPos, boxSize);
+        for (int i = 0; i < hitCount; i++)
         {
-            var hit = hits[i];
-            if (!hit.TryGetComponent<Passenger>(out var passenger))
+            Collider2D hit = _overlapHits[i];
+            if (hit == null || !hit.TryGetComponent<Passenger>(out var passenger))
                 continue;
 
-            if (!clickedPassengers.Contains(passenger))
+            if (_clickedPassengerSet.Add(passenger))
                 clickedPassengers.Add(passenger);
         }
+    }
+
+    private int CollectOverlapHits(Vector2 worldPos, Vector2 boxSize)
+    {
+        int hitCount;
+        do
+        {
+            hitCount = Physics2D.OverlapBoxNonAlloc(worldPos, boxSize, 0f, _overlapHits);
+            if (hitCount < _overlapHits.Length || _overlapHits.Length >= MaxOverlapHits)
+                return hitCount;
+
+            int nextSize = Mathf.Min(_overlapHits.Length * 2, MaxOverlapHits);
+            if (nextSize == _overlapHits.Length)
+                return hitCount;
+
+            _overlapHits = new Collider2D[nextSize];
+        }
+        while (true);
     }
 
     private bool AttemptOverlapPairing(List<Passenger> group)
@@ -107,8 +130,8 @@ public class ManualPairingManager : MonoBehaviour, LoveMetro.Input.IManualPairin
         if (p1 == null || !p1.CanMatchWith(p2))
             return false;
 
-        float dist = Vector2.Distance(p1.transform.position, p2.transform.position);
-        return dist <= _maxPairingDistance;
+        float maxPairingDistanceSq = _maxPairingDistance * _maxPairingDistance;
+        return ((Vector2)(p1.transform.position - p2.transform.position)).sqrMagnitude <= maxPairingDistanceSq;
     }
 
     private void PairPassengers(Passenger p1, Passenger p2)

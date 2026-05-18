@@ -111,7 +111,6 @@ public class RefactoringAcceptanceTests
         {
             NormalizeAssetPath(Path.Combine(scriptsRoot, "Runtime", "Core", "RuntimeCompositionRoot.cs")),
             NormalizeAssetPath(Path.Combine(scriptsRoot, "Runtime", "Core", "SceneObjectIndex.cs")),
-            NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "AutoAttachCollisionDebugger.cs")),
             NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "FindAllBoundaries.cs")),
             NormalizeAssetPath(Path.Combine(scriptsRoot, "Core", "LayerCollisionMatrixDecoder.cs")),
             NormalizeAssetPath(Path.Combine(scriptsRoot, "UI", "MenuInitializer.cs")),
@@ -130,6 +129,47 @@ public class RefactoringAcceptanceTests
 
             Assert.IsTrue(approved.Contains(normalized), $"{normalized} uses runtime scene discovery outside an approved installer/diagnostic file.");
         }
+    }
+
+    [Test]
+    public void RuntimeCompositionRoot_DoesNotUseFullSceneSnapshot()
+    {
+        string scriptsRoot = Path.Combine(Application.dataPath, "Scripts");
+        string sceneObjectIndex = File.ReadAllText(Path.Combine(scriptsRoot, "Runtime", "Core", "SceneObjectIndex.cs"));
+        string compositionRoot = File.ReadAllText(Path.Combine(scriptsRoot, "Runtime", "Core", "RuntimeCompositionRoot.cs"));
+
+        Assert.IsFalse(sceneObjectIndex.Contains("FindObjectsOfType<MonoBehaviour>"));
+        Assert.IsFalse(sceneObjectIndex.Contains("FindObjectsByType<MonoBehaviour>"));
+        Assert.IsFalse(sceneObjectIndex.Contains("FindObjectsOfType<Transform>"));
+        Assert.IsFalse(compositionRoot.Contains("RegisterSceneComponents(index.MonoBehaviours)"));
+    }
+
+    [Test]
+    public void StartupDiagnostics_DoNotAutoRunOnSceneLoad()
+    {
+        string scriptsRoot = Path.Combine(Application.dataPath, "Scripts");
+        string[] diagnosticFiles =
+        {
+            Path.Combine(scriptsRoot, "Core", "FindAllBoundaries.cs"),
+            Path.Combine(scriptsRoot, "Core", "LayerCollisionMatrixDecoder.cs"),
+            Path.Combine(scriptsRoot, "Core", "StartupLog.cs")
+        };
+
+        foreach (string file in diagnosticFiles)
+        {
+            string source = File.ReadAllText(file);
+            Assert.IsFalse(source.Contains("RuntimeInitializeOnLoadMethod"), $"{file} auto-runs diagnostics on scene load.");
+        }
+    }
+
+    [Test]
+    public void SceneObjectIndex_UsesRuntimeServicesBeforeSceneDiscovery()
+    {
+        string path = Path.Combine(Application.dataPath, "Scripts", "Runtime", "Core", "SceneObjectIndex.cs");
+        string source = File.ReadAllText(path);
+
+        StringAssert.Contains("RuntimeServices.Instance", source);
+        StringAssert.Contains("ResolveService<", source);
     }
 
     [Test]

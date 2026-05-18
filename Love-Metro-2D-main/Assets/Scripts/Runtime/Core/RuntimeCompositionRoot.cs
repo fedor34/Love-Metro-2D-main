@@ -129,7 +129,7 @@ namespace LoveMetro.Core
 
         private SceneObjectIndex Bind(RuntimeCompositionOptions options)
         {
-            SceneObjectIndex index = SceneObjectIndex.CaptureActiveScene();
+            SceneObjectIndex index = SceneObjectIndex.CaptureActiveScene(options);
             EnsureCoreComponents(index, options);
             RegisterServices(index);
             ConfigureScene(index);
@@ -203,7 +203,6 @@ namespace LoveMetro.Core
                 trainEvents,
                 stationFlow,
                 RuntimeServices.Instance.ScoreService);
-            index.FieldEffectSystem?.RegisterSceneComponents(index.MonoBehaviours);
         }
 
         private void EnsureBackgroundScroller(SceneObjectIndex index, RuntimeCompositionOptions options)

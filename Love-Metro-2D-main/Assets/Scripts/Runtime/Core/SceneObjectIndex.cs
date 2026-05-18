@@ -27,29 +27,48 @@ namespace LoveMetro.Core
 
         public static SceneObjectIndex CaptureActiveScene()
         {
-            return new SceneObjectIndex
+            return CaptureActiveScene(RuntimeCompositionOptions.CoreDefaults);
+        }
+
+        public static SceneObjectIndex CaptureActiveScene(RuntimeCompositionOptions options)
+        {
+            RuntimeServices services = RuntimeServices.Instance;
+            SceneObjectIndex index = new SceneObjectIndex
             {
-                PassengerRegistry = Object.FindObjectOfType<PassengerRegistry>(),
-                CouplesManager = Object.FindObjectOfType<CouplesManager>(),
-                FieldEffectSystem = Object.FindObjectOfType<FieldEffectSystem>(),
-                ClickDirectionManager = Object.FindObjectOfType<ClickDirectionManager>(),
-                ManualPairingManager = Object.FindObjectOfType<ManualPairingManager>(),
-                TrainManager = Object.FindObjectOfType<TrainManager>(),
-                PassangerSpawner = Object.FindObjectOfType<PassangerSpawner>(),
-                PassangersContainer = Object.FindObjectOfType<PassangersContainer>(),
-                ParallaxEffect = Object.FindObjectOfType<ParallaxEffect>(),
-                SimpleBackgroundScroller = Object.FindObjectOfType<SimpleBackgroundScroller>(),
-                BackgroundGroupScroller = Object.FindObjectOfType<BackgroundGroupScroller>(),
-                ParallaxMaterialDriver = Object.FindObjectOfType<ParallaxMaterialDriver>(),
-                BackgroundMaterialOverride = Object.FindObjectOfType<BackgroundMaterialOverride>(),
-                EnsureParallaxLayers = Object.FindObjectOfType<EnsureParallaxLayers>(),
-                InertiaArrowHud = Object.FindObjectOfType<InertiaArrowHUD>(),
-                ScoreCounter = Object.FindObjectOfType<ScoreCounter>(),
-                SpriteRenderers = Object.FindObjectsOfType<SpriteRenderer>(true),
-                ParallaxLayers = Object.FindObjectsOfType<ParallaxLayer>(true),
-                MonoBehaviours = Object.FindObjectsOfType<MonoBehaviour>(true),
-                Transforms = Object.FindObjectsOfType<Transform>(true)
+                PassengerRegistry = ResolveService<PassengerRegistry>(services.PassengerRegistry) ?? FindFirst<PassengerRegistry>(),
+                CouplesManager = FindFirst<CouplesManager>(),
+                FieldEffectSystem = ResolveService<FieldEffectSystem>(services.FieldEffectSystem) ?? FindFirst<FieldEffectSystem>(),
+                ClickDirectionManager = ResolveService<ClickDirectionManager>(services.InputIntentProvider) ?? FindFirst<ClickDirectionManager>(),
+                ManualPairingManager = ResolveService<ManualPairingManager>(services.ManualPairingService) ?? FindFirst<ManualPairingManager>(),
+                TrainManager = ResolveService<TrainManager>(services.TrainMotionEvents) ??
+                    ResolveService<TrainManager>(services.StationFlowService) ??
+                    FindFirst<TrainManager>(),
+                PassangerSpawner = FindFirst<PassangerSpawner>(),
+                PassangersContainer = FindFirst<PassangersContainer>(),
+                ParallaxEffect = FindFirst<ParallaxEffect>(),
+                SimpleBackgroundScroller = FindFirst<SimpleBackgroundScroller>(),
+                BackgroundGroupScroller = FindFirst<BackgroundGroupScroller>(),
+                ParallaxMaterialDriver = FindFirst<ParallaxMaterialDriver>(),
+                BackgroundMaterialOverride = FindFirst<BackgroundMaterialOverride>(),
+                EnsureParallaxLayers = FindFirst<EnsureParallaxLayers>(),
+                InertiaArrowHud = FindFirst<InertiaArrowHUD>(),
+                ScoreCounter = ResolveService<ScoreCounter>(services.ScoreService) ?? FindFirst<ScoreCounter>()
             };
+
+            index.CaptureHeavyArrays(options);
+            return index;
+        }
+
+        internal void CaptureHeavyArrays(RuntimeCompositionOptions options)
+        {
+            if (NeedsSpriteRenderers(options))
+                SpriteRenderers = FindAll<SpriteRenderer>();
+
+            if (ParallaxEffect != null)
+                ParallaxLayers = FindAll<ParallaxLayer>();
+
+            if (options.EnsureBackgroundScroller && BackgroundGroupScroller != null)
+                Transforms = FindAll<Transform>();
         }
 
         public Transform ResolveTransformByName(string objectName)
@@ -92,6 +111,30 @@ namespace LoveMetro.Core
             }
 
             return null;
+        }
+
+        private static bool NeedsSpriteRenderers(RuntimeCompositionOptions options)
+        {
+            return options.EnsureBackgroundScroller ||
+                options.EnsureParallaxMaterialDriver ||
+                options.EnsureBackgroundMaterialOverride;
+        }
+
+        private static T FindFirst<T>() where T : Object
+        {
+            T[] objects = Object.FindObjectsByType<T>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            return objects.Length > 0 ? objects[0] : null;
+        }
+
+        private static T ResolveService<T>(object service) where T : Object
+        {
+            T component = service as T;
+            return component != null ? component : null;
+        }
+
+        private static T[] FindAll<T>() where T : Object
+        {
+            return Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         }
     }
 }

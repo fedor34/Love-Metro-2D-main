@@ -43,6 +43,31 @@ public class RuntimeSmokeTests
     }
 
     [UnityTest]
+    public IEnumerator MainMenu_Play_LoadsScene2WithBackgroundScroller()
+    {
+        SceneManager.LoadScene("MainMenu");
+        yield return null;
+        yield return null;
+
+        MenuManager menuManager = Object.FindObjectOfType<MenuManager>();
+        Assert.IsNotNull(menuManager);
+
+        menuManager.OnPlayButtonClicked();
+
+        float deadline = Time.realtimeSinceStartup + 5f;
+        while (SceneManager.GetActiveScene().name != "Scene2" && Time.realtimeSinceStartup < deadline)
+            yield return null;
+
+        Assert.AreEqual("Scene2", SceneManager.GetActiveScene().name);
+
+        yield return null;
+        yield return null;
+
+        Assert.IsNotNull(Object.FindObjectOfType<TrainManager>());
+        Assert.IsNotNull(Object.FindObjectOfType<SimpleBackgroundScroller>());
+    }
+
+    [UnityTest]
     public IEnumerator WindForce_MovesPassengerIntoFlyingState()
     {
         GameBootstrap.EnsureRuntimeServices();
@@ -53,7 +78,6 @@ public class RuntimeSmokeTests
 
         passenger.Initiate(Vector2.right, train, null);
         passenger.ApplyFieldForce(Vector2.right * 10f, FieldEffectType.Wind);
-        yield return null;
 
         Assert.AreEqual("Flying", passenger.GetCurrentStateName());
 

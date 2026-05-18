@@ -8766,10 +8766,10 @@ MonoBehaviour:
   _turnSpeed: 0.6
   _maxSpeed: 0.3
   _minSpeed: 0.02
-  _acceleration: 0.05
+  _acceleration: 0.16
   _deceleration: 0.1
   _brakeDeceleration: 25
-  _startBoost: 8
+  _startBoost: 10
   _backGround: {fileID: 2114619397}
   _passangers: {fileID: 1577337117}
   _camera: {fileID: 519420032}

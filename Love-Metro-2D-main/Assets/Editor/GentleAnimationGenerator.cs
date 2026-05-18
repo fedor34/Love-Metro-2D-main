@@ -180,11 +180,15 @@ public static class GentleAnimationGenerator
             map[kv.Key.name] = kv.Key;
         }
         var overrides = new List<KeyValuePair<AnimationClip, AnimationClip>>();
+        var overriddenClips = new HashSet<AnimationClip>();
         void TrySet(string baseName, AnimationClip newClip)
         {
             if (newClip == null) return;
             if (map.TryGetValue(baseName, out var baseClip))
+            {
                 overrides.Add(new KeyValuePair<AnimationClip, AnimationClip>(baseClip, newClip));
+                overriddenClips.Add(baseClip);
+            }
         }
         TrySet("Standing", set.Standing);
         TrySet("Walking", set.Walking);
@@ -195,7 +199,7 @@ public static class GentleAnimationGenerator
         // Preserve other mappings
         foreach (var kv in pairs)
         {
-            if (overrides.Exists(p => p.Key == kv.Key)) continue;
+            if (overriddenClips.Contains(kv.Key)) continue;
             overrides.Add(kv); // keep original
         }
         aoc.ApplyOverrides(overrides);

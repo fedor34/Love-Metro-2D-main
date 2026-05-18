@@ -249,8 +249,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e5a06b2442c5464e8a62af42a5b72f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _movementThreshold: 0.1
-  _stopHoldSeconds: 0.9
+  _movementThreshold: 0.02
+  _stopHoldSeconds: 0.15
   _animSpeedMin: 0.8
   _animSpeedMax: 1.3
   _animSpeedSmoothing: 8

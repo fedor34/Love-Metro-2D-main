@@ -17,9 +17,9 @@ internal static class SettingsPanelLayout
         if (canvasWidth <= 1f || canvasHeight <= 1f)
             return;
 
-        float frameMarginX = Mathf.Clamp(canvasWidth * 0.035f, 28f, 90f);
-        float frameTop = Mathf.Clamp(canvasHeight * 0.025f, 18f, 44f);
-        float frameBottom = Mathf.Clamp(canvasHeight * 0.035f, 24f, 58f);
+        float frameMarginX = Mathf.Clamp(canvasWidth * 0.085f, 70f, 150f);
+        float frameTop = Mathf.Clamp(canvasHeight * 0.07f, 56f, 110f);
+        float frameBottom = Mathf.Clamp(canvasHeight * 0.09f, 70f, 130f);
         float frameWidth = canvasWidth - frameMarginX * 2f;
         float frameHeight = canvasHeight - frameTop - frameBottom;
         float scale = Mathf.Clamp(Mathf.Min(frameWidth / ReferenceWidth, frameHeight / ReferenceHeight), 0.68f, 1f);
@@ -37,15 +37,15 @@ internal static class SettingsPanelLayout
 
     private static void LayoutFrame(RectTransform frame, float width, float height, float scale)
     {
-        float pad = Mathf.Clamp(width * 0.02f, 22f, 34f);
-        float headerHeight = Mathf.Clamp(height * 0.105f, 68f, 96f);
-        float footerHeight = Mathf.Clamp(height * 0.075f, 54f, 72f);
-        float footerBottom = Mathf.Clamp(height * 0.028f, 20f, 34f);
-        float contentTop = headerHeight + Mathf.Clamp(height * 0.03f, 20f, 32f);
-        float contentBottom = footerHeight + footerBottom + Mathf.Clamp(height * 0.028f, 22f, 34f);
+        float pad = Mathf.Clamp(width * 0.018f, 18f, 30f);
+        float headerHeight = Mathf.Clamp(height * 0.095f, 58f, 86f);
+        float footerHeight = Mathf.Clamp(height * 0.068f, 48f, 64f);
+        float footerBottom = Mathf.Clamp(height * 0.035f, 24f, 42f);
+        float contentTop = headerHeight + Mathf.Clamp(height * 0.025f, 16f, 26f);
+        float contentBottom = footerHeight + footerBottom + Mathf.Clamp(height * 0.035f, 24f, 42f);
         float contentHeight = Mathf.Max(360f, height - contentTop - contentBottom);
-        float navWidth = Mathf.Clamp(width * 0.205f, 195f, 300f);
-        float gap = Mathf.Clamp(width * 0.018f, 18f, 30f);
+        float navWidth = Mathf.Clamp(width * 0.18f, 150f, 245f);
+        float gap = Mathf.Clamp(width * 0.016f, 14f, 24f);
 
         SetStretch(Find(frame, "FrameBackground"), 8f, 8f, 8f, 8f);
         SetStretch(Find(frame, "FrameShadow"), -10f, -10f, -10f, -10f);
@@ -73,8 +73,8 @@ internal static class SettingsPanelLayout
             return;
 
         string[] names = { "SoundTab", "GraphicsTab", "ControlsTab", "GameTab" };
-        float tabHeight = Mathf.Clamp(height * 0.15f, 70f, 98f);
-        float gap = Mathf.Clamp(height * 0.055f, 24f, 42f);
+        float tabHeight = Mathf.Clamp(height * 0.14f, 58f, 86f);
+        float gap = Mathf.Clamp(height * 0.047f, 18f, 34f);
         float y = 0f;
 
         foreach (string name in names)
@@ -83,8 +83,8 @@ internal static class SettingsPanelLayout
             SetTopLeft(tab, 0f, y, width, tabHeight);
             SetStretch(Find(tab, "Shadow"), 8f, -8f, 8f, -8f);
             SetStretch(Find(tab, "Body"), 8f, 8f, 8f, 8f);
-            SetTopLeft(Find(tab, "LabelShadow"), 82f * scale + 4f, (tabHeight - 36f * scale) * 0.5f + 4f, width - 95f * scale, 38f * scale);
-            SetTopLeft(Find(tab, "Label"), 82f * scale, (tabHeight - 36f * scale) * 0.5f, width - 95f * scale, 38f * scale);
+            SetTopLeft(Find(tab, "LabelShadow"), 62f * scale + 4f, (tabHeight - 36f * scale) * 0.5f + 4f, width - 72f * scale, 38f * scale);
+            SetTopLeft(Find(tab, "Label"), 62f * scale, (tabHeight - 36f * scale) * 0.5f, width - 72f * scale, 38f * scale);
             y += tabHeight + gap;
         }
     }
@@ -270,9 +270,9 @@ internal static class SettingsPanelLayout
 
     private static void LayoutFooter(RectTransform frame, float width, float height, float bottom, float pad, float gap, float scale)
     {
-        float buttonGap = Mathf.Clamp(width * 0.045f, 24f, 58f);
-        float buttonWidth = Mathf.Min(410f, (width - pad * 2f - buttonGap * 2f) / 3f);
-        float defaultsWidth = Mathf.Min(500f, buttonWidth + 70f);
+        float buttonGap = Mathf.Clamp(width * 0.035f, 18f, 44f);
+        float buttonWidth = Mathf.Min(350f, (width - pad * 2f - buttonGap * 2f) / 3f);
+        float defaultsWidth = Mathf.Min(430f, buttonWidth + 56f);
         buttonWidth = Mathf.Min(buttonWidth, (width - pad * 2f - buttonGap * 2f - (defaultsWidth - buttonWidth)) / 3f);
 
         SetBottomLeft(Find(frame, "BackButton"), pad, bottom, buttonWidth, height);
